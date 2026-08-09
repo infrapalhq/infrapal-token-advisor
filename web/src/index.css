@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+/*
+ * ccotel design tokens (light theme). Six named hex values plus a secondary
+ * categorical palette used only to distinguish span types in the waterfall.
+ * Deliberately not a straight hue-inversion of the prior dark theme: signal/
+ * fault/cat-* are darkened relative to their dark-mode values since those
+ * were tuned for contrast against a near-black page and read as too light
+ * for body/link text on a white one. See HANDOFF.md "Milestone 6 recap" for
+ * the original dark-theme rationale this supersedes.
+ */
+@theme {
+  --color-ink: #1c1e24;
+  --color-void: #f1f1ee;
+  --color-panel: #ffffff;
+  --color-wire: #dcdcd7;
+  --color-signal: #b45309;
+  --color-fault: #dc2626;
+
+  /* Categorical palette: span-type distinction in the waterfall only. */
+  --color-cat-tool: #0284c7;
+  --color-cat-llm: #7c3aed;
+  --color-cat-subagent: #059669;
+  --color-cat-mcp: #db2777;
+  --color-cat-neutral: #64748b;
+
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+/* Diagonal-hatch texture for blocked_on_user spans in the waterfall. */
+.hatch-fault {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-fault) 0,
+    var(--color-fault) 3px,
+    transparent 3px,
+    transparent 7px
+  );
+}

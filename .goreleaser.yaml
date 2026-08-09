@@ -1,0 +1,59 @@
+version: 2
+
+project_name: ccotel
+
+before:
+  hooks:
+    - go mod tidy
+    - ./scripts/build-web.sh
+
+builds:
+  - id: ccotel
+    main: ./cmd/ccotel
+    binary: ccotel
+    # modernc.org/sqlite is pure Go, so CGO stays off — one static binary
+    # per platform, no libsqlite3 to link against on the build or install
+    # machine.
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/ShamikMukhopadhyay/ccotel/internal/cli.Version={{.Version}}
+
+archives:
+  - id: ccotel
+    formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+brews:
+  - name: ccotel
+    repository:
+      owner: ShamikMukhopadhyay
+      name: homebrew-tap
+    directory: Formula
+    homepage: "https://github.com/ShamikMukhopadhyay/ccotel"
+    description: "Local-only OTLP receiver, SQLite store, and dashboard for Claude Code telemetry"
+    license: "MIT"
+    install: |
+      bin.install "ccotel"
+    test: |
+      assert_match "ccotel", shell_output("#{bin}/ccotel version")
