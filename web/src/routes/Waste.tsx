@@ -9,8 +9,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { PageShell } from "../components/PageShell";
+import { InsightBanner } from "../components/InsightBanner";
 import {
   getView,
+  getInsights,
+  type Insight,
   type WastedSpend,
   type PermissionFriction,
 } from "../lib/api";
@@ -26,6 +29,7 @@ function toolLabel(row: PermissionFriction): string {
 export default function Waste() {
   const [wasted, setWasted] = useState<WastedSpend[]>([]);
   const [friction, setFriction] = useState<PermissionFriction[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -42,6 +46,12 @@ export default function Waste() {
         );
       })
       .catch((e) => setError(String(e)));
+  }, []);
+
+  useEffect(() => {
+    getInsights()
+      .then((all) => setInsights(all.filter((i) => i.category === "waste")))
+      .catch(() => setInsights([]));
   }, []);
 
   const totalWasted = useMemo(
@@ -69,6 +79,10 @@ export default function Waste() {
       subtitle="Rejected-work cost and permission friction — where to add allow-rules"
     >
       {error && <p className="mb-4 text-sm text-fault">{error}</p>}
+
+      {insights.map((i) => (
+        <InsightBanner key={i.id} insight={i} />
+      ))}
 
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded border border-wire bg-panel p-4">

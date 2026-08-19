@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageShell } from "../components/PageShell";
+import { InsightBanner } from "../components/InsightBanner";
 import { TimeRangeSelect } from "../components/TimeRangeSelect";
 import { type TimeRange } from "../lib/timeRange";
-import { listSessions, type Session } from "../lib/api";
+import { listSessions, getInsights, type Insight, type Session } from "../lib/api";
 import { formatCostUsd, formatDurationMs, formatTimestamp } from "../lib/format";
 
 type SortKey =
@@ -33,6 +34,7 @@ export default function Sessions() {
   const navigate = useNavigate();
   const [range, setRange] = useState<TimeRange>("30d");
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("started_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -41,6 +43,12 @@ export default function Sessions() {
     listSessions(200, 0, range)
       .then(setSessions)
       .catch((e) => setError(String(e)));
+  }, [range]);
+
+  useEffect(() => {
+    getInsights(range || undefined)
+      .then((all) => setInsights(all.filter((i) => i.category === "sessions")))
+      .catch(() => setInsights([]));
   }, [range]);
 
   const sorted = useMemo(() => {
@@ -69,6 +77,11 @@ export default function Sessions() {
       </div>
 
       {error && <p className="mb-4 text-sm text-fault">{error}</p>}
+
+      {insights.map((i) => (
+        <InsightBanner key={i.id} insight={i} />
+      ))}
+
       <div className="overflow-x-auto rounded border border-wire">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead>

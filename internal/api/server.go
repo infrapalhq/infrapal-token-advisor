@@ -34,6 +34,7 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	mux.HandleFunc("GET /api/search", s.handleSearch)
 	mux.HandleFunc("GET /api/views/{name}", s.handleView)
 	mux.HandleFunc("GET /api/timeseries", s.handleTimeseries)
+	mux.HandleFunc("GET /api/insights", s.handleInsights)
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
@@ -52,6 +53,7 @@ func Endpoints() []string {
 		"GET /api/search?q=",
 		"GET /api/views/{name}",
 		"GET /api/timeseries?metric=&bucket=",
+		"GET /api/insights?since=",
 	}
 }
 

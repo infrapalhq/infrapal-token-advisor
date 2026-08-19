@@ -270,3 +270,17 @@ export function getTimeseries(
     `/api/timeseries?metric=${encodeURIComponent(metric)}&bucket=${bucket}&since=${since}`,
   );
 }
+
+export type Insight = {
+  id: string;
+  category: "efficiency" | "sessions" | "waste" | "tools";
+  severity: "info" | "warn";
+  title: string;
+  detail: string;
+  link: string;
+};
+
+export function getInsights(since?: string): Promise<Insight[]> {
+  const qs = since ? `?since=${encodeURIComponent(since)}` : "";
+  return getJSON(`/api/insights${qs}`);
+}
