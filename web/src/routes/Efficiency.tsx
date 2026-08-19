@@ -11,14 +11,16 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { PageShell } from "../components/PageShell";
+import { InsightBanner } from "../components/InsightBanner";
 import { TimeRangeSelect } from "../components/TimeRangeSelect";
 import { type TimeRange } from "../lib/timeRange";
-import { getView, type PromptEfficiency } from "../lib/api";
+import { getView, getInsights, type Insight, type PromptEfficiency } from "../lib/api";
 import { formatCostUsd, formatTimestamp } from "../lib/format";
 
 export default function Efficiency() {
   const [range, setRange] = useState<TimeRange>("30d");
   const [rows, setRows] = useState<PromptEfficiency[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,6 +32,12 @@ export default function Efficiency() {
         setRows([...r].sort((a, b) => b.total_cost_usd - a.total_cost_usd)),
       )
       .catch((e) => setError(String(e)));
+  }, [range]);
+
+  useEffect(() => {
+    getInsights(range || undefined)
+      .then((all) => setInsights(all.filter((i) => i.category === "efficiency")))
+      .catch(() => setInsights([]));
   }, [range]);
 
   const scatterData = useMemo(
@@ -55,6 +63,10 @@ export default function Efficiency() {
       </div>
 
       {error && <p className="mb-4 text-sm text-fault">{error}</p>}
+
+      {insights.map((i) => (
+        <InsightBanner key={i.id} insight={i} />
+      ))}
 
       <div className="mb-6 rounded border border-wire bg-panel p-3">
         <div className="mb-2 text-[11px] uppercase tracking-wide text-ink/50">

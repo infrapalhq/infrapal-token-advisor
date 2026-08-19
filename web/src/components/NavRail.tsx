@@ -21,7 +21,7 @@ const iconProps = {
 const items: NavItem[] = [
   {
     to: "/",
-    label: "Today",
+    label: "Dashboard",
     icon: (
       <svg {...iconProps}>
         <circle cx="12" cy="12" r="4" />

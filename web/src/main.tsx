@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import "./index.css";
 import App from "./App.tsx";
-import Today from "./routes/Today.tsx";
+import Dashboard from "./routes/Dashboard.tsx";
 import Sessions from "./routes/Sessions.tsx";
 import Waterfall from "./routes/Waterfall.tsx";
 import Efficiency from "./routes/Efficiency.tsx";
@@ -16,7 +16,7 @@ createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<App />}>
-          <Route index element={<Today />} />
+          <Route index element={<Dashboard />} />
           <Route path="sessions" element={<Sessions />} />
           <Route path="waterfall" element={<Waterfall />} />
           <Route path="efficiency" element={<Efficiency />} />

@@ -8,12 +8,15 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { PageShell } from "../components/PageShell";
+import { InsightBanner } from "../components/InsightBanner";
 import { TimeRangeSelect } from "../components/TimeRangeSelect";
 import { timeRangeLabel, type TimeRange } from "../lib/timeRange";
 import {
   listSessions,
   getSession,
   getTimeseries,
+  getInsights,
+  type Insight,
   type SessionInteraction,
 } from "../lib/api";
 import {
@@ -115,13 +118,14 @@ function StatCard({
   );
 }
 
-export default function Today() {
+export default function Dashboard() {
   const [range, setRange] = useState<TimeRange>("7d");
   const [cost, setCost] = useState<Point[]>([]);
   const [tokens, setTokens] = useState<Point[]>([]);
   const [sessions, setSessions] = useState<Point[]>([]);
   const [activeUser, setActiveUser] = useState<Point[]>([]);
   const [recent, setRecent] = useState<RecentInteraction[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -160,16 +164,26 @@ export default function Today() {
       .catch((e) => setError(String(e)));
   }, []);
 
+  useEffect(() => {
+    getInsights(range || undefined)
+      .then(setInsights)
+      .catch(() => setInsights([]));
+  }, [range]);
+
   return (
     <PageShell
-      title="Today"
-      subtitle={`Cost, tokens, sessions, and active time — trailing ${timeRangeLabel(range)}`}
+      title="Dashboard"
+      subtitle={`Flagged insights, cost, tokens, sessions, and active time — trailing ${timeRangeLabel(range)}`}
     >
       <div className="mb-4 flex items-center justify-end">
         <TimeRangeSelect value={range} onChange={setRange} allowAllTime={false} />
       </div>
 
       {error && <p className="mb-4 text-sm text-fault">{error}</p>}
+
+      {insights.map((i) => (
+        <InsightBanner key={i.id} insight={i} />
+      ))}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
