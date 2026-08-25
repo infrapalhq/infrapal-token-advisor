@@ -1,8 +1,13 @@
-// Package api implements ccotel's read-only HTTP API over the captured
-// telemetry: sessions, interaction waterfalls, full-text search, and the
-// derived views from migration 0006. Business logic lives in SQL (the
-// views); handlers here stay thin — decode params, run one query, encode
-// JSON.
+// Package api implements ccotel's HTTP API over the captured telemetry:
+// sessions, interaction waterfalls, full-text search, and the derived views
+// from migration 0006. Business logic lives in SQL (the views); handlers
+// here stay thin — decode params, run one query, encode JSON.
+//
+// One deliberate exception to "read-only, local-only": POST
+// /api/ai/recommendations makes an outbound call to the Anthropic API, but
+// only in direct response to a user-triggered request from the AI Mode
+// page's "Generate" button, and only once an API key has been explicitly
+// configured — see internal/ai and the README's network-egress note.
 package api
 
 import (
@@ -35,6 +40,10 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	mux.HandleFunc("GET /api/views/{name}", s.handleView)
 	mux.HandleFunc("GET /api/timeseries", s.handleTimeseries)
 	mux.HandleFunc("GET /api/insights", s.handleInsights)
+	mux.HandleFunc("GET /api/ai/config", s.handleGetAIConfig)
+	mux.HandleFunc("PUT /api/ai/config", s.handlePutAIConfig)
+	mux.HandleFunc("GET /api/ai/recommendations", s.handleGetAIRecommendations)
+	mux.HandleFunc("POST /api/ai/recommendations", s.handlePostAIRecommendations)
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
@@ -54,6 +63,10 @@ func Endpoints() []string {
 		"GET /api/views/{name}",
 		"GET /api/timeseries?metric=&bucket=",
 		"GET /api/insights?since=",
+		"GET /api/ai/config",
+		"PUT /api/ai/config",
+		"GET /api/ai/recommendations?since=",
+		"POST /api/ai/recommendations",
 	}
 }
 

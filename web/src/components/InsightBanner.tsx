@@ -1,27 +1,37 @@
 import { Link } from "react-router-dom";
 import type { Insight } from "../lib/api";
 
+const CATEGORY_LABEL: Record<Insight["category"], string> = {
+  efficiency: "Efficiency",
+  sessions: "Sessions",
+  waste: "Waste",
+  tools: "Tools & MCP",
+};
+
 // InsightBanner renders a single server-computed callout (see
-// internal/api/insights.go) above a page's existing chart/table. Renders
-// nothing when no insight qualifies for this page — a page with nothing
-// flagged should show no banner, not an empty box.
+// internal/api/insights.go) as a flag card: a category pill, the title, the
+// detail sentence, and a link into the evidence. Renders nothing when no
+// insight qualifies — a page with nothing flagged should show no card, not
+// an empty box.
 export function InsightBanner({ insight }: { insight: Insight | undefined }) {
   if (!insight) return null;
 
-  const borderColor = insight.severity === "warn" ? "border-fault" : "border-signal";
+  const isWarn = insight.severity === "warn";
 
   return (
-    <div className={`mb-4 flex items-start justify-between gap-4 rounded border border-wire border-l-4 bg-panel p-4 ${borderColor}`}>
-      <div>
-        <div className="font-display text-sm font-semibold text-ink">{insight.title}</div>
-        <p className="mt-1 text-sm text-ink/70">{insight.detail}</p>
+    <article className={`card flag ${isWarn ? "" : "flag-signal"} flex flex-col`}>
+      <div className="flex-1 p-4.5">
+        <span className={`pill ${isWarn ? "pill-fault" : "pill-signal"}`}>
+          {CATEGORY_LABEL[insight.category]}
+        </span>
+        <div className="flag-title">{insight.title}</div>
+        <p className="flag-text">{insight.detail}</p>
       </div>
-      <Link
-        to={insight.link}
-        className="whitespace-nowrap font-mono text-xs text-signal hover:underline"
-      >
-        Open →
-      </Link>
-    </div>
+      <div className="flex items-center justify-between border-t border-wire px-4.5 py-3">
+        <Link to={insight.link} className="text-[13px] text-signal hover:underline">
+          View evidence →
+        </Link>
+      </div>
+    </article>
   );
 }

@@ -27,6 +27,13 @@ var metricAliases = map[string]metricSpec{
 	"lines_removed":    {name: "claude_code.lines_of_code.count", typeFilter: "removed"},
 	"active_time_user": {name: "claude_code.active_time.total", typeFilter: "user"},
 	"active_time_cli":  {name: "claude_code.active_time.total", typeFilter: "cli"},
+	// Token-usage split by the same attrs.type values Claude Code already
+	// reports (input/output/cacheRead/cacheCreation), for a composition
+	// view instead of the single "tokens" total above.
+	"tokens_input":          {name: "claude_code.token.usage", typeFilter: "input"},
+	"tokens_output":         {name: "claude_code.token.usage", typeFilter: "output"},
+	"tokens_cache_read":     {name: "claude_code.token.usage", typeFilter: "cacheRead"},
+	"tokens_cache_creation": {name: "claude_code.token.usage", typeFilter: "cacheCreation"},
 }
 
 // bucketFormats maps a ?bucket= value to a SQLite strftime format string.

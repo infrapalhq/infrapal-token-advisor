@@ -27,7 +27,7 @@ function renderSnippet(snippet: string): ReactNode[] {
     if (!part) return;
     out.push(
       marking ? (
-        <mark key={idx} className="rounded-sm bg-signal/30 text-signal">
+        <mark key={idx} className="rounded-sm bg-signal/25 text-signal">
           {part}
         </mark>
       ) : (
@@ -67,40 +67,41 @@ export default function Search() {
   return (
     <PageShell
       title="Search"
-      subtitle="Full-text search across your prompt and response history"
+      subtitle="Find a prompt, a tool call or a session by anything recorded on it."
     >
       <form
         onSubmit={(e) => {
           e.preventDefault();
           runSearch(query);
         }}
-        className="mb-4 flex gap-2"
       >
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search prompts and responses…"
-          className="w-full max-w-md rounded border border-wire bg-panel px-3 py-1.5 text-sm text-ink outline-none focus-visible:ring-2 focus-visible:ring-signal"
-          autoFocus
-        />
-        <button
-          type="submit"
-          className="rounded border border-wire bg-panel px-3 py-1.5 text-sm text-ink hover:bg-wire/30"
-        >
-          Search
-        </button>
+        <div className="flex h-12 items-center gap-2.5 rounded-lg border border-wire-2 bg-panel px-4">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeOpacity={0.45} strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+          </svg>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search prompts, tools, sessions…"
+            className="flex-1 border-0 bg-transparent font-body text-sm text-ink outline-none"
+            autoFocus
+          />
+          <span className="font-mono text-xs text-ink/45">⌘K</span>
+        </div>
       </form>
 
-      {error && <p className="mb-4 text-sm text-fault">{error}</p>}
-      {status === "loading" && (
-        <p className="text-sm text-ink/50">Searching…</p>
-      )}
+      {error && <p className="text-sm text-fault">{error}</p>}
+      {status === "loading" && <p className="text-sm text-ink/55">Searching…</p>}
       {status === "done" && results.length === 0 && !error && (
-        <p className="text-sm text-ink/50">No matches for "{query}".</p>
+        <div className="empty">No matches for "{query}".</div>
+      )}
+      {status === "idle" && (
+        <div className="empty">Results appear here as you type.</div>
       )}
 
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2">
         {results.map((r) => (
           <Link
             key={`${r.kind}-${r.id}`}
@@ -109,22 +110,13 @@ export default function Search() {
                 ? `/waterfall?session=${r.session_id}&prompt=${r.id}`
                 : `/waterfall?session=${r.session_id}`
             }
-            className="block rounded border border-wire bg-panel p-3 hover:bg-wire/20"
+            className="card block p-3.5 hover:bg-panel-2"
           >
-            <div className="mb-1 flex items-center justify-between">
-              <span
-                className={[
-                  "rounded-sm px-1.5 py-0.5 text-[10px] uppercase tracking-wide",
-                  r.kind === "prompt"
-                    ? "bg-cat-tool/20 text-cat-tool"
-                    : "bg-cat-llm/20 text-cat-llm",
-                ].join(" ")}
-              >
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className={`pill ${r.kind === "prompt" ? "pill-signal" : "pill-warn"}`}>
                 {r.kind}
               </span>
-              <span className="font-mono text-[10px] text-ink/40">
-                {formatTimestamp(r.ts)}
-              </span>
+              <span className="font-mono text-[10px] text-ink/40">{formatTimestamp(r.ts)}</span>
             </div>
             <p className="text-sm text-ink/90">{renderSnippet(r.snippet)}</p>
           </Link>

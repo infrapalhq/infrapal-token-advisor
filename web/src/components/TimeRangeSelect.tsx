@@ -13,16 +13,19 @@ export function TimeRangeSelect({
     ? TIME_RANGE_OPTIONS
     : TIME_RANGE_OPTIONS.filter((o) => o.value !== "");
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as TimeRange)}
-      className="rounded border border-wire bg-panel px-2 py-1.5 text-sm text-ink"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <label className="flex flex-col gap-1.5">
+      <span className="field-label">Date range</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as TimeRange)}
+        className="select w-[210px]"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
