@@ -8,15 +8,17 @@ import (
 
 // TestHandleView_AllNames exercises every whitelisted view name against the
 // shared fixture, confirming the pass-through query executes cleanly and
-// returns valid JSON. v_wasted_spend needs a rejected tool call, which the
-// shared fixture doesn't have (its tool_call is 'accept'), so that one gets
-// its own test below with an extra seeded row.
+// returns valid JSON. v_wasted_spend needs a rejected tool call and
+// v_retry_waste needs a retried api_request, neither of which the shared
+// fixture has (its tool_call is 'accept' and its one api_request has no
+// attempt column set), so those two get their own tests below with an
+// extra seeded row each.
 func TestHandleView_AllNames(t *testing.T) {
 	db := seedDB(t)
 	ts := newTestServer(t, db)
 
 	for name := range viewTable {
-		if name == "wasted_spend" {
+		if name == "wasted_spend" || name == "retry_waste" {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
@@ -95,6 +97,40 @@ func TestHandleView_WastedSpend(t *testing.T) {
 	}
 	if rows[0]["rejected_tool_count"] != float64(1) {
 		t.Errorf("rejected_tool_count = %v, want 1", rows[0]["rejected_tool_count"])
+	}
+}
+
+func TestHandleView_RetryWaste(t *testing.T) {
+	db := seedDB(t)
+	if _, err := db.Exec(`
+		INSERT INTO api_requests (request_id, prompt_id, session_id, ts, model, cost_usd_micros, attempt, success)
+		VALUES ('req-2', 'p1', 's1', 1070, 'claude-3-opus', 50000, 2, 1)
+	`); err != nil {
+		t.Fatalf("seed retry: %v", err)
+	}
+	ts := newTestServer(t, db)
+
+	resp, err := http.Get(ts.URL + "/api/views/retry_waste")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	var rows []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&rows); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d: %+v", len(rows), rows)
+	}
+	if rows[0]["session_id"] != "s1" {
+		t.Errorf("session_id = %v, want s1", rows[0]["session_id"])
+	}
+	if rows[0]["retried_requests"] != float64(1) {
+		t.Errorf("retried_requests = %v, want 1", rows[0]["retried_requests"])
 	}
 }
 

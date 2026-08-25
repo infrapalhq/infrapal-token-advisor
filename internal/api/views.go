@@ -18,6 +18,8 @@ var viewTable = map[string]string{
 	"mcp_inventory":       "v_mcp_inventory",
 	"session_summary":     "v_session_summary",
 	"model_performance":   "v_model_performance",
+	"tool_payload":        "v_tool_payload",
+	"retry_waste":         "v_retry_waste",
 }
 
 // viewsWithSessionID lists which of the above views carry a session_id
@@ -26,6 +28,7 @@ var viewsWithSessionID = map[string]bool{
 	"prompt_efficiency": true,
 	"wasted_spend":      true,
 	"session_summary":   true,
+	"retry_waste":       true,
 }
 
 // sinceColumn describes the column a view's ?since= filter applies to.
@@ -43,6 +46,7 @@ var viewsWithSince = map[string]sinceColumn{
 	"prompt_efficiency": {name: "started_at"},
 	"session_summary":   {name: "started_at"},
 	"wasted_spend":      {name: "day", dateString: true},
+	"retry_waste":       {name: "day", dateString: true},
 }
 
 // handleView handles GET /api/views/{name}, a generic pass-through to one

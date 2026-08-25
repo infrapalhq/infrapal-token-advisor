@@ -4,8 +4,21 @@ export function formatDurationMs(ms: number | null | undefined): string {
   const s = ms / 1000;
   if (s < 60) return `${s.toFixed(s < 10 ? 2 : 1)}s`;
   const m = Math.floor(s / 60);
-  const rem = Math.round(s % 60);
-  return `${m}m ${rem}s`;
+  const remS = Math.round(s % 60);
+  if (m < 60) return `${m}m ${remS}s`;
+  const h = Math.floor(m / 60);
+  const remM = m % 60;
+  return `${h}h ${remM}m`;
+}
+
+const compactTokenFormatter = new Intl.NumberFormat("en", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+
+export function formatTokenCount(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return compactTokenFormatter.format(n);
 }
 
 export function formatCostMicros(micros: number | null | undefined): string {

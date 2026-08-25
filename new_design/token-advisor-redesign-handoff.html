@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Token Advisor — redesign spec</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ---------------------------------------------------------------
+   DESIGN TOKENS — dark theme (the current app ships a light theme:
+   --color-void:#f1f1ee etc. Add these as a dark set, don't remap.)
+--------------------------------------------------------------- */
+:root {
+  --void:      #080b11;  /* app background            */
+  --panel:     #111823;  /* card / surface            */
+  --panel-2:   #0d141d;  /* table head, inset chips   */
+  --chrome:    #0b1017;  /* topbar + sidebar          */
+  --wire:      #1e2733;  /* hairline border           */
+  --wire-2:    #25303f;  /* control border            */
+  --ink:       #e6eaf0;
+  --ink-70:    rgba(230,234,240,.75);
+  --ink-55:    rgba(230,234,240,.55);
+  --ink-45:    rgba(230,234,240,.45);
+  --ink-35:    rgba(230,234,240,.35);
+  --signal:    #4c8dff;  /* links, active nav accent  */
+  --action:    #5b5bd6;  /* primary button            */
+  --fault:     #ff6b60;  /* over budget, waste, blocked */
+  --warn:      #e0a33c;
+  --good:      #4ade80;
+  --chart:     #8b9bb4;  /* neutral series stroke     */
+  --font: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --r: 8px;              /* card radius */
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--void); color: var(--ink); font-family: var(--font); font-size: 14px; -webkit-font-smoothing: antialiased; }
+a { color: var(--signal); text-decoration: none; }
+a:hover { color: #7dabff; }
+button { font-family: inherit; cursor: pointer; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #202b39; border-radius: 6px; }
+
+/* ---------------- shell ---------------- */
+.app { display: flex; flex-direction: column; height: 100vh; }
+.topbar { display: flex; align-items: center; justify-content: space-between; flex: 0 0 56px; padding: 0 20px; border-bottom: 1px solid #1a2331; background: var(--chrome); }
+.brand { display: flex; align-items: center; gap: 14px; }
+.brand__name { display: flex; align-items: center; gap: 9px; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.brand__rule { width: 1px; height: 18px; background: var(--wire-2); }
+.brand__product { font-size: 13px; color: var(--ink-55); }
+.topbar__actions { display: flex; align-items: center; gap: 8px; }
+
+.btn { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid var(--wire-2); border-radius: 6px; background: var(--panel); color: var(--ink-70); font-size: 13px; }
+.btn:hover { background: #16202c; color: var(--ink); }
+.btn--icon { width: 32px; padding: 0; justify-content: center; }
+.btn--primary { height: 38px; padding: 0 16px; border: none; background: var(--action); color: #fff; font-weight: 500; }
+.btn--primary:hover { background: #6b6be0; }
+.kbd { font-family: var(--mono); font-size: 12px; color: var(--ink-45); }
+
+.body { display: flex; flex: 1; min-height: 0; }
+
+/* ---------------- sidebar ---------------- */
+.sidebar { display: flex; flex-direction: column; flex: 0 0 236px; padding: 16px 12px; border-right: 1px solid #1a2331; background: var(--chrome); }
+.sidebar__label { padding: 0 8px 10px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-35); }
+.navlist { display: flex; flex-direction: column; gap: 2px; }
+.navitem { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 9px 11px; border: none; border-radius: 7px; background: none; color: var(--ink-55); font-size: 13.5px; font-weight: 500; text-align: left; }
+.navitem:hover { color: var(--ink); background: #101826; }
+.navitem[aria-current="page"] { background: #1a2540; color: var(--ink); font-weight: 600; box-shadow: inset 2px 0 0 var(--signal); }
+.navitem__main { display: flex; align-items: center; gap: 11px; }
+.navitem__badge { padding: 2px 8px; border-radius: 999px; background: rgba(255,107,96,.15); color: var(--fault); font-size: 11.5px; font-weight: 600; }
+.sidebar__foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding: 12px 8px; border-top: 1px solid #1a2331; font-size: 12px; }
+.sidebar__foot .muted { display: flex; align-items: center; gap: 9px; color: var(--ink-45); }
+.sidebar__foot .alert { display: flex; align-items: center; gap: 9px; color: var(--fault); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ---------------- page ---------------- */
+.main { flex: 1; min-width: 0; overflow-y: auto; padding: 28px 32px 56px; }
+.page { display: flex; flex-direction: column; gap: 22px; max-width: 1400px; }
+.page[hidden] { display: none; }
+h1 { margin: 0; font-size: 29px; font-weight: 700; letter-spacing: -.02em; }
+.page__sub { margin: 6px 0 0; font-size: 14px; color: var(--ink-55); }
+.toolbar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.toolbar__left { display: flex; align-items: flex-end; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field__label { font-size: 12px; color: var(--ink-45); }
+select, .input { height: 38px; padding: 0 12px; border: 1px solid var(--wire-2); border-radius: 6px; background: var(--panel); color: var(--ink); font-family: inherit; font-size: 14px; }
+select { width: 230px; }
+
+.seg { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--wire-2); border-radius: var(--r); background: var(--panel-2); }
+.seg button { height: 30px; padding: 0 14px; border: none; border-radius: 6px; background: none; color: var(--ink-55); font-size: 13px; }
+.seg button[aria-pressed="true"] { background: #232f3f; color: var(--ink); font-weight: 500; }
+
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { height: 30px; padding: 0 14px; border: 1px solid var(--wire-2); border-radius: 999px; background: var(--panel-2); color: var(--ink-55); font-size: 12.5px; }
+.chip[aria-pressed="true"] { border-color: #2c3a4c; background: #232f3f; color: var(--ink); }
+.chip--static { display: inline-flex; align-items: center; }
+
+/* ---------------- cards ---------------- */
+.card { border: 1px solid var(--wire); border-radius: var(--r); background: var(--panel); }
+.card--flush { overflow: hidden; }
+.card__pad { padding: 18px 20px; }
+.card__head { display: flex; align-items: center; justify-content: space-between; gap: 13px; padding: 16px 20px; border-bottom: 1px solid var(--wire); }
+.card__head-main { display: flex; align-items: center; gap: 13px; }
+.card__icon { display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: 0 0 30px; border: 1px solid var(--wire-2); border-radius: 6px; background: #141d29; color: var(--chart); }
+.card__title { font-size: 15px; font-weight: 600; }
+.card__desc { font-size: 12.5px; color: var(--ink-55); }
+.card__foot { padding: 13px 20px; border-top: 1px solid var(--wire); font-size: 12.5px; color: var(--ink-45); }
+.note { font-size: 12.5px; color: var(--ink-35); line-height: 1.5; }
+
+/* budget banner */
+.budget { padding: 20px 22px; }
+.budget__row { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.budget__meta { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-55); }
+.budget__spent { margin-top: 8px; font-size: 25px; font-weight: 600; letter-spacing: -.01em; }
+.budget__rate { margin-top: 6px; font-size: 13px; color: var(--ink-55); }
+.budget__over { font-size: 20px; font-weight: 600; color: var(--fault); text-align: right; }
+.budget__overnote { margin-top: 4px; max-width: 190px; font-size: 12px; color: var(--ink-45); text-align: right; }
+.track { position: relative; margin-top: 20px; height: 7px; border-radius: 4px; background: #1b2431; }
+.track__fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg,#3a4a5f,#8b9bb4); }
+.track__pace { position: absolute; top: -5px; width: 2px; height: 17px; background: var(--ink-55); }
+.track__legend { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: var(--ink-45); }
+
+/* kpi */
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+.kpi { padding: 16px 18px 12px; }
+.kpi--fault { border-color: rgba(255,107,96,.4); background: #141319; }
+.kpi__label { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-45); }
+.kpi__value { margin-top: 10px; font-size: 31px; font-weight: 600; letter-spacing: -.02em; }
+.kpi__note { margin-top: 6px; font-size: 12px; color: var(--ink-55); line-height: 1.45; }
+.spark { display: block; width: 100%; height: 38px; margin-top: 12px; }
+
+/* model mix */
+.split { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: 18px; padding: 18px 20px; }
+.bars { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; }
+.bar__top { display: flex; justify-content: space-between; font-size: 13.5px; }
+.bar__top b { font-weight: 600; }
+.bar__track { margin-top: 8px; height: 6px; border-radius: 3px; background: #1b2431; }
+.bar__fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg,#3a4a5f,#9fb0c7); }
+
+.chartrow { display: flex; gap: 10px; margin-top: 16px; }
+.yaxis { display: flex; flex-direction: column; justify-content: space-between; height: 200px; font-size: 11px; color: var(--ink-35); text-align: right; }
+.xaxis { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--ink-35); }
+.area { display: block; width: 100%; height: 200px; }
+
+/* horizontal bar chart (sessions / tool usage) */
+.hbars { display: flex; flex-direction: column; gap: 7px; margin-top: 20px; }
+.hbar { display: grid; grid-template-columns: var(--label-w, 96px) minmax(0,1fr); align-items: center; gap: 14px; }
+.hbar__label { font-family: var(--mono); font-size: 12px; color: var(--ink-70); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar__val { height: 20px; border: 1px solid #6f8095; border-radius: 2px; background: rgba(139,155,180,.12); }
+.hbar__scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-35); }
+
+/* vertical bar chart (waste by day) */
+.vchart { display: flex; gap: 12px; margin-top: 20px; }
+.vbars { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); align-items: end; gap: 24px; height: 180px; border-bottom: 1px solid var(--wire); }
+.vbar { border: 1px solid var(--fault); border-bottom: none; border-radius: 3px 3px 0 0; background: rgba(255,107,96,.1); }
+.vlabels { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 24px; margin-top: 8px; font-size: 11px; color: var(--ink-35); text-align: center; }
+
+/* flagged */
+.section__title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+.flag { display: flex; flex-direction: column; border-left-width: 3px; border-left-style: solid; }
+.flag--fault { border-left-color: var(--fault); }
+.flag--signal { border-left-color: var(--signal); }
+.flag--warn { border-left-color: var(--warn); }
+.flag__body { flex: 1; padding: 16px 18px; }
+.flag__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.flag__metric { font-size: 14px; font-weight: 600; }
+.flag__metric--fault { color: var(--fault); }
+.flag__title { margin-top: 12px; font-size: 15px; font-weight: 600; line-height: 1.35; text-wrap: pretty; }
+.flag__text { margin-top: 10px; font-size: 13px; color: var(--ink-70); line-height: 1.55; text-wrap: pretty; }
+.flag__trend { margin-top: 12px; font-size: 12px; color: var(--ink-35); }
+.flag__foot { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-top: 1px solid var(--wire); }
+
+.pill { padding: 3px 9px; border-radius: 999px; font-size: 11.5px; border: 1px solid; }
+.pill--fault { border-color: rgba(255,107,96,.35); background: rgba(255,107,96,.1); color: #ff8a80; }
+.pill--signal { border-color: rgba(76,141,255,.35); background: rgba(76,141,255,.1); color: #8fb6ff; }
+.pill--warn  { border-color: rgba(224,163,60,.35); background: rgba(224,163,60,.1); color: #e8be74; }
+.pill--good  { border-color: rgba(74,222,128,.3);  background: rgba(74,222,128,.1); color: var(--good); }
+.pill--quiet { border-color: var(--wire-2); background: none; color: var(--ink-55); font-size: 11px; }
+
+.code { font-family: var(--mono); font-size: 12px; padding: 3px 8px; border: 1px solid var(--wire-2); border-radius: 4px; background: var(--panel-2); }
+.link-more { display: inline-flex; align-items: center; gap: 7px; margin-top: 14px; font-size: 13px; }
+
+/* recent conversations */
+.rows { display: flex; flex-direction: column; gap: 8px; }
+.row { display: grid; grid-template-columns: 90px minmax(0,1fr) 100px; align-items: center; gap: 16px; padding: 14px 18px; border: 1px solid var(--wire); border-radius: var(--r); background: var(--panel); color: var(--ink); }
+.row:hover { background: #16202c; border-color: #2c3a4c; color: var(--ink); }
+.row__cost { font-size: 14px; font-weight: 600; }
+.row__text { font-size: 13.5px; color: var(--ink-70); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row__when { font-size: 12px; color: var(--ink-35); text-align: right; }
+
+/* ---------------- tables ---------------- */
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead tr { background: var(--panel-2); }
+th { padding: 11px 14px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-45); font-weight: 500; text-align: left; white-space: nowrap; }
+th[aria-sort] { color: var(--ink); }
+td { padding: 12px 14px; font-size: 13px; border-top: 1px solid var(--wire); }
+.num { text-align: right; }
+.strong { font-weight: 600; }
+.dim { color: var(--ink-55); }
+.fault { color: var(--fault); }
+.warn { color: var(--warn); }
+.good { color: var(--good); }
+.disclose { width: 40px; color: var(--ink-35); }
+.truncate { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--wire); font-size: 12.5px; color: var(--ink-45); }
+.pager button { height: 30px; padding: 0 12px; border: 1px solid var(--wire-2); border-radius: 6px; background: #141d29; color: var(--ink-70); font-size: 12.5px; }
+.pager button:disabled { color: var(--ink-45); cursor: not-allowed; }
+
+/* search */
+.searchbar { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 16px; border: 1px solid var(--wire-2); border-radius: var(--r); background: var(--panel); }
+.searchbar input { flex: 1; border: none; background: none; color: var(--ink); font-family: inherit; font-size: 14px; outline: none; }
+.empty { padding: 40px; border: 1px dashed var(--wire-2); border-radius: var(--r); background: var(--panel-2); text-align: center; font-size: 13px; color: var(--ink-45); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__name">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4c8dff" stroke-width="1.7" stroke-linecap="round"><path d="M6 17h11a4 4 0 0 0 0-8 6 6 0 0 0-11.5 2A3.5 3.5 0 0 0 6 17z"></path></svg>
+        infrapal
+      </span>
+      <span class="brand__rule"></span>
+      <span class="brand__product">Token Advisor</span>
+    </div>
+    <div class="topbar__actions">
+      <button class="btn"><span class="kbd">&#8984;K</span> Jump to</button>
+      <button class="btn btn--icon" aria-label="Toggle theme">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+      </button>
+      <button class="btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"></path></svg> Export
+      </button>
+    </div>
+  </header>
+
+  <div class="body">
+    <nav class="sidebar">
+      <div class="sidebar__label">Dashboard</div>
+      <div class="navlist" id="nav"></div>
+      <div class="sidebar__foot">
+        <span class="muted">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 3v2M12 19v2M5 12H3M21 12h-2"></path></svg>
+          Light theme
+        </span>
+        <span class="alert"><span class="dot"></span> 2 ingest errors in the last hour</span>
+      </div>
+    </nav>
+
+    <main class="main">
+
+      <!-- ============================ OVERVIEW ============================ -->
+      <section class="page" id="page-overview" data-screen-label="Overview">
+        <div>
+          <h1>Overview</h1>
+          <p class="page__sub">What was spent, where it went, and what stands out in this range.</p>
+        </div>
+
+        <div class="toolbar">
+          <label class="field">
+            <span class="field__label">Date range</span>
+            <select><option>1 week</option><option>1 month</option><option>3 months</option><option>All time</option></select>
+          </label>
+          <button class="btn btn--primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"></path></svg> Export report
+          </button>
+        </div>
+
+        <div class="card budget">
+          <div class="budget__row">
+            <div>
+              <div class="budget__meta">
+                Weekly budget &middot; $60.00
+                <a href="#"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="vertical-align:-2px"><path d="M4 20h4L20 8l-4-4L4 16v4z"></path></svg> Edit</a>
+              </div>
+              <div class="budget__spent">$47.32 spent &middot; 6 days in</div>
+              <div class="budget__rate">$7.89/day, 7-day average</div>
+            </div>
+            <div>
+              <div class="budget__over">$4.11 over</div>
+              <div class="budget__overnote">where you'd be at an even pace</div>
+            </div>
+          </div>
+          <div class="track">
+            <div class="track__fill" style="width:78%"></div>
+            <div class="track__pace" style="left:78%"></div>
+          </div>
+          <div class="track__legend"><span>$12.68 left &middot; 1 day remaining</span><span>pace</span></div>
+        </div>
+
+        <div class="grid-4" id="overview-kpis"></div>
+
+        <div class="card card--flush" style="background:#0e151f">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"></path></svg></span>
+              <div>
+                <div class="card__title">Model mix and trend</div>
+                <div class="card__desc">Cost by model and daily token consumption</div>
+              </div>
+            </div>
+          </div>
+          <div class="split">
+            <div class="card card__pad">
+              <div class="card__title">Cost by model</div>
+              <div class="card__desc">From api_requests in this range</div>
+              <div class="bars" id="model-bars"></div>
+            </div>
+            <div class="card card__pad">
+              <div class="card__title">Token usage trend</div>
+              <div class="card__desc">Millions of tokens per day</div>
+              <div class="chartrow">
+                <div class="yaxis"><span>80</span><span>60</span><span>40</span><span>20</span><span>0</span></div>
+                <div style="flex:1;min-width:0">
+                  <svg class="area" viewBox="0 0 600 200" preserveAspectRatio="none">
+                    <g stroke="var(--wire)" stroke-dasharray="3 4">
+                      <line x1="0" y1="0" x2="600" y2="0"></line><line x1="0" y1="50" x2="600" y2="50"></line>
+                      <line x1="0" y1="100" x2="600" y2="100"></line><line x1="0" y1="150" x2="600" y2="150"></line>
+                      <line x1="0" y1="199" x2="600" y2="199"></line>
+                    </g>
+                    <path d="M0 145 C40 140 60 138 100 140 C140 142 160 168 200 170 C240 172 250 130 300 118 C340 108 360 100 400 108 C440 116 450 148 500 140 C540 133 560 60 600 22 L600 199 L0 199 Z" fill="rgba(230,234,240,.07)" stroke="var(--ink)" stroke-width="2"></path>
+                  </svg>
+                  <div class="xaxis"><span>3 Aug</span><span>4 Aug</span><span>5 Aug</span><span>6 Aug</span><span>7 Aug</span><span>8 Aug</span><span>9 Aug</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section__title">Flagged</div>
+          <div class="grid-3">
+            <article class="card flag flag--fault">
+              <div class="flag__body">
+                <div class="flag__row">
+                  <span class="pill pill--fault">Permission friction</span>
+                  <span class="flag__metric flag__metric--fault">48m 49s blocked</span>
+                </div>
+                <div class="flag__title">Bash was temporarily allowed 8 times, never made permanent</div>
+                <p class="flag__text">269 calls to <span class="code">Bash</span> this range. 8 temporary allows, 5 permanent. Each temporary allow blocks the agent until you respond.</p>
+                <div class="flag__trend">8 this week, 14 last week</div>
+              </div>
+              <div class="flag__foot">
+                <a href="#">View evidence &rarr;</a>
+                <button class="btn" style="height:30px;font-size:12.5px;background:#141d29">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M15 5H6a2 2 0 0 0-2 2v9"></path></svg> Copy rule
+                </button>
+              </div>
+            </article>
+
+            <article class="card flag flag--signal">
+              <div class="flag__body">
+                <div class="flag__row">
+                  <span class="pill pill--signal">Rejected work</span>
+                  <span class="flag__metric">$26.50</span>
+                </div>
+                <div class="flag__title">13 tool calls were rejected after the tokens were spent</div>
+                <p class="flag__text">Rejections occurred across 9 sessions. The conversations containing them cost $26.50 in total.</p>
+                <div class="flag__trend">13 this week, 9 last week</div>
+              </div>
+              <div class="flag__foot"><a href="#">View evidence &rarr;</a></div>
+            </article>
+
+            <article class="card flag flag--warn">
+              <div class="flag__body">
+                <div class="flag__row">
+                  <span class="pill pill--warn">MCP inventory</span>
+                  <span class="flag__metric">2 servers</span>
+                </div>
+                <div class="flag__title">Two MCP servers connected without a single tool call</div>
+                <p class="flag__text"><span class="code">github</span> connected 69 times and had 1 tool call. <span class="code">sentry</span> connected 12 times and had none. Tool definitions are sent on every request.</p>
+                <div class="flag__trend">2 this week, 2 last week</div>
+              </div>
+              <div class="flag__foot"><a href="#">View evidence &rarr;</a></div>
+            </article>
+          </div>
+          <a class="link-more" href="#"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 9l6 6 6-6"></path></svg> Show two more</a>
+        </div>
+
+        <div>
+          <div class="section__title">Recent conversations</div>
+          <div class="rows" id="conversations"></div>
+        </div>
+      </section>
+
+      <!-- ============================ SESSIONS ============================ -->
+      <section class="page" id="page-sessions" data-screen-label="Sessions" hidden>
+        <div>
+          <h1>Sessions</h1>
+          <p class="page__sub">Every agent run recorded locally, and the conversations inside each one.</p>
+        </div>
+
+        <div class="toolbar">
+          <div class="toolbar__left">
+            <label class="field">
+              <span class="field__label">Date range</span>
+              <select><option>1 week</option><option>1 month</option><option>3 months</option><option>All time</option></select>
+            </label>
+            <div class="seg">
+              <button aria-pressed="true">Sessions</button>
+              <button aria-pressed="false">Conversations</button>
+            </div>
+          </div>
+          <button class="btn btn--primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"></path></svg> Export report
+          </button>
+        </div>
+
+        <div class="card card__pad">
+          <div class="card__title">Wasted spend per session</div>
+          <div class="card__desc">Cost of conversations containing a rejected call</div>
+          <div class="hbars" id="waste-per-session"></div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 3 3 8l9 5 9-5-9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5"></path></svg></span>
+              <div>
+                <div class="card__title">Cost concentration</div>
+                <div class="card__desc">Which session cost most, and which conversation inside it</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th class="disclose"></th><th>Session</th><th class="num">Conversations</th><th class="num">Cost</th>
+                <th class="num">% of range</th><th class="num">Cumulative %</th><th>Costliest conversation</th>
+              </tr></thead>
+              <tbody id="concentration"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 12h4l3-7 4 14 3-7h4"></path></svg></span>
+              <div>
+                <div class="card__title">Sessions</div>
+                <div class="card__desc">Sortable across every recorded metric</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table style="min-width:1020px">
+              <thead><tr>
+                <th>Session</th><th>Started</th><th class="num">Wall clock</th><th class="num">Active work</th>
+                <th class="num" aria-sort="descending">Cost &#8963;</th><th class="num">Tokens</th><th class="num">Conversations</th>
+                <th class="num">Tool calls</th><th class="num">Commits</th><th class="num">PRs</th><th class="num">+Lines</th>
+              </tr></thead>
+              <tbody id="sessions"></tbody>
+            </table>
+          </div>
+          <div class="card__foot">9 sessions under 3s &middot; $0.00</div>
+        </div>
+
+        <div class="chips">
+          <span class="chip chip--static">Wall clock includes idle time</span>
+          <span class="chip chip--static">Active work is user plus CLI engagement</span>
+        </div>
+      </section>
+
+      <!-- ============================ WASTE ============================ -->
+      <section class="page" id="page-waste" data-screen-label="Waste" hidden>
+        <div>
+          <h1>Waste</h1>
+          <p class="page__sub">Spend on work that was rejected, blocked or rebuilt.</p>
+        </div>
+
+        <div class="toolbar">
+          <label class="field">
+            <span class="field__label">Date range</span>
+            <select><option>1 week</option><option>1 month</option><option>3 months</option><option>All time</option></select>
+          </label>
+          <button class="btn btn--primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"></path></svg> Export report
+          </button>
+        </div>
+
+        <div class="grid-4" id="waste-kpis"></div>
+        <p class="note">Wasted spend attributes a conversation's full cost when any of its tool calls was rejected. Tool calls carry no individual cost, so finer attribution is not possible.</p>
+
+        <div class="card card__pad">
+          <div class="card__head" style="padding:0;border:none;align-items:flex-start">
+            <div>
+              <div class="card__title">Wasted spend</div>
+              <div class="card__desc">Click a bar to filter the tables below</div>
+            </div>
+            <div class="seg">
+              <button aria-pressed="true">By day</button>
+              <button aria-pressed="false">By session</button>
+            </div>
+          </div>
+          <div class="vchart">
+            <div class="yaxis" style="height:180px"><span>12</span><span>9</span><span>6</span><span>3</span><span>0</span></div>
+            <div style="flex:1;min-width:0">
+              <div class="vbars" id="waste-by-day"></div>
+              <div class="vlabels" id="waste-by-day-labels"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></span>
+              <div>
+                <div class="card__title">Permission friction</div>
+                <div class="card__desc">Time the agent spent waiting on a decision, by tool identity</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th class="disclose"></th><th>Tool</th><th class="num">Total calls</th>
+                <th class="num">Temporary allows</th><th class="num">Permanent allows</th><th class="num">Time blocked</th>
+              </tr></thead>
+              <tbody id="friction"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span>Page 1 of 2</span>
+            <button disabled>&lsaquo; Previous</button>
+            <button>Next &rsaquo;</button>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></span>
+              <div>
+                <div class="card__title">Rejected calls</div>
+                <div class="card__desc">What the agent attempted, and where the tokens went</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th class="disclose"></th><th>Tool</th><th>Session</th><th>Timestamp</th><th class="num">Conversation cost</th>
+              </tr></thead>
+              <tbody id="rejected"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h6"></path></svg></span>
+              <div>
+                <div class="card__title">Context pressure</div>
+                <div class="card__desc">Conversations that compacted or hit the output ceiling</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th>Conversation</th><th class="num">Cost</th><th class="num">Tokens</th><th class="num">Turns</th><th>Condition</th>
+              </tr></thead>
+              <tbody id="pressure"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></span>
+              <div>
+                <div class="card__title">Waste by session</div>
+                <div class="card__desc">Routes into the session detail</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Session</th><th>Day</th><th class="num">Rejected calls</th><th class="num">Wasted spend</th></tr></thead>
+              <tbody id="waste-by-session"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ TOOLS & MCP ============================ -->
+      <section class="page" id="page-tools" data-screen-label="Tools &amp; MCP" hidden>
+        <div>
+          <h1>Tools &amp; MCP</h1>
+          <p class="page__sub">Call volume, success rates and the servers whose definitions ride along on every request.</p>
+        </div>
+
+        <div class="toolbar">
+          <label class="field">
+            <span class="field__label">Date range</span>
+            <select><option>1 week</option><option>1 month</option><option>3 months</option><option>All time</option></select>
+          </label>
+          <button class="btn btn--primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12M7 11l5 5 5-5M4 20h16"></path></svg> Export report
+          </button>
+        </div>
+
+        <div class="card card__pad">
+          <div class="card__title">Tool usage</div>
+          <div class="card__desc">Top 12 tools by call count in this range</div>
+          <div class="hbars" id="tool-usage" style="--label-w:150px"></div>
+        </div>
+
+        <div class="grid-3" id="tools-kpis"></div>
+
+        <div class="chips">
+          <button class="chip" aria-pressed="true">All</button>
+          <button class="chip" aria-pressed="false">Native</button>
+          <button class="chip" aria-pressed="false">MCP</button>
+          <button class="chip" aria-pressed="false">Failing</button>
+          <button class="chip" aria-pressed="false">Slow</button>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2z"></path></svg></span>
+              <div>
+                <div class="card__title">Tools</div>
+                <div class="card__desc">Identity, volume, outcome and latency</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th>Tool</th><th class="num" aria-sort="descending">Calls &#8963;</th><th class="num">Success rate</th><th class="num">Average latency</th>
+              </tr></thead>
+              <tbody id="tools"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span>Page 1 of 2</span>
+            <button disabled>&lsaquo; Previous</button>
+            <button>Next &rsaquo;</button>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"></rect><rect x="3" y="13" width="18" height="7" rx="2"></rect></svg></span>
+              <div>
+                <div class="card__title">MCP inventory</div>
+                <div class="card__desc">Connections against actual tool usage</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th class="disclose"></th><th>Server</th><th class="num">Connections</th><th>Last connected</th>
+                <th class="num">Tool calls</th><th class="num">Distinct tools</th><th>Status</th>
+              </tr></thead>
+              <tbody id="mcp"></tbody>
+            </table>
+          </div>
+          <div class="card__foot">2 servers connected without a single tool call. Their tool definitions are sent on every request.</div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 18V8M10 18V4M16 18v-7M22 18h-20"></path></svg></span>
+              <div>
+                <div class="card__title">Model performance</div>
+                <div class="card__desc">Requests, errors and latency percentiles</div>
+              </div>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr>
+                <th>Model</th><th class="num">Effort</th><th class="num">Speed</th><th class="num">Requests</th>
+                <th class="num">Error rate</th><th class="num">p50 TTFT</th><th class="num">p95 TTFT</th>
+                <th class="num">p50 duration</th><th class="num">p95 duration</th>
+              </tr></thead>
+              <tbody id="model-perf"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card card--flush">
+          <div class="card__head">
+            <div class="card__head-main">
+              <span class="card__icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="8" r="3"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span>
+              <div>
+                <div class="card__title">Sub-agents and skills</div>
+                <div class="card__desc">Invocations recorded on tool calls</div>
+              </div>
+            </div>
+            <span class="pill pill--warn">Partial data</span>
+          </div>
+          <div class="tablewrap">
+            <table>
+              <thead><tr><th>Name</th><th class="num">Invocations</th><th class="num">Total cost</th><th class="num">Average duration</th></tr></thead>
+              <tbody id="agents"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ SEARCH ============================ -->
+      <section class="page" id="page-search" data-screen-label="Search" hidden style="max-width:900px">
+        <div>
+          <h1>Search</h1>
+          <p class="page__sub">Find a prompt, a tool call or a session by anything recorded on it.</p>
+        </div>
+        <div class="searchbar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(230,234,240,.45)" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          <input placeholder="Search prompts, tools, sessions&hellip;" />
+          <span class="kbd">&#8984;K</span>
+        </div>
+        <div class="empty">Results appear here as you type.</div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------
+   FIXTURE DATA — replace each key with the matching API payload.
+   Shapes here are the contract the markup above expects.
+--------------------------------------------------------------- */
+const ICON = {
+  overview: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+  sessions: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>',
+  waste:    '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>',
+  tools:    '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2z"/></svg>',
+  search:   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>'
+};
+
+const NAV = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'sessions', label: 'Sessions' },
+  { key: 'waste',    label: 'Waste',       badge: 13 },
+  { key: 'tools',    label: 'Tools & MCP', badge: 4 },
+  { key: 'search',   label: 'Search' }
+];
+
+const SPARK = {
+  spend:    'M0 28 C20 20 34 12 52 16 C70 20 80 32 100 30 C118 28 130 16 150 14 C168 12 182 22 200 20',
+  tokens:   'M0 30 C22 28 36 30 54 26 C74 21 84 26 104 24 C124 22 136 12 156 12 C176 12 186 18 200 14',
+  sessions: 'M0 26 C20 24 32 18 52 16 C72 14 84 22 104 24 C124 26 134 18 154 16 C174 14 188 20 200 22',
+  waste:    'M0 30 C20 30 34 22 52 24 C70 26 82 34 102 32 C122 30 132 14 152 14 C172 14 186 24 200 18 L200 40 L0 40 Z'
+};
+
+const DATA = {
+  overviewKpis: [
+    { label: 'Spend today',   value: '$28.32', note: '+41% vs 7-day average', spark: 'spend' },
+    { label: 'Tokens today',  value: '65.06M', note: '+18% vs 7-day average', spark: 'tokens' },
+    { label: 'Sessions today',value: '16',     note: '9 under 3s',            spark: 'sessions' },
+    { label: 'Wasted spend',  value: '$26.50', note: '48% of spend in range', spark: 'waste', tone: 'fault' }
+  ],
+  models: [
+    { name: 'Sonnet 4.5', cost: '$31.40', pct: 100 },
+    { name: 'Opus 4.1',   cost: '$18.90', pct: 60 },
+    { name: 'Haiku 4.5',  cost: '$4.82',  pct: 15 }
+  ],
+  conversations: [
+    { cost: '$9.37', when: '9 Aug 15:44', text: 'Refactor the insight link handling so cards carry a server-built link field. Today each card recomputes its own route on the client, which means the evidence view drifts.' },
+    { cost: '$8.84', when: '9 Aug 12:42', text: 'Explore the Go backend views and API for efficiency, sessions and waste. I want a written map of which view feeds which endpoint, where the aggregation happens.' },
+    { cost: '$7.11', when: '6 Aug 11:12', text: 'Add multi-insight support so each category can stack every qualifying finding rather than only the top one. Keep ordering deterministic by measured impact.' },
+    { cost: '$2.85', when: '7 Aug 14:03', text: 'Rename the landing page route and update the nav label.' },
+    { cost: '$2.71', when: '7 Aug 15:11', text: 'Check what data the collector is actually writing.' },
+    { cost: '$2.60', when: '4 Aug 10:22', text: 'Run the full build, vet and lint and confirm against real data.' }
+  ],
+  wastePerSession: [
+    { id: 'e34bd5d1', pct: 78 }, { id: '515e4413', pct: 56 }, { id: 'a7fd8eb4', pct: 35 },
+    { id: '0e189b1b', pct: 18 }, { id: '65de56e4', pct: 14 }, { id: '84de7b8b', pct: 5 },
+    { id: 'df981165', pct: 4 },  { id: 'd299981a', pct: 1.5 }, { id: '6abf8dfd', pct: .6 }
+  ],
+  concentration: [
+    { id: 'e34bd5d1', convs: 3, cost: '$26.80', pct: '60.2%', cum: '60.2%',  top: 'Refactor the insight link handling so cards carry a server-built link field' },
+    { id: '515e4413', convs: 1, cost: '$7.11',  pct: '16.0%', cum: '76.2%',  top: 'Add multi-insight support so each category can stack every finding' },
+    { id: 'a7fd8eb4', convs: 1, cost: '$4.37',  pct: '9.8%',  cum: '86.0%',  top: 'Rename the landing page route and update the nav label' },
+    { id: '0e189b1b', convs: 1, cost: '$2.21',  pct: '5.0%',  cum: '91.0%',  top: 'Run the full build, vet and lint and confirm against real data' },
+    { id: '65de56e4', convs: 1, cost: '$1.79',  pct: '4.0%',  cum: '95.0%',  top: 'Check what data the collector is actually writing' },
+    { id: '84de7b8b', convs: 1, cost: '$1.52',  pct: '3.4%',  cum: '98.4%',  top: 'continue. be token efficient' },
+    { id: 'df981165', convs: 0, cost: '$0.46',  pct: '1.0%',  cum: '99.5%',  top: '\u2014' },
+    { id: 'd299981a', convs: 0, cost: '$0.18',  pct: '0.4%',  cum: '99.9%',  top: '\u2014' },
+    { id: '6abf8dfd', convs: 0, cost: '$0.05',  pct: '0.1%',  cum: '100.0%', top: '\u2014' }
+  ],
+  sessions: [
+    { id: 'e34bd5d1', started: '9 Aug 12:28', wall: '9h 43m',  active: '26m 0s',  cost: '$26.80', tokens: '62.91M', convs: 3, calls: 276, commits: 3, prs: 1, lines: 1662 },
+    { id: '515e4413', started: '6 Aug 11:12', wall: '46m 12s', active: '17m 30s', cost: '$7.11',  tokens: '4.89M',  convs: 1, calls: 65,  commits: 2, prs: 1, lines: 310 },
+    { id: 'a7fd8eb4', started: '7 Aug 14:03', wall: '1h 12m',  active: '12m 50s', cost: '$4.37',  tokens: '4.13M',  convs: 1, calls: 40,  commits: 1, prs: '\u2014', lines: 204 },
+    { id: '0e189b1b', started: '4 Aug 10:22', wall: '38m 27s', active: '10m 50s', cost: '$2.21',  tokens: '4.13M',  convs: 1, calls: 33,  commits: 1, prs: '\u2014', lines: 127 },
+    { id: '65de56e4', started: '7 Aug 15:11', wall: '21m 8s',  active: '8m 30s',  cost: '$1.79',  tokens: '2.37M',  convs: 1, calls: 30,  commits: 1, prs: '\u2014', lines: 96 },
+    { id: '84de7b8b', started: '9 Aug 11:57', wall: '8m 4s',   active: '5m 50s',  cost: '$1.52',  tokens: '2.15M',  convs: 1, calls: 14,  commits: 1, prs: '\u2014', lines: 55 },
+    { id: 'df981165', started: '7 Aug 16:40', wall: '14m 51s', active: '3m 40s',  cost: '$0.46',  tokens: '729.7K', convs: 0, calls: 8,   commits: '\u2014', prs: '\u2014', lines: 41 },
+    { id: 'd299981a', started: '7 Aug 17:02', wall: '6m 2s',   active: '1m 50s',  cost: '$0.18',  tokens: '284.9K', convs: 0, calls: 5,   commits: '\u2014', prs: '\u2014', lines: 9 },
+    { id: '6abf8dfd', started: '7 Aug 17:44', wall: '2m 11s',  active: '1m 0s',   cost: '$0.05',  tokens: '816.9K', convs: 0, calls: 4,   commits: '\u2014', prs: '\u2014', lines: 3 }
+  ],
+  wasteKpis: [
+    { label: 'Wasted spend',       value: '$26.50', note: 'cost of conversations containing a rejected call' },
+    { label: 'Rejected tool calls',value: '13',     note: 'across 9 sessions' },
+    { label: 'Blocked on you',     value: '2h 28m', note: 'waiting on permission decisions' },
+    { label: 'Context pressure',   value: '12',     note: 'conversations that compacted or hit max tokens' }
+  ],
+  wasteByDay: [
+    { day: '4 Aug', pct: 28 }, { day: '6 Aug', pct: 58 }, { day: '7 Aug', pct: 66 }, { day: '9 Aug', pct: 92 }
+  ],
+  friction: [
+    { tool: 'ExitPlanMode',    calls: 5,   temp: 4, perm: 0, blocked: '1h 0m',   tone: 'fault' },
+    { tool: 'Bash',            calls: 269, temp: 8, perm: 5, blocked: '48m 49s', tone: 'fault' },
+    { tool: 'AskUserQuestion', calls: 7,   temp: 2, perm: 0, blocked: '38m 11s', tone: 'fault' },
+    { tool: 'Monitor',         calls: 1,   temp: 1, perm: 0, blocked: '1m 1s',   tone: 'warn' },
+    { tool: 'Read',            calls: 185, temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'Edit',            calls: 35,  temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'TaskUpdate',      calls: 33,  temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'TaskCreate',      calls: 21,  temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'mcp__playwright__computer', calls: 14, temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'Write',           calls: 11,  temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'mcp__playwright__navigate', calls: 10, temp: 0, perm: 0, blocked: '0s' },
+    { tool: 'Agent',           calls: 7,   temp: 0, perm: 0, blocked: '0s' }
+  ],
+  rejected: [
+    { tool: 'Bash',  session: 'e34bd5d1', ts: '9 Aug 12:51', cost: '$8.84' },
+    { tool: 'Bash',  session: '515e4413', ts: '6 Aug 11:38', cost: '$7.11' },
+    { tool: 'Bash',  session: 'a7fd8eb4', ts: '7 Aug 14:22', cost: '$2.85' },
+    { tool: 'Bash',  session: 'a7fd8eb4', ts: '7 Aug 14:41', cost: '$2.85' },
+    { tool: 'Write', session: 'a7fd8eb4', ts: '7 Aug 14:52', cost: '$2.85' },
+    { tool: 'Bash',  session: '0e189b1b', ts: '4 Aug 10:48', cost: '$2.60' },
+    { tool: 'Bash',  session: '65de56e4', ts: '7 Aug 15:33', cost: '$2.71' },
+    { tool: 'Bash',  session: '84de7b8b', ts: '9 Aug 12:04', cost: '$2.44' },
+    { tool: 'Bash',  session: 'df981165', ts: '7 Aug 16:47', cost: '$0.46' },
+    { tool: 'Edit',  session: 'df981165', ts: '7 Aug 16:52', cost: '$0.46' },
+    { tool: 'Bash',  session: 'd299981a', ts: '7 Aug 17:09', cost: '$0.18' },
+    { tool: 'Bash',  session: '6abf8dfd', ts: '7 Aug 17:47', cost: '$0.05' },
+    { tool: 'Bash',  session: 'e34bd5d1', ts: '9 Aug 16:22', cost: '$9.37' }
+  ],
+  pressure: [
+    { id: 'p_9f2a11', text: 'Refactor the insight link handling so cards\u2026', cost: '$9.37', tokens: '20.26M', turns: 47, condition: 'Compaction' },
+    { id: 'p_7c40de', text: 'Explore the Go backend views and API\u2026',       cost: '$8.84', tokens: '23.20M', turns: 74, condition: 'Compaction, max tokens' }
+  ],
+  wasteBySession: [
+    { id: 'e34bd5d1', day: '9 Aug', rejected: 2, cost: '$9.77' },
+    { id: '515e4413', day: '6 Aug', rejected: 1, cost: '$7.11' },
+    { id: 'a7fd8eb4', day: '7 Aug', rejected: 3, cost: '$4.37' },
+    { id: '0e189b1b', day: '4 Aug', rejected: 1, cost: '$2.21' },
+    { id: '65de56e4', day: '7 Aug', rejected: 1, cost: '$1.79' },
+    { id: '84de7b8b', day: '9 Aug', rejected: 1, cost: '$0.55' },
+    { id: 'df981165', day: '7 Aug', rejected: 2, cost: '$0.46' },
+    { id: 'd299981a', day: '7 Aug', rejected: 1, cost: '$0.18' },
+    { id: '6abf8dfd', day: '7 Aug', rejected: 1, cost: '$0.05' }
+  ],
+  toolUsage: [
+    { name: 'Bash', pct: 96 }, { name: 'Read', pct: 66 }, { name: 'Edit', pct: 13 },
+    { name: 'TaskUpdate', pct: 12 }, { name: 'TaskCreate', pct: 8 }, { name: 'playwright \u00b7 computer', pct: 5 },
+    { name: 'Write', pct: 4 }, { name: 'playwright \u00b7 navigate', pct: 4 }, { name: 'Agent', pct: 2.5 },
+    { name: 'AskUserQuestion', pct: 2.5 }, { name: 'ExitPlanMode', pct: 2 }, { name: 'filesystem \u00b7 search_services', pct: 1.4 }
+  ],
+  toolsKpis: [
+    { label: 'Total tool calls',      value: '610', note: 'across every session in range' },
+    { label: 'Success rate',          value: '97%', note: '18 calls returned an error' },
+    { label: 'Calls slower than 1s',  value: '7',   note: 'tools by average duration' }
+  ],
+  tools: [
+    { name: 'Bash', calls: 269, rate: '97%',  rateTone: 'warn', latency: '10s',     latTone: 'warn' },
+    { name: 'Read', calls: 185, rate: '98%',  rateTone: 'warn', latency: '4ms' },
+    { name: 'Edit', calls: 35,  rate: '100%', rateTone: 'good', latency: '4ms' },
+    { name: 'TaskUpdate', calls: 33, rate: '100%', rateTone: 'good', latency: '5ms' },
+    { name: 'TaskCreate', calls: 21, rate: '100%', rateTone: 'good', latency: '3ms' },
+    { name: 'mcp__playwright__computer', calls: 14, rate: '86%', rateTone: 'warn', latency: '69ms' },
+    { name: 'Write', calls: 11, rate: '100%', rateTone: 'good', latency: '2s', latTone: 'warn' },
+    { name: 'mcp__playwright__navigate', calls: 10, rate: '90%', rateTone: 'warn', latency: '61ms' },
+    { name: 'AskUserQuestion', calls: 7, rate: '100%', rateTone: 'good', latency: '5m 20s', latTone: 'warn' },
+    { name: 'Agent', calls: 7, rate: '100%', rateTone: 'good', latency: '1m 42s', latTone: 'warn' },
+    { name: 'ExitPlanMode', calls: 5, rate: '100%', rateTone: 'good', latency: '10m 54s', latTone: 'warn' },
+    { name: 'mcp__filesystem__search_services', calls: 4, rate: '75%', rateTone: 'warn', latency: '1s' },
+    { name: 'mcp__postgres__query', calls: 2, rate: '100%', rateTone: 'good', latency: '254ms' },
+    { name: 'mcp__filesystem__get_service', calls: 2, rate: '100%', rateTone: 'good', latency: '487ms' },
+    { name: 'mcp__filesystem__list_services', calls: 2, rate: '0%', rateTone: 'fault', latency: '38ms' }
+  ],
+  mcp: [
+    { server: 'filesystem', connections: 69, last: '9 Aug, 22:11', calls: 19, distinct: 5, status: 'Active',      tone: 'good' },
+    { server: 'github',     connections: 69, last: '9 Aug, 22:11', calls: 1,  distinct: 1, status: 'Active',      tone: 'good' },
+    { server: 'playwright', connections: 0,  last: '\u2014',       calls: 63, distinct: 9, status: 'Active',      tone: 'good' },
+    { server: 'postgres',   connections: 20, last: '7 Aug, 15:17', calls: 2,  distinct: 2, status: 'Active',      tone: 'good' },
+    { server: 'sentry',     connections: 12, last: '7 Aug, 09:04', calls: 0,  distinct: 0, status: 'Dead config', tone: 'warn' }
+  ],
+  modelPerf: [
+    { model: 'claude-sonnet-4-5', effort: '\u2014', speed: '\u2014', requests: 412, err: '0.7%', p50t: '620ms',  p95t: '1840ms', p50d: '4s',  p95d: '19s' },
+    { model: 'claude-opus-4-1',   effort: 'high',   speed: '\u2014', requests: 88,  err: '2.3%', errTone: 'warn', p50t: '1140ms', p95t: '3120ms', p50d: '10s', p95d: '41s' },
+    { model: 'claude-haiku-4-5',  effort: '\u2014', speed: 'fast',   requests: 156, err: '0.0%', p50t: '210ms',  p95t: '480ms',  p50d: '1s',  p95d: '3s' }
+  ],
+  agents: [
+    { name: 'general-purpose', kind: 'Sub-agent', invocations: 5, cost: '$3.42', duration: '1m 42s' },
+    { name: 'code-reviewer',   kind: 'Sub-agent', invocations: 2, cost: '$1.18', duration: '1m 4s' },
+    { name: 'pdf-extract',     kind: 'Skill',     invocations: 3, cost: '$0.44', duration: '8s' },
+    { name: 'sql-explain',     kind: 'Skill',     invocations: 2, cost: '$0.21', duration: '3s' }
+  ]
+};
+
+/* ---------------------------------------------------------------
+   RENDER — plain DOM, no framework. Swap for React components 1:1;
+   every block below maps to one card in the markup above.
+--------------------------------------------------------------- */
+const $ = id => document.getElementById(id);
+const html = (el, s) => { el.innerHTML = s; };
+const code = v => '<span class="code">' + v + '</span>';
+const tone = t => t ? ' ' + t : '';
+
+/* nav + routing */
+function renderNav(active) {
+  html($('nav'), NAV.map(n =>
+    '<button class="navitem" data-key="' + n.key + '"' + (n.key === active ? ' aria-current="page"' : '') + '>' +
+      '<span class="navitem__main">' + ICON[n.key] + n.label + '</span>' +
+      (n.badge ? '<span class="navitem__badge">' + n.badge + '</span>' : '') +
+    '</button>'
+  ).join(''));
+  $('nav').querySelectorAll('.navitem').forEach(b => b.onclick = () => go(b.dataset.key));
+}
+function go(key) {
+  NAV.forEach(n => $('page-' + n.key).hidden = n.key !== key);
+  renderNav(key);
+  document.querySelector('.main').scrollTop = 0;
+}
+
+/* overview */
+html($('overview-kpis'), DATA.overviewKpis.map(k =>
+  '<div class="card kpi' + (k.tone === 'fault' ? ' kpi--fault' : '') + '">' +
+    '<div class="kpi__label">' + k.label + '</div>' +
+    '<div class="kpi__value">' + k.value + '</div>' +
+    '<div class="kpi__note">' + k.note + '</div>' +
+    '<svg class="spark" viewBox="0 0 200 40" preserveAspectRatio="none"><path d="' + SPARK[k.spark] + '" fill="' +
+      (k.tone === 'fault' ? 'rgba(255,107,96,.12)' : 'none') + '" stroke="' +
+      (k.tone === 'fault' ? 'var(--fault)' : 'var(--chart)') + '" stroke-width="1.6"/></svg>' +
+  '</div>'
+).join(''));
+
+html($('model-bars'), DATA.models.map(m =>
+  '<div><div class="bar__top"><span>' + m.name + '</span><b>' + m.cost + '</b></div>' +
+  '<div class="bar__track"><div class="bar__fill" style="width:' + m.pct + '%"></div></div></div>'
+).join(''));
+
+html($('conversations'), DATA.conversations.map(c =>
+  '<a class="row" href="#"><span class="row__cost">' + c.cost + '</span>' +
+  '<span class="row__text">' + c.text + '</span>' +
+  '<span class="row__when">' + c.when + '</span></a>'
+).join(''));
+
+/* sessions */
+function hbars(el, rows) {
+  html(el, rows.map(r =>
+    '<div class="hbar"><span class="hbar__label">' + (r.id || r.name) + '</span>' +
+    '<div class="hbar__val" style="width:' + r.pct + '%"></div></div>'
+  ).join(''));
+}
+hbars($('waste-per-session'), DATA.wastePerSession);
+$('waste-per-session').insertAdjacentHTML('beforeend',
+  '<div class="hbar"><span></span><div class="hbar__scale"><span>0</span><span>3</span><span>6</span><span>9</span><span>12</span></div></div>');
+
+html($('concentration'), DATA.concentration.map(r =>
+  '<tr><td class="disclose">\u203a</td><td>' + code(r.id) + '</td>' +
+  '<td class="num">' + r.convs + '</td><td class="num strong">' + r.cost + '</td>' +
+  '<td class="num">' + r.pct + '</td><td class="num dim">' + r.cum + '</td>' +
+  '<td class="truncate dim">' + r.top + '</td></tr>'
+).join(''));
+
+html($('sessions'), DATA.sessions.map(s =>
+  '<tr><td>' + code(s.id) + '</td><td class="dim">' + s.started + '</td>' +
+  '<td class="num">' + s.wall + '</td><td class="num">' + s.active + '</td>' +
+  '<td class="num strong">' + s.cost + '</td><td class="num">' + s.tokens + '</td>' +
+  '<td class="num">' + s.convs + '</td><td class="num">' + s.calls + '</td>' +
+  '<td class="num dim">' + s.commits + '</td><td class="num dim">' + s.prs + '</td>' +
+  '<td class="num">' + s.lines + '</td></tr>'
+).join(''));
+
+/* waste */
+function kpis(el, rows) {
+  html(el, rows.map(k =>
+    '<div class="card kpi"><div class="kpi__label">' + k.label + '</div>' +
+    '<div class="kpi__value">' + k.value + '</div>' +
+    '<div class="kpi__note">' + k.note + '</div></div>'
+  ).join(''));
+}
+kpis($('waste-kpis'), DATA.wasteKpis);
+kpis($('tools-kpis'), DATA.toolsKpis);
+
+html($('waste-by-day'), DATA.wasteByDay.map(d => '<div class="vbar" style="height:' + d.pct + '%"></div>').join(''));
+html($('waste-by-day-labels'), DATA.wasteByDay.map(d => '<span>' + d.day + '</span>').join(''));
+
+html($('friction'), DATA.friction.map(f =>
+  '<tr><td class="disclose">\u203a</td><td>' + code(f.tool) + '</td>' +
+  '<td class="num">' + f.calls + '</td><td class="num">' + f.temp + '</td>' +
+  '<td class="num">' + f.perm + '</td><td class="num' + tone(f.tone) + '">' + f.blocked + '</td></tr>'
+).join(''));
+
+html($('rejected'), DATA.rejected.map(r =>
+  '<tr><td class="disclose">\u203a</td><td>' + code(r.tool) + '</td>' +
+  '<td style="font-family:var(--mono);font-size:12px" class="dim">' + r.session + '</td>' +
+  '<td class="dim">' + r.ts + '</td><td class="num strong">' + r.cost + '</td></tr>'
+).join(''));
+
+html($('pressure'), DATA.pressure.map(p =>
+  '<tr><td>' + code(p.id) + ' <span class="dim">' + p.text + '</span></td>' +
+  '<td class="num strong">' + p.cost + '</td><td class="num">' + p.tokens + '</td>' +
+  '<td class="num">' + p.turns + '</td><td class="dim">' + p.condition + '</td></tr>'
+).join(''));
+
+html($('waste-by-session'), DATA.wasteBySession.map(w =>
+  '<tr><td>' + code(w.id) + '</td><td class="dim">' + w.day + '</td>' +
+  '<td class="num">' + w.rejected + '</td><td class="num strong fault">' + w.cost + '</td></tr>'
+).join(''));
+
+/* tools & mcp */
+hbars($('tool-usage'), DATA.toolUsage);
+$('tool-usage').insertAdjacentHTML('beforeend',
+  '<div class="hbar"><span></span><div class="hbar__scale"><span>0</span><span>70</span><span>140</span><span>210</span><span>280</span></div></div>');
+
+html($('tools'), DATA.tools.map(t =>
+  '<tr><td>' + code(t.name) + '</td><td class="num">' + t.calls + '</td>' +
+  '<td class="num' + tone(t.rateTone) + '">' + t.rate + '</td>' +
+  '<td class="num' + tone(t.latTone) + '">' + t.latency + '</td></tr>'
+).join(''));
+
+html($('mcp'), DATA.mcp.map(m =>
+  '<tr><td class="disclose">\u203a</td><td>' + code(m.server) + '</td>' +
+  '<td class="num">' + m.connections + '</td><td class="dim">' + m.last + '</td>' +
+  '<td class="num">' + m.calls + '</td><td class="num">' + m.distinct + '</td>' +
+  '<td><span class="pill pill--' + m.tone + '">' + m.status + '</span></td></tr>'
+).join(''));
+
+html($('model-perf'), DATA.modelPerf.map(m =>
+  '<tr><td>' + code(m.model) + '</td><td class="num dim">' + m.effort + '</td>' +
+  '<td class="num dim">' + m.speed + '</td><td class="num">' + m.requests + '</td>' +
+  '<td class="num' + tone(m.errTone) + '">' + m.err + '</td>' +
+  '<td class="num">' + m.p50t + '</td><td class="num">' + m.p95t + '</td>' +
+  '<td class="num">' + m.p50d + '</td><td class="num">' + m.p95d + '</td></tr>'
+).join(''));
+
+html($('agents'), DATA.agents.map(a =>
+  '<tr><td>' + code(a.name) + ' <span class="pill pill--quiet">' + a.kind + '</span></td>' +
+  '<td class="num">' + a.invocations + '</td><td class="num strong">' + a.cost + '</td>' +
+  '<td class="num">' + a.duration + '</td></tr>'
+).join(''));
+
+/* segmented + chip toggles (visual only) */
+document.querySelectorAll('.seg, .chips').forEach(group => {
+  group.querySelectorAll('button').forEach(b => b.onclick = () => {
+    group.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', 'true');
+  });
+});
+
+go('overview');
+</script>
+</body>
+</html>

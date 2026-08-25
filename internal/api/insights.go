@@ -73,7 +73,20 @@ func (s *Server) handleInsights(w http.ResponseWriter, r *http.Request) {
 		haveCutoff = true
 	}
 
-	ctx := r.Context()
+	insights, err := computeInsights(r.Context(), s.db, cutoffMs, haveCutoff)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, insights)
+}
+
+// computeInsights runs every registered check and returns the qualifying
+// Insights. Shared by handleInsights (JSON passthrough) and AI Mode's
+// context builder (internal/api/ai.go), which needs the same deterministic
+// facts rather than re-implementing the checks.
+func computeInsights(ctx context.Context, db *sql.DB, cutoffMs int64, haveCutoff bool) ([]Insight, error) {
 	insights := []Insight{}
 
 	checks := []func(context.Context, *sql.DB, int64, bool) (*Insight, error){
@@ -84,10 +97,9 @@ func (s *Server) handleInsights(w http.ResponseWriter, r *http.Request) {
 		longApprovalWaitInsight,
 	}
 	for _, check := range checks {
-		ins, err := check(ctx, s.db, cutoffMs, haveCutoff)
+		ins, err := check(ctx, db, cutoffMs, haveCutoff)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
+			return nil, err
 		}
 		if ins != nil {
 			insights = append(insights, *ins)
@@ -104,17 +116,16 @@ func (s *Server) handleInsights(w http.ResponseWriter, r *http.Request) {
 		deadMCPServerInsight,
 	}
 	for _, check := range untimedChecks {
-		ins, err := check(ctx, s.db)
+		ins, err := check(ctx, db)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
+			return nil, err
 		}
 		if ins != nil {
 			insights = append(insights, *ins)
 		}
 	}
 
-	writeJSON(w, http.StatusOK, insights)
+	return insights, nil
 }
 
 // topCostPromptInsight flags the single most expensive prompt (by

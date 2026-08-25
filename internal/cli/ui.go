@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 func runUI(args []string) error {
 	fs := newFlagSet("ui")
 	noBrowser := fs.Bool("no-browser", false, "don't try to open the dashboard in a browser")
+	port := fs.Int("port", 0, "override the API port from config.json, without persisting it")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -43,7 +45,11 @@ func runUI(args []string) error {
 		return fmt.Errorf("load embedded dashboard: %w", err)
 	}
 
-	addr := fmt.Sprintf("127.0.0.1:%d", cfg.APIPort)
+	apiPort := cfg.APIPort
+	if *port != 0 {
+		apiPort = *port
+	}
+	addr := fmt.Sprintf("127.0.0.1:%d", apiPort)
 	srv := api.NewServer(addr, db, distFS)
 
 	serveErr := make(chan error, 1)
@@ -53,7 +59,15 @@ func runUI(args []string) error {
 	fmt.Printf("ccotel dashboard: %s\n", url)
 	fmt.Println("API endpoints:")
 	for _, ep := range api.Endpoints() {
-		fmt.Printf("  http://%s%s\n", addr, ep[len("GET "):])
+		method, path, ok := strings.Cut(ep, " ")
+		if !ok {
+			method, path = "", ep
+		}
+		if method == "" || method == "GET" {
+			fmt.Printf("  http://%s%s\n", addr, path)
+		} else {
+			fmt.Printf("  %s http://%s%s\n", method, addr, path)
+		}
 	}
 	fmt.Println("press Ctrl+C to stop")
 

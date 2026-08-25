@@ -10,12 +10,14 @@ export function PageShell({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex h-full flex-col">
-      <header className="border-b border-wire px-6 py-4">
-        <h1 className="font-display text-lg font-semibold text-ink">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-ink/60">{subtitle}</p>}
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-6">{children}</div>
+    <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-8 py-7 pb-14">
+      <div>
+        <h1 className="font-display text-[29px] font-bold tracking-tight text-ink">
+          {title}
+        </h1>
+        {subtitle && <p className="mt-1.5 text-sm text-ink/55">{subtitle}</p>}
+      </div>
+      {children}
     </div>
   );
 }

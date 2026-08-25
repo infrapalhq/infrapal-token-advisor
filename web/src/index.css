@@ -7,32 +7,59 @@
 @import "@fontsource/jetbrains-mono/500.css";
 
 /*
- * ccotel design tokens (light theme). Six named hex values plus a secondary
- * categorical palette used only to distinguish span types in the waterfall.
- * Deliberately not a straight hue-inversion of the prior dark theme: signal/
- * fault/cat-* are darkened relative to their dark-mode values since those
- * were tuned for contrast against a near-black page and read as too light
- * for body/link text on a white one. See HANDOFF.md "Milestone 6 recap" for
- * the original dark-theme rationale this supersedes.
+ * infrapal / Token Advisor design tokens. Dark is the default theme (see
+ * new_design/token-advisor-redesign-handoff.html); [data-theme="light"] on
+ * <html> swaps every token back to the original light-theme values so the
+ * topbar theme toggle has a real second theme to switch to, not just a
+ * darkened version of the same one.
  */
 @theme {
-  --color-ink: #1c1e24;
-  --color-void: #f1f1ee;
-  --color-panel: #ffffff;
-  --color-wire: #dcdcd7;
-  --color-signal: #b45309;
-  --color-fault: #dc2626;
+  --color-void: #080b11;
+  --color-panel: #111823;
+  --color-panel-2: #0d141d;
+  --color-chrome: #0b1017;
+  --color-wire: #1e2733;
+  --color-wire-2: #25303f;
+  --color-ink: #e6eaf0;
+  --color-signal: #4c8dff;
+  --color-action: #5b5bd6;
+  --color-fault: #ff6b60;
+  --color-warn: #e0a33c;
+  --color-good: #4ade80;
+  --color-chart: #8b9bb4;
 
   /* Categorical palette: span-type distinction in the waterfall only. */
+  --color-cat-tool: #38bdf8;
+  --color-cat-llm: #a78bfa;
+  --color-cat-subagent: #34d399;
+  --color-cat-mcp: #f472b6;
+  --color-cat-neutral: #94a3b8;
+
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root[data-theme="light"] {
+  --color-void: #f1f1ee;
+  --color-panel: #ffffff;
+  --color-panel-2: #f1f1ee;
+  --color-chrome: #ffffff;
+  --color-wire: #dcdcd7;
+  --color-wire-2: #dcdcd7;
+  --color-ink: #1c1e24;
+  --color-signal: #b45309;
+  --color-action: #b45309;
+  --color-fault: #dc2626;
+  --color-warn: #b45309;
+  --color-good: #059669;
+  --color-chart: #64748b;
+
   --color-cat-tool: #0284c7;
   --color-cat-llm: #7c3aed;
   --color-cat-subagent: #059669;
   --color-cat-mcp: #db2777;
   --color-cat-neutral: #64748b;
-
-  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
 html,
@@ -48,6 +75,15 @@ body {
   font-family: var(--font-body);
 }
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-wire-2);
+  border-radius: 6px;
+}
+
 /* Diagonal-hatch texture for blocked_on_user spans in the waterfall. */
 .hatch-fault {
   background-image: repeating-linear-gradient(
@@ -57,4 +93,189 @@ body {
     transparent 3px,
     transparent 7px
   );
+}
+
+@layer components {
+  .card {
+    @apply rounded-lg border border-wire bg-panel;
+  }
+  .card-pad {
+    @apply p-5;
+  }
+  .card-head {
+    @apply flex items-center justify-between gap-3 border-b border-wire px-5 py-4;
+  }
+  .card-icon {
+    @apply flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-md border border-wire-2 bg-panel-2 text-chart;
+  }
+  .card-title {
+    @apply font-display text-[15px] font-semibold text-ink;
+  }
+  .card-desc {
+    @apply text-[12.5px] text-ink/55;
+  }
+  .card-foot {
+    @apply border-t border-wire px-5 py-3 text-[12.5px] text-ink/45;
+  }
+
+  .field-label {
+    @apply text-xs text-ink/45;
+  }
+  .select,
+  .text-input {
+    @apply h-[38px] rounded-md border border-wire-2 bg-panel px-3 font-body text-sm text-ink outline-none;
+  }
+
+  .btn {
+    @apply flex h-8 items-center gap-2 rounded-md border border-wire-2 bg-panel px-3 text-[13px] text-ink/70 transition-colors hover:bg-panel-2 hover:text-ink;
+  }
+  .btn-icon {
+    @apply w-8 justify-center px-0;
+  }
+  .btn-primary {
+    @apply h-[38px] rounded-md border-0 bg-action px-4 text-sm font-medium text-white hover:bg-action/85;
+  }
+
+  .seg {
+    @apply flex gap-0.5 rounded-lg border border-wire-2 bg-panel-2 p-[3px];
+  }
+  .seg-btn {
+    @apply h-[30px] rounded-md px-3.5 text-[13px] text-ink/55;
+  }
+  .seg-btn-active {
+    @apply bg-wire-2 font-medium text-ink;
+  }
+
+  .pill {
+    @apply rounded-full border px-2.5 py-0.5 text-[11.5px];
+  }
+  .pill-fault {
+    @apply border-fault/35 bg-fault/10 text-fault;
+  }
+  .pill-signal {
+    @apply border-signal/35 bg-signal/10 text-signal;
+  }
+  .pill-warn {
+    @apply border-warn/35 bg-warn/10 text-warn;
+  }
+  .pill-good {
+    @apply border-good/30 bg-good/10 text-good;
+  }
+  .pill-quiet {
+    @apply border-wire-2 bg-transparent text-[11px] text-ink/55;
+  }
+
+  .code {
+    @apply rounded border border-wire-2 bg-panel-2 px-2 py-0.5 font-mono text-xs;
+  }
+
+  .kpi-label {
+    @apply text-[11px] uppercase tracking-wide text-ink/45;
+  }
+  .kpi-value {
+    @apply mt-2.5 font-display text-[28px] font-semibold tracking-tight text-ink;
+  }
+  .kpi-note {
+    @apply mt-1.5 text-xs leading-relaxed text-ink/55;
+  }
+
+  table {
+    @apply w-full border-collapse text-left;
+  }
+  thead tr {
+    @apply bg-panel-2;
+  }
+  th {
+    @apply whitespace-nowrap px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wide text-ink/45;
+  }
+  td {
+    @apply whitespace-nowrap border-t border-wire px-3.5 py-3 text-[13px] text-ink;
+  }
+  .num {
+    @apply text-right;
+  }
+  .dim {
+    @apply text-ink/55;
+  }
+  .strong {
+    @apply font-semibold;
+  }
+  .fault {
+    @apply text-fault;
+  }
+  .warn {
+    @apply text-warn;
+  }
+  .good {
+    @apply text-good;
+  }
+  .cell-truncate {
+    @apply max-w-[340px] overflow-hidden text-ellipsis whitespace-nowrap;
+  }
+  tbody tr {
+    @apply transition-colors;
+  }
+  tbody tr.row-link {
+    @apply cursor-pointer hover:bg-panel-2;
+  }
+  .disclose {
+    @apply w-10 text-ink/35;
+  }
+
+  .row {
+    @apply grid grid-cols-[90px_minmax(0,1fr)_100px] items-center gap-4 rounded-lg border border-wire bg-panel px-4.5 py-3.5 text-ink transition-colors hover:border-wire-2 hover:bg-panel-2;
+  }
+  .row-cost {
+    @apply text-sm font-semibold;
+  }
+  .row-text {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-[13.5px] text-ink/70;
+  }
+  .row-when {
+    @apply text-right font-mono text-xs text-ink/35;
+  }
+
+  .hbar {
+    @apply grid grid-cols-[var(--label-w,96px)_minmax(0,1fr)] items-center gap-3.5;
+  }
+  .hbar-label {
+    @apply overflow-hidden text-ellipsis whitespace-nowrap text-right font-mono text-xs text-ink/70;
+  }
+  .hbar-val {
+    @apply h-5 rounded-sm border border-chart/60 bg-chart/10;
+  }
+  .hbar-scale {
+    @apply flex justify-between text-[11px] text-ink/35;
+  }
+
+  .flag {
+    @apply flex flex-col border-l-[3px] border-l-fault;
+  }
+  .flag-signal {
+    @apply border-l-signal;
+  }
+  .flag-warn {
+    @apply border-l-warn;
+  }
+  .flag-title {
+    @apply mt-3 text-[15px] font-semibold leading-snug text-ink;
+  }
+  .flag-text {
+    @apply mt-2.5 text-[13px] leading-relaxed text-ink/70;
+  }
+
+  .chip {
+    @apply h-[30px] rounded-full border border-wire-2 bg-panel-2 px-3.5 text-xs text-ink/55;
+  }
+  .chip-active {
+    @apply border-wire-2 bg-wire-2 text-ink;
+  }
+
+  .empty {
+    @apply rounded-lg border border-dashed border-wire-2 bg-panel-2 p-10 text-center text-[13px] text-ink/45;
+  }
+
+  .link-more {
+    @apply inline-flex items-center gap-1.5 text-[13px] text-signal hover:underline;
+  }
 }

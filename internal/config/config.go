@@ -32,6 +32,23 @@ type Config struct {
 	// Empty if init never ran, or settings.json didn't exist yet at init
 	// time. uninstall uses this to restore settings.json byte-for-byte.
 	SettingsBackupPath string `json:"settings_backup_path"`
+
+	// AnthropicAPIKey is the user's own key, pasted into the AI Mode
+	// settings panel. Used only in direct response to the "Generate"
+	// button (internal/ai, internal/api/ai.go) — ccotel's one deliberate
+	// network-egress exception; see ResolveAnthropicAPIKey.
+	AnthropicAPIKey string `json:"anthropic_api_key,omitempty"`
+}
+
+// ResolveAnthropicAPIKey returns the key AI Mode should use: the
+// ANTHROPIC_API_KEY environment variable if set (never persisted back to
+// config.json), else the key stored in cfg. Empty means AI Mode is
+// unconfigured.
+func ResolveAnthropicAPIKey(cfg Config) string {
+	if v := os.Getenv("ANTHROPIC_API_KEY"); v != "" {
+		return v
+	}
+	return cfg.AnthropicAPIKey
 }
 
 // Default returns ccotel's out-of-the-box configuration.
@@ -67,5 +84,12 @@ func Save(p paths.Paths, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p.ConfigPath, data, paths.FileMode)
+	if err := os.WriteFile(p.ConfigPath, data, paths.FileMode); err != nil {
+		return err
+	}
+	// config.json can now hold a secret (AnthropicAPIKey). WriteFile only
+	// applies FileMode when creating the file, so explicitly chmod to
+	// tighten a pre-existing looser-mode file too — mirrors store.Open's
+	// belt-and-suspenders chmod on ccotel.db.
+	return os.Chmod(p.ConfigPath, paths.FileMode)
 }
