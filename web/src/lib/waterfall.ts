@@ -2,6 +2,15 @@ import type { ApiRequest, Interaction, ToolCall } from "./api";
 
 export type RowKind = "llm" | "tool" | "mcp" | "subagent";
 
+// minPerceptibleBlockedMs is the floor below which blocked_on_user_ms is
+// treated as approval overhead noise rather than a real wait — a handful
+// of milliseconds from a config-decided auto-approval, not a pause for a
+// human. Below this, the hatch overlay doesn't render at all: at a
+// zoomed-out timeline scale, a hatch's own minimum render width would
+// otherwise make a near-instant approval look like the whole call was
+// blocked.
+const minPerceptibleBlockedMs = 250;
+
 export type WaterfallRow = {
   id: string;
   kind: RowKind;
@@ -63,7 +72,7 @@ export function buildWaterfallRows(
       : tc.subagent_type
         ? `subagent: ${tc.subagent_type}`
         : (tc.full_command ?? null);
-    const blocked = tc.blocked_on_user_ms != null && tc.blocked_on_user_ms > 0;
+    const blocked = tc.blocked_on_user_ms != null && tc.blocked_on_user_ms >= minPerceptibleBlockedMs;
     return {
       id: `tool-${tc.tool_use_id}`,
       kind,
