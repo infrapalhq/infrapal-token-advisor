@@ -1,5 +1,7 @@
-import { useNavigate } from "react-router-dom";
 import type { Theme } from "../lib/theme";
+import { useDateRange } from "../lib/dateRange";
+import { TimeRangeSelect } from "./TimeRangeSelect";
+import { OPEN_COMMAND_PALETTE_EVENT } from "./CommandPalette";
 
 const iconProps = {
   fill: "none",
@@ -16,7 +18,7 @@ export function Topbar({
   theme: Theme;
   onToggleTheme: () => void;
 }) {
-  const navigate = useNavigate();
+  const { range, setRange } = useDateRange();
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-wire bg-chrome px-5">
@@ -30,8 +32,14 @@ export function Topbar({
         <span className="h-[18px] w-px bg-wire-2" />
         <span className="text-[13px] text-ink/55">Token Advisor</span>
       </div>
-      <div className="flex items-center gap-2">
-        <button type="button" className="btn" onClick={() => navigate("/search")}>
+      <div className="flex items-center gap-3">
+        <TimeRangeSelect value={range} onChange={setRange} compact />
+        <span className="h-[18px] w-px bg-wire-2" />
+        <button
+          type="button"
+          className="btn"
+          onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
+        >
           <span className="font-mono text-xs text-ink/45">⌘K</span> Jump to
         </button>
         <button

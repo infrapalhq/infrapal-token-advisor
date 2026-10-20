@@ -6,8 +6,11 @@ Claude Code emits into a SQLite database, and serves an embedded dashboard
 for reading it back — cost, tokens, tool usage, permission friction, and a
 flame-chart-style waterfall of every prompt's execution.
 
-Single-user, local-only, no network egress. Nothing here talks to any server
-other than `127.0.0.1`.
+Single-user, local-only by default. The dashboard's API is bound to
+`127.0.0.1` and never talks to any other server, with one deliberate
+exception: the Trace page's optional "Explain this trace" action calls the
+Anthropic API, and only once you've configured an API key yourself. See
+"Network egress" below.
 
 ## Install
 
@@ -109,17 +112,27 @@ Both bind to `127.0.0.1` only, never `0.0.0.0`. Configurable in
 
 ## The dashboard
 
-`ccotel ui` serves seven pages: **Today** (cost/tokens/sessions/active-time
-with sparklines), **Sessions** (sortable table), **Waterfall** (the
-centerpiece — a Gantt-style timeline of one prompt's LLM calls, tool calls,
-and nested subagent spans, with time spent blocked on your own approval
-called out separately from Claude's own latency), **Efficiency** (cost vs.
-prompt length and turn count), **Waste** (rejected-work cost and permission
-friction, framed as allow-rules you should add to your settings), **Tools &
-MCP** (usage, success rate, latency, and which connected MCP servers never
-actually had a tool called — dead config costing you tool-definition tokens
-on every request), and **Search** (full-text search across your own prompt
-and response history).
+`ccotel ui` serves three pages, each showing only what earns its place —
+a chart stays only if it shows a shape you can't state in a sentence:
+
+- **Fix** (`/`) — the reason to reopen the tool. Ranked, actionable
+  findings (dead MCP servers, permission friction, sessions left open,
+  rejected work, fat tool payloads, cache invalidation, retry loops, and
+  background calls on an expensive model), each priced in tokens/minutes/
+  dollars where that's honestly knowable, with a copy-pasteable fix and
+  Dismiss/Snooze/Mark-fixed. One chart: recoverable tokens over time,
+  falling as you fix things.
+- **Spend** (`/spend`) — token composition, cost concentration (which
+  session accounts for most of your spend), a tool cost/payload/failure
+  matrix, a sortable sessions table, and tools/models usage and latency.
+- **Trace** (`/trace`) — never a cold entry point, reached from a finding,
+  a session, or a conversation. The Gantt-style waterfall of one prompt's
+  LLM calls, tool calls, and nested subagent spans (time blocked on your
+  own approval called out separately from Claude's own latency), plus
+  per-turn context growth and an optional "Explain this trace" action.
+
+Full-text search across your own prompt/response history and a global jump
+list live behind ⌘K from any page.
 
 ## Privacy
 
@@ -137,8 +150,14 @@ and file paths — this is a tool for reading your own history, so treat
   `ccotel init --raw-bodies`**, and even then only to
   `~/.ccotel/bodies` as files — never inlined into the database, which
   would silently truncate at 60 KB and bloat every export.
-- Zero outbound network calls, ever. There is no telemetry about the
-  telemetry tool.
+- No telemetry about the telemetry tool, and no outbound network calls in
+  the default configuration. The one exception: the Trace page's "Explain
+  this trace" action sends the deterministic findings context (numbers,
+  names, ids — never raw prompt/response text) to the Anthropic API, and
+  only once you've explicitly configured an API key and clicked it. The
+  local database also gains its first write endpoint alongside this —
+  `POST /api/findings/{id}/state`, which records a Dismiss/Snooze/
+  Mark-fixed decision against a local table and never leaves the machine.
 
 ## Gotchas (read before you trust a number in the dashboard)
 

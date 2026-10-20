@@ -12,23 +12,28 @@ import (
 // their actual SQL view. The path segment is never interpolated into a
 // query directly — only a value looked up from this map is.
 var viewTable = map[string]string{
-	"prompt_efficiency":   "v_prompt_efficiency",
-	"wasted_spend":        "v_wasted_spend",
-	"permission_friction": "v_permission_friction",
-	"mcp_inventory":       "v_mcp_inventory",
-	"session_summary":     "v_session_summary",
-	"model_performance":   "v_model_performance",
-	"tool_payload":        "v_tool_payload",
-	"retry_waste":         "v_retry_waste",
+	"prompt_efficiency":     "v_prompt_efficiency",
+	"wasted_spend":          "v_wasted_spend",
+	"permission_friction":   "v_permission_friction",
+	"mcp_inventory":         "v_mcp_inventory",
+	"session_summary":       "v_session_summary",
+	"model_performance":     "v_model_performance",
+	"tool_payload":          "v_tool_payload",
+	"retry_waste":           "v_retry_waste",
+	"turn_context":          "v_turn_context",
+	"session_cache_health":  "v_session_cache_health",
+	"ancillary_model_spend": "v_ancillary_model_spend",
 }
 
 // viewsWithSessionID lists which of the above views carry a session_id
 // column, and therefore accept the ?session_id= filter.
 var viewsWithSessionID = map[string]bool{
-	"prompt_efficiency": true,
-	"wasted_spend":      true,
-	"session_summary":   true,
-	"retry_waste":       true,
+	"prompt_efficiency":    true,
+	"wasted_spend":         true,
+	"session_summary":      true,
+	"retry_waste":          true,
+	"turn_context":         true,
+	"session_cache_health": true,
 }
 
 // sinceColumn describes the column a view's ?since= filter applies to.

@@ -21,6 +21,11 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
 }
 
+// decodeJSONBody decodes the request body's JSON into dst.
+func decodeJSONBody(r *http.Request, dst any) error {
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
 // intParam reads an integer query parameter, falling back to def if absent
 // or unparseable.
 func intParam(r *http.Request, name string, def int) int {

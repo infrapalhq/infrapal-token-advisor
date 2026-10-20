@@ -2,12 +2,32 @@ package api
 
 import "net/http"
 
-// handleListInteractions handles GET /api/interactions?limit=&offset=&since=:
-// a flat, paginated feed of real interactions across all sessions, newest
-// first, enriched with per-prompt cost/tokens/turns/tool-call-count from
+// interactionSortColumns whitelists the ?sort= values accepted by
+// handleListInteractions against the actual ORDER BY expression — the
+// query param is never interpolated directly.
+var interactionSortColumns = map[string]string{
+	"started_at": "i.started_at DESC",
+	"cost":       "COALESCE(pe.total_cost_usd, 0) DESC",
+	"errors":     "COALESCE(pe.tool_error_count, 0) DESC",
+}
+
+// handleListInteractions handles GET /api/interactions?limit=&offset=&since=&sort=:
+// a flat, paginated feed of real interactions across all sessions,
+// enriched with per-prompt cost/tokens/turns/tool-call-count from
 // v_prompt_efficiency — the data a card browser needs without a second
 // round trip per card. since (e.g. "7d", "30d") restricts to interactions
-// started at or after that cutoff; omitted means all time.
+// started at or after that cutoff; omitted means all time. sort defaults
+// to started_at (newest first); cost and errors sort descending by their
+// own column.
+//
+// Interactions with zero total_tokens (a bare model-routing/login/
+// remote-control event with nothing for a waterfall to show) are always
+// excluded — there's no reason to browse them, only to trip over them.
+//
+// rejected_count/tool_error_count/blocked_on_user_ms are carried through so
+// the Trace page's filter chips (Expensive/Failed/Rejected/Long-running)
+// work client-side off this one response, without a second round trip per
+// card.
 func (s *Server) handleListInteractions(w http.ResponseWriter, r *http.Request) {
 	limit := intParam(r, "limit", 50)
 	offset := intParam(r, "offset", 0)
@@ -18,22 +38,31 @@ func (s *Server) handleListInteractions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	sortExpr, ok := interactionSortColumns[r.URL.Query().Get("sort")]
+	if !ok {
+		sortExpr = interactionSortColumns["started_at"]
+	}
+
 	query := `
 		SELECT i.prompt_id, i.session_id, i.seq, i.started_at, i.duration_ms,
 			i.prompt_text, i.prompt_length, i.command_name,
 			COALESCE(pe.total_cost_usd, 0) AS total_cost_usd,
 			COALESCE(pe.total_tokens, 0) AS total_tokens,
 			COALESCE(pe.llm_turn_count, 0) AS llm_turn_count,
-			COALESCE(pe.tool_call_count, 0) AS tool_call_count
+			COALESCE(pe.tool_call_count, 0) AS tool_call_count,
+			COALESCE(pe.rejected_count, 0) AS rejected_count,
+			COALESCE(pe.tool_error_count, 0) AS tool_error_count,
+			COALESCE(pe.blocked_on_user_ms, 0) AS blocked_on_user_ms
 		FROM interactions i
 		LEFT JOIN v_prompt_efficiency pe ON pe.prompt_id = i.prompt_id
+		WHERE COALESCE(pe.total_tokens, 0) > 0
 	`
 	args := []any{}
 	if hasSince {
-		query += " WHERE i.started_at >= ?"
+		query += " AND i.started_at >= ?"
 		args = append(args, cutoffMs)
 	}
-	query += " ORDER BY i.started_at DESC LIMIT ? OFFSET ?"
+	query += " ORDER BY " + sortExpr + " LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(r.Context(), query, args...)

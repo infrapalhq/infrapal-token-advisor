@@ -73,10 +73,10 @@ func (s *Server) handleGetAIRecommendations(w http.ResponseWriter, r *http.Reque
 }
 
 // handlePostAIRecommendations handles POST /api/ai/recommendations, body
-// {"since": "30d", "force": false}. This is ccotel's one deliberate
-// network-egress point — it runs only in direct response to this request,
-// which the frontend only ever sends from the AI Mode page's explicit
-// "Generate" button.
+// {"since": "30d", "force": false}. This is one of ccotel's two deliberate
+// exceptions to read-only/local-only (see the package doc) — it runs only
+// in direct response to a user-triggered request, which the frontend only
+// ever sends from the Trace page's "Explain this trace" action.
 func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Since string `json:"since"`
@@ -108,18 +108,23 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 	}
 	apiKey := config.ResolveAnthropicAPIKey(cfg)
 	if apiKey == "" {
-		writeError(w, http.StatusPreconditionFailed, "no Anthropic API key configured — add one on the AI Mode page first")
+		writeError(w, http.StatusPreconditionFailed, "no Anthropic API key configured — add one from the Trace page first")
 		return
 	}
 
-	rawInsights, err := computeInsights(r.Context(), s.db, cutoffMs, haveCutoff)
+	rawFindings, err := computeFindings(r.Context(), s.db)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	facts := make([]ai.InsightFact, len(rawInsights))
-	for i, ins := range rawInsights {
-		facts[i] = ai.InsightFact{Category: ins.Category, Severity: ins.Severity, Title: ins.Title, Detail: ins.Detail}
+	facts := make([]ai.InsightFact, len(rawFindings))
+	for i, f := range rawFindings {
+		facts[i] = ai.InsightFact{
+			Category: findingCategoryForAI(f.Kind),
+			Severity: findingSeverityForAI(f.Severity),
+			Title:    f.Title,
+			Detail:   f.Evidence,
+		}
 	}
 
 	client := ai.NewClient(apiKey)
@@ -134,4 +139,29 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// findingCategoryForAI maps a Finding.Kind (the 4 detector kinds in
+// findings.go, each guaranteed to carry a runnable fix) onto the 4-value
+// category enum ai.InsightFact and the Anthropic tool schema
+// (internal/ai/client.go) already expect.
+func findingCategoryForAI(kind string) string {
+	switch kind {
+	case "dead_mcp":
+		return "tools"
+	case "permission_friction", "rejected_work":
+		return "waste"
+	default: // fat_payload
+		return "efficiency"
+	}
+}
+
+// findingSeverityForAI maps a Finding.Severity ("bad"|"warn"|"good"|"info")
+// onto the 2-value severity enum ("info"|"warn") the rest of the AI
+// pipeline expects.
+func findingSeverityForAI(severity string) string {
+	if severity == "bad" || severity == "warn" {
+		return "warn"
+	}
+	return "info"
 }

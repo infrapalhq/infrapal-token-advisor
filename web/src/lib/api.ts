@@ -45,14 +45,20 @@ export type InteractionSummary = {
   total_tokens: number;
   llm_turn_count: number;
   tool_call_count: number;
+  rejected_count: number;
+  tool_error_count: number;
+  blocked_on_user_ms: number;
 };
+
+export type InteractionSort = "started_at" | "cost" | "errors";
 
 export function listInteractions(
   limit = 50,
   offset = 0,
   since?: string,
+  sort: InteractionSort = "cost",
 ): Promise<InteractionSummary[]> {
-  const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const qs = new URLSearchParams({ limit: String(limit), offset: String(offset), sort });
   if (since) qs.set("since", since);
   return getJSON(`/api/interactions?${qs}`);
 }
@@ -164,6 +170,19 @@ async function getJSON<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+async function postJSON<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error ?? `${path}: HTTP ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 export function listSessions(
   limit = 50,
   offset = 0,
@@ -271,16 +290,123 @@ export function getTimeseries(
   );
 }
 
-export type Insight = {
-  id: string;
-  category: "efficiency" | "sessions" | "waste" | "tools";
-  severity: "info" | "warn";
-  title: string;
-  detail: string;
-  link: string;
+// Impact prices a Finding in whichever units are actually knowable — a
+// unit ccotel can't honestly compute for this finding is simply absent
+// (undefined), never a fabricated zero. See internal/api/findings.go's
+// Impact struct.
+export type Impact = {
+  tokens_est?: number;
+  minutes?: number;
+  usd?: number;
+  estimated: boolean;
+  note?: string;
 };
 
-export function getInsights(since?: string): Promise<Insight[]> {
-  const qs = since ? `?since=${encodeURIComponent(since)}` : "";
-  return getJSON(`/api/insights${qs}`);
+export type VizPoint = { label: string; a: number; b?: number };
+
+export type Viz = {
+  type: "stacked" | "bar";
+  unit: "bytes" | "minutes" | "count";
+  points: VizPoint[];
+};
+
+// fix_lang tells the Fix page how to label and how to run/apply Fix:
+// "bash" — shell commands to run as-is; "settings-json" — paste into the
+// "permissions" key of ~/.claude/settings.json; "claude-md" — paste into
+// CLAUDE.md. Every Finding this API returns is guaranteed to carry a
+// non-empty fix — see internal/api/findings.go's computeFindings comment.
+export type FixLang = "bash" | "settings-json" | "claude-md";
+
+export type Finding = {
+  id: string;
+  kind: string;
+  severity: "bad" | "warn" | "good" | "info";
+  title: string;
+  evidence: string;
+  impact: Impact;
+  fix: string;
+  fix_lang: FixLang;
+  link?: string;
+  viz?: Viz;
+  state: "open" | "dismissed" | "snoozed" | "fixed";
+};
+
+// getFindings takes no ?since= — every remaining detector queries all-time
+// data (see internal/api/findings.go's handleFindings doc).
+export function getFindings(): Promise<Finding[]> {
+  return getJSON(`/api/findings`);
 }
+
+export function setFindingState(
+  id: string,
+  state: "dismissed" | "snoozed" | "fixed",
+  snoozeDays?: number,
+): Promise<{ id: string; state: string }> {
+  return postJSON(`/api/findings/${encodeURIComponent(id)}/state`, {
+    state,
+    snooze_days: snoozeDays,
+  });
+}
+
+export type FindingsActivity = { fixed: number; dismissed: number };
+
+export function getFindingsActivity(since = "7d"): Promise<FindingsActivity> {
+  return getJSON(`/api/findings/activity?since=${encodeURIComponent(since)}`);
+}
+
+// Point/ToolPayload/RetryWaste mirror internal/store/migrations/0007's
+// views and the tokens_* timeseries aliases (internal/api/timeseries.go) —
+// folded in here now that both ship on the same release build these
+// fetches already talk to (they previously lived behind a second, dev-only
+// /opt-api instance while these views were new; see git history).
+export type Point = { bucket: string; value: number };
+
+export type ToolPayload = {
+  tool_name: string;
+  mcp_server_name: string | null;
+  mcp_tool_name: string | null;
+  call_count: number;
+  total_input_bytes: number;
+  total_result_bytes: number;
+  avg_result_bytes: number | null;
+  total_result_tokens: number;
+};
+
+export type RetryWaste = {
+  session_id: string;
+  day: string;
+  retried_requests: number;
+  retried_cost_usd: number;
+  retried_tokens: number;
+};
+
+// TurnContext is one row of v_turn_context (migration 0010): the peak
+// context size (not the summed spend) carried by one turn, plus whether it
+// hit compaction or the max-tokens ceiling.
+export type TurnContext = {
+  prompt_id: string;
+  session_id: string;
+  seq: number;
+  started_at: number;
+  peak_context_tokens: number;
+  triggered_compaction: number;
+  hit_max_tokens: number;
+};
+
+// SessionCacheHealth and AncillaryModelSpend (migration 0011) back two
+// Spend-page stats. Neither has a runnable fix, so neither is a Fix-page
+// Finding — see internal/api/findings.go's computeFindings comment.
+export type SessionCacheHealth = {
+  session_id: string;
+  cache_read_tokens: number;
+  cache_creation_tokens: number;
+  cache_hit_ratio: number | null;
+};
+
+export type AncillaryModelSpend = {
+  query_source: string;
+  model: string;
+  request_count: number;
+  cost_usd: number;
+  tokens: number;
+};
