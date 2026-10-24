@@ -3,7 +3,7 @@ package cli
 import (
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/durfmt"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
 )
 
 // parseSince parses durations like "7d", "24h", "30m", "2w" — the shorthand

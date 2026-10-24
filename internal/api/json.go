@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/durfmt"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
 )
 
 // writeJSON encodes v as the response body with the given status code.

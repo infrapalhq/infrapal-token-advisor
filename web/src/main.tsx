@@ -1,39 +1,61 @@
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import "./index.css";
-import App from "./App.tsx";
-import Fix from "./routes/Fix.tsx";
-import Spend from "./routes/Spend.tsx";
-import Trace from "./routes/Trace.tsx";
+import Overview from "./ta/Overview";
+import Sessions from "./ta/Sessions";
+import SessionPage from "./ta/Session";
+import Fixes from "./ta/Fixes";
+import Settings from "./ta/Settings";
+import { api } from "./ta/api";
 
-// RedirectPreservingQuery sends an old path to `to`, carrying over the
-// current query string (e.g. a saved /waterfall?session=..&prompt=.. link
-// becomes /trace?session=..&prompt=..).
+// The old Fix, Spend and Trace routes are replaced by the mock's pages. Their
+// saved links keep working: /spend and /trace go to Overview and Sessions, and
+// /trace?session=<id> opens that session.
 function RedirectPreservingQuery({ to }: { to: string }) {
   const location = useLocation();
   return <Navigate to={`${to}${location.search}`} replace />;
+}
+
+function TraceRedirect() {
+  const location = useLocation();
+  const session = new URLSearchParams(location.search).get("session");
+  return <Navigate to={session ? `/sessions/${encodeURIComponent(session)}` : "/sessions"} replace />;
+}
+
+// VisitRecorder tells the API the Sessions page was opened, so "NEW since your
+// last visit" is accurate on the next load.
+function VisitRecorder() {
+  useEffect(() => {
+    api.visit().catch(() => {});
+  }, []);
+  return null;
+}
+
+function SessionRoute() {
+  const { id } = useParams();
+  return <SessionPage key={id} />;
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<App />}>
-          <Route index element={<Fix />} />
-          <Route path="spend" element={<Spend />} />
-          <Route path="trace" element={<Trace />} />
+        <Route path="/" element={<Overview />} />
+        <Route path="/sessions" element={<><VisitRecorder /><Sessions /></>} />
+        <Route path="/sessions/:id" element={<SessionRoute />} />
+        <Route path="/fixes" element={<Fixes />} />
+        <Route path="/settings" element={<Settings />} />
 
-          {/* Redirects from the pre-redesign 7-tab layout, so saved links
-              and bookmarks keep working. */}
-          <Route path="waste" element={<RedirectPreservingQuery to="/" />} />
-          <Route path="optimize" element={<RedirectPreservingQuery to="/spend" />} />
-          <Route path="tools" element={<RedirectPreservingQuery to="/spend" />} />
-          <Route path="sessions" element={<RedirectPreservingQuery to="/spend" />} />
-          <Route path="waterfall" element={<RedirectPreservingQuery to="/trace" />} />
-          <Route path="search" element={<RedirectPreservingQuery to="/trace" />} />
-          <Route path="ai-mode" element={<RedirectPreservingQuery to="/trace" />} />
-        </Route>
+        <Route path="/spend" element={<RedirectPreservingQuery to="/" />} />
+        <Route path="/trace" element={<TraceRedirect />} />
+        <Route path="/waste" element={<RedirectPreservingQuery to="/" />} />
+        <Route path="/optimize" element={<RedirectPreservingQuery to="/" />} />
+        <Route path="/tools" element={<RedirectPreservingQuery to="/" />} />
+        <Route path="/waterfall" element={<TraceRedirect />} />
+        <Route path="/search" element={<RedirectPreservingQuery to="/sessions" />} />
+        <Route path="/ai-mode" element={<RedirectPreservingQuery to="/settings" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,

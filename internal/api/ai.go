@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/ai"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/config"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/durfmt"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ai"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
 
 // handleGetAIConfig handles GET /api/ai/config — reports only whether an

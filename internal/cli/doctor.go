@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/claudesettings"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 )
 
 // managedSettingsPath returns the platform's enterprise managed-settings.json
@@ -63,7 +63,7 @@ func runDoctor(args []string) error {
 		conn.Close()
 	}
 	ok(dialErr == nil, fmt.Sprintf("collector listening on %s", addr),
-		"run `ccotel start` (foreground) or `ccotel init` (background service) to bring the collector up")
+		"run `infrapal-token-advisor start` (foreground) or `infrapal-token-advisor init` (background service) to bring the collector up")
 
 	// 2. Does settings.json contain our env block, endpoint matching our port?
 	doc, existed, err := claudesettings.Load(p.ClaudeSettingsPath)
@@ -96,8 +96,8 @@ func runDoctor(args []string) error {
 			settingsOK = true
 		}
 	}
-	ok(settingsOK, fmt.Sprintf("%s has ccotel's env block", p.ClaudeSettingsPath),
-		fmt.Sprintf("%s — run `ccotel init` to fix", settingsDetail))
+	ok(settingsOK, fmt.Sprintf("%s has infrapal-token-advisor's env block", p.ClaudeSettingsPath),
+		fmt.Sprintf("%s — run `infrapal-token-advisor init` to fix", settingsDetail))
 
 	// 3. Conflicting OTEL_*/CLAUDE_CODE_* vars in doctor's own shell env.
 	var conflicting []string
@@ -111,7 +111,7 @@ func runDoctor(args []string) error {
 		ok(true, "no OTEL_*/CLAUDE_CODE_* vars exported in this shell", "")
 	} else {
 		ok(false, "no OTEL_*/CLAUDE_CODE_* vars exported in this shell",
-			fmt.Sprintf("this shell exports: %s — these can override settings.json for any `claude` launched from here; unset them or reconcile with `ccotel init`'s values. Note: this only reflects the shell doctor was invoked from, not every shell you might launch `claude` from.", strings.Join(conflicting, ", ")))
+			fmt.Sprintf("this shell exports: %s — these can override settings.json for any `claude` launched from here; unset them or reconcile with `infrapal-token-advisor init`'s values. Note: this only reflects the shell doctor was invoked from, not every shell you might launch `claude` from.", strings.Join(conflicting, ", ")))
 	}
 
 	// 4. Managed settings file present (strips developer-set OTLP endpoints)?

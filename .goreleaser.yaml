@@ -1,6 +1,6 @@
 version: 2
 
-project_name: ccotel
+project_name: infrapal-token-advisor
 
 before:
   hooks:
@@ -8,9 +8,9 @@ before:
     - ./scripts/build-web.sh
 
 builds:
-  - id: ccotel
-    main: ./cmd/ccotel
-    binary: ccotel
+  - id: infrapal-token-advisor
+    main: ./cmd/infrapal-token-advisor
+    binary: infrapal-token-advisor
     # modernc.org/sqlite is pure Go, so CGO stays off — one static binary
     # per platform, no libsqlite3 to link against on the build or install
     # machine.
@@ -23,10 +23,10 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/ShamikMukhopadhyay/ccotel/internal/cli.Version={{.Version}}
+      - -s -w -X github.com/infrapalhq/infrapal-token-advisor/internal/cli.Version={{.Version}}
 
 archives:
-  - id: ccotel
+  - id: infrapal-token-advisor
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
@@ -45,15 +45,15 @@ changelog:
       - "^chore:"
 
 brews:
-  - name: ccotel
+  - name: infrapal-token-advisor
     repository:
-      owner: ShamikMukhopadhyay
+      owner: infrapalhq
       name: homebrew-tap
     directory: Formula
-    homepage: "https://github.com/ShamikMukhopadhyay/ccotel"
+    homepage: "https://github.com/infrapalhq/infrapal-token-advisor"
     description: "Local-only OTLP receiver, SQLite store, and dashboard for Claude Code telemetry"
     license: "MIT"
     install: |
-      bin.install "ccotel"
+      bin.install "infrapal-token-advisor"
     test: |
-      assert_match "ccotel", shell_output("#{bin}/ccotel version")
+      assert_match "infrapal-token-advisor", shell_output("#{bin}/infrapal-token-advisor version")

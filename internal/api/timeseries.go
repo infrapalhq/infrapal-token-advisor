@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/durfmt"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
 )
 
 // metricSpec maps a short API alias to the metric_points.name it reads and,

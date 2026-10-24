@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/store"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 func openTestDB(t *testing.T) *sql.DB {

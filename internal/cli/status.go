@@ -6,9 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/service"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/store"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 func runStatus(args []string) error {
@@ -79,7 +79,7 @@ func serviceStatusLine(p paths.Paths) string {
 	}
 	switch {
 	case !st.Installed:
-		return "not installed — run `ccotel init`"
+		return "not installed — run `infrapal-token-advisor init`"
 	case st.Running:
 		return "running — " + st.Detail
 	default:

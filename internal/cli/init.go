@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/claudesettings"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/config"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/service"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
 
 func runInit(args []string) error {
@@ -72,7 +72,7 @@ func runInit(args []string) error {
 	}
 
 	if len(changes) == 0 {
-		fmt.Println("settings.json already had everything ccotel wants — nothing changed")
+		fmt.Println("settings.json already had everything infrapal-token-advisor wants — nothing changed")
 	} else {
 		fmt.Println("changed in", p.ClaudeSettingsPath+":")
 		for _, c := range changes {
@@ -152,7 +152,7 @@ func installService(p paths.Paths) error {
 	}
 	svc, err := newService(sp)
 	if err == service.ErrUnsupported {
-		fmt.Println("no supported service manager on this platform — run `ccotel start` yourself (e.g. via cron @reboot or your own supervisor) to keep the collector running")
+		fmt.Println("no supported service manager on this platform — run `infrapal-token-advisor start` yourself (e.g. via cron @reboot or your own supervisor) to keep the collector running")
 		return nil
 	}
 	if err != nil {
