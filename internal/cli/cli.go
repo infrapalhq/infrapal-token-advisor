@@ -7,21 +7,21 @@ import (
 	"fmt"
 )
 
-const usage = `ccotel — local Claude Code telemetry collector
+const usage = `infrapal-token-advisor — local Claude Code telemetry collector
 
 Usage:
-  ccotel init            patch ~/.claude/settings.json, create DB, install background service
-  ccotel start           run collector in foreground (what the service invokes)
-  ccotel stop            stop the background service
-  ccotel status          is the service up, DB size, event count, last event timestamp
-  ccotel ui              start API + serve embedded React app, open browser
-  ccotel doctor          diagnose why no data is arriving
-  ccotel export          export captured data (--format jsonl|csv --since 7d)
-  ccotel purge           delete captured data (--before 30d | --session <id> | --all)
-  ccotel uninstall       revert settings.json from backup, remove service
-  ccotel version       print the ccotel version
+  infrapal-token-advisor init            patch ~/.claude/settings.json, create DB, install background service
+  infrapal-token-advisor start           run collector in foreground (what the service invokes)
+  infrapal-token-advisor stop            stop the background service
+  infrapal-token-advisor status          is the service up, DB size, event count, last event timestamp
+  infrapal-token-advisor ui              start API + serve embedded React app, open browser
+  infrapal-token-advisor doctor          diagnose why no data is arriving
+  infrapal-token-advisor export          export captured data (--format jsonl|csv --since 7d)
+  infrapal-token-advisor purge           delete captured data (--before 30d | --session <id> | --all)
+  infrapal-token-advisor uninstall       revert settings.json from backup, remove service
+  infrapal-token-advisor version       print the infrapal-token-advisor version
 
-Run "ccotel <command> -h" for flags on a specific command.
+Run "infrapal-token-advisor <command> -h" for flags on a specific command.
 `
 
 // Version is ccotel's build version, overridden at release build time via
@@ -56,7 +56,7 @@ func Run(args []string) error {
 		fmt.Print(usage)
 		return nil
 	case "-v", "--version", "version":
-		fmt.Println("ccotel " + Version)
+		fmt.Println("infrapal-token-advisor " + Version)
 		return nil
 	}
 
@@ -71,7 +71,7 @@ func Run(args []string) error {
 // notImplemented prints a stub message for commands whose real behavior
 // arrives in a later build milestone, per the project's build order.
 func notImplemented(name string, milestone string) error {
-	fmt.Printf("ccotel %s: not implemented yet — arrives in milestone %s\n", name, milestone)
+	fmt.Printf("infrapal-token-advisor %s: not implemented yet — arrives in milestone %s\n", name, milestone)
 	return nil
 }
 

@@ -10,7 +10,7 @@ func runReplay(args []string) error {
 		return err
 	}
 	if fs.NArg() != 1 {
-		return fmt.Errorf("usage: ccotel replay <dir>")
+		return fmt.Errorf("usage: infrapal-token-advisor replay <dir>")
 	}
 	return notImplemented("replay", "2/3 (ingest pipeline)")
 }

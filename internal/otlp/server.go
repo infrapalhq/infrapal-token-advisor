@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
 )
 
 // Server is the local OTLP http/protobuf receiver, implementing the logs,

@@ -49,7 +49,11 @@ func writeLogsBatch(db *sql.DB, batch []RawEvent) error {
 	}
 	defer stmt.Close()
 
+	touched := map[string]struct{}{}
 	for _, e := range batch {
+		if e.SessionID != "" {
+			touched[e.SessionID] = struct{}{}
+		}
 		if _, err := stmt.Exec(
 			e.Ts,
 			nullableString(e.SessionID),
@@ -65,6 +69,11 @@ func writeLogsBatch(db *sql.DB, batch []RawEvent) error {
 		}
 		if err := projectLogEvent(tx, e); err != nil {
 			return fmt.Errorf("project %q: %w", e.EventName, err)
+		}
+	}
+	for sid := range touched {
+		if err := resolveSessionProject(tx, sid); err != nil {
+			return fmt.Errorf("resolve project for session %s: %w", sid, err)
 		}
 	}
 	return tx.Commit()

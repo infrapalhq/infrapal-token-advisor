@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/store"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 // seedDB builds a temp SQLite DB with one session ("s1"), one interaction

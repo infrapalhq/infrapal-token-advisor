@@ -1,4 +1,4 @@
-module github.com/ShamikMukhopadhyay/ccotel
+module github.com/infrapalhq/infrapal-token-advisor
 
 go 1.26.2
 

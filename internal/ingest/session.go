@@ -26,6 +26,17 @@ func upsertSession(tx *sql.Tx, sessionID string, ts int64, attrs, resourceAttrs 
 		}
 	}
 
+	// The earliest session ever captured marks the install date (ui_state
+	// install_at, the baseline for "since install"). Keeps the minimum seen,
+	// regardless of the order batches arrive in.
+	if _, err := tx.Exec(`
+		INSERT INTO ui_state (key, value) VALUES ('install_at', CAST(? AS TEXT))
+		ON CONFLICT(key) DO UPDATE SET
+			value = CAST(MIN(CAST(ui_state.value AS INTEGER), CAST(excluded.value AS INTEGER)) AS TEXT)`,
+		ts); err != nil {
+		return err
+	}
+
 	_, err := tx.Exec(`
 		INSERT INTO sessions (
 			session_id, started_at, ended_at, start_type, app_version,
