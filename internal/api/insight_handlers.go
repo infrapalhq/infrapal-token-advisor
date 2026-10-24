@@ -139,7 +139,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var fixFirst []*insightItem
+	fixFirst := []*insightItem{}
 	var recoveredUSD, recoveredMin float64
 	for _, it := range open {
 		if it.Fix == "" {
@@ -179,7 +179,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Slice(modelRows, func(i, j int) bool { return modelRows[i]["cost_usd"].(float64) > modelRows[j]["cost_usd"].(float64) })
 
-	var review []sessionCard
+	review := []sessionCard{}
 	for _, c := range cards {
 		if c.Priority == "now" && len(review) < 2 {
 			review = append(review, c)
