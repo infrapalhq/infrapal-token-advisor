@@ -3,8 +3,8 @@ package cli
 import (
 	"database/sql"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/store"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 // openDB resolves ccotel's paths, ensures the base directory exists, and

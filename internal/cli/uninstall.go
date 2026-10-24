@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/claudesettings"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/config"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/service"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
 
 func runUninstall(args []string) error {
@@ -29,7 +29,7 @@ func runUninstall(args []string) error {
 	svc, err := newService(sp)
 	switch {
 	case err == service.ErrUnsupported:
-		fmt.Println("no supported service manager on this platform — stop and remove the `ccotel start` process yourself")
+		fmt.Println("no supported service manager on this platform — stop and remove the `infrapal-token-advisor start` process yourself")
 	case err != nil:
 		return err
 	default:

@@ -52,6 +52,16 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	mux.HandleFunc("PUT /api/ai/config", s.handlePutAIConfig)
 	mux.HandleFunc("GET /api/ai/recommendations", s.handleGetAIRecommendations)
 	mux.HandleFunc("POST /api/ai/recommendations", s.handlePostAIRecommendations)
+	mux.HandleFunc("GET /api/overview", s.handleOverview)
+	mux.HandleFunc("GET /api/sessions/cards", s.handleSessionCards)
+	mux.HandleFunc("GET /api/sessions/{id}/timeline", s.handleSessionTimeline)
+	mux.HandleFunc("GET /api/sessions/{id}/issues", s.handleSessionIssues)
+	mux.HandleFunc("GET /api/fixes", s.handleFixes)
+	mux.HandleFunc("POST /api/fixes/{id}/state", s.handlePostFixState)
+	mux.HandleFunc("GET /api/ui/state", s.handleGetUIState)
+	mux.HandleFunc("POST /api/ui/visit", s.handlePostUIVisit)
+	mux.HandleFunc("GET /api/progress", s.handleProgress)
+	mux.HandleFunc("GET /api/status", s.handleStatus)
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
@@ -77,6 +87,16 @@ func Endpoints() []string {
 		"PUT /api/ai/config",
 		"GET /api/ai/recommendations?since=",
 		"POST /api/ai/recommendations",
+		"GET /api/overview?since=",
+		"GET /api/sessions/cards?since=",
+		"GET /api/sessions/{id}/timeline",
+		"GET /api/sessions/{id}/issues",
+		"GET /api/fixes?since=",
+		"POST /api/fixes/{id}/state",
+		"GET /api/ui/state",
+		"POST /api/ui/visit",
+		"GET /api/progress?since=",
+		"GET /api/status",
 	}
 }
 

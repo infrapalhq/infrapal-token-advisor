@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 )
 
 // withFakeHome points $HOME at a fresh temp dir for the duration of a test,

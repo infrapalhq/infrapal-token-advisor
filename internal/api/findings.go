@@ -10,7 +10,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/durfmt"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
 )
 
 // minRejectedToolCount is the floor before the rejected-work finding fires

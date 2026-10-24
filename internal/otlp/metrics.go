@@ -3,7 +3,7 @@ package otlp
 import (
 	"fmt"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
 	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
