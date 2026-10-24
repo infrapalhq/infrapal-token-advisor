@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/store"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 // sensitiveFixtureStrings are values seeded below that must NEVER appear in

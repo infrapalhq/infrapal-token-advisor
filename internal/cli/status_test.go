@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
 
 func TestServiceStatusLine(t *testing.T) {

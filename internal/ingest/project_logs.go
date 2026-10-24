@@ -27,6 +27,8 @@ func projectLogEvent(tx *sql.Tx, e RawEvent) error {
 		return insertAPIRequest(tx, e, true)
 	case "mcp_server_connection":
 		return insertMCPServerConnection(tx, e)
+	case "compaction":
+		return insertCompaction(tx, e)
 	default:
 		return nil
 	}
@@ -266,6 +268,23 @@ func insertAPIRequest(tx *sql.Tx, e RawEvent, isError bool) error {
 		nullStringAttr(e.Attrs, "agent.name"), nullStringAttr(e.Attrs, "skill.name"),
 		nullStringAttr(e.Attrs, "plugin.name"), nullStringAttr(e.Attrs, "marketplace.name"),
 		nullStringAttr(e.Attrs, "mcp_server.name"), nullStringAttr(e.Attrs, "mcp_tool.name"),
+	)
+	return err
+}
+
+// insertCompaction projects a compaction event into the typed compactions
+// table (migration 0013). A compaction is identified by (session, ts); a
+// redelivered event is ignored rather than duplicated.
+func insertCompaction(tx *sql.Tx, e RawEvent) error {
+	if e.SessionID == "" {
+		return nil
+	}
+	_, err := tx.Exec(`
+		INSERT OR IGNORE INTO compactions (session_id, prompt_id, ts, pre_tokens, post_tokens, trigger, duration_ms)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		e.SessionID, nullableString(e.PromptID), e.Ts,
+		nullInt64Attr(e.Attrs, "pre_tokens"), nullInt64Attr(e.Attrs, "post_tokens"),
+		nullStringAttr(e.Attrs, "trigger"), nullInt64Attr(e.Attrs, "duration_ms"),
 	)
 	return err
 }

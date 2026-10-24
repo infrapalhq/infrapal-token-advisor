@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
 
 const (

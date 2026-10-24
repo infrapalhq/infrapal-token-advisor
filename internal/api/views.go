@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/durfmt"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
 )
 
 // viewTable whitelists the derived-view names exposed over the API against

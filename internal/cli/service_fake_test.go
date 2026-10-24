@@ -1,6 +1,6 @@
 package cli
 
-import "github.com/ShamikMukhopadhyay/ccotel/internal/service"
+import "github.com/infrapalhq/infrapal-token-advisor/internal/service"
 
 // fakeService is an in-memory service.Service double for CLI tests, so
 // runInit/runStop/runUninstall/runStatus can be exercised end-to-end without

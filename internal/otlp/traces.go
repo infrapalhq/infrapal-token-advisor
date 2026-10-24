@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"

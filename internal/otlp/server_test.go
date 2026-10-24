@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/ingest"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/store"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 )

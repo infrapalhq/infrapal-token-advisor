@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/ShamikMukhopadhyay/ccotel/internal/paths"
-	"github.com/ShamikMukhopadhyay/ccotel/internal/service"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
 
 func runStop(args []string) error {
@@ -23,7 +23,7 @@ func runStop(args []string) error {
 	}
 	svc, err := newService(sp)
 	if err == service.ErrUnsupported {
-		fmt.Println("no supported service manager on this platform — kill the `ccotel start` process yourself")
+		fmt.Println("no supported service manager on this platform — kill the `infrapal-token-advisor start` process yourself")
 		return nil
 	}
 	if err != nil {
