@@ -41,7 +41,7 @@ func TestMergeEnv_PreservesUnrelatedKeys(t *testing.T) {
 	}
 
 	changes, err := MergeEnv(doc, map[string]string{
-		"OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4318",
+		"OTEL_EXPORTER_OTLP_ENDPOINT":  "http://localhost:4318",
 		"CLAUDE_CODE_ENABLE_TELEMETRY": "1",
 	})
 	if err != nil {

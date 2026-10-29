@@ -1,32 +1,40 @@
-# React + TypeScript + Vite
+# Dashboard (web/)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The React dashboard served by `infrapal-token-advisor ui`. It is built with
+Vite and embedded into the Go binary from `internal/webui/dist`.
 
-Currently, two official plugins are available:
+## Layout
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `src/main.tsx`: routes
+- `src/ta/`: pages (Overview, Sessions, Session, Fixes, Settings), the
+  app shell, and `api.ts`, the typed client for the Go API
+  (`internal/api/insight_*.go`)
 
-## React Compiler
+## Develop
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Start the API, then the Vite dev server. Vite proxies `/api` to
+`127.0.0.1:4319`, so the app talks to the real API with hot reload.
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+go run ./cmd/infrapal-token-advisor ui
+npm --prefix web install
+npm --prefix web run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Check
+
+```sh
+npm --prefix web run lint    # oxlint
+npm --prefix web run build   # tsc type check + production build
+```
+
+## Ship a change
+
+The Go binary embeds `internal/webui/dist`, not `web/dist`. After changing
+anything under `web/`, rebuild and copy it from the repo root:
+
+```sh
+scripts/build-web.sh
+```
+
+Commit the updated `internal/webui/dist` in the same PR as the source change.
