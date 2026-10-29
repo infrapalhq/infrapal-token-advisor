@@ -1,0 +1,62 @@
+name: Bug report
+description: Something is broken or wrong.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. For security problems, use [private reporting](https://github.com/infrapalhq/infrapal-token-advisor/security/advisories/new) instead.
+        Please don't paste prompts, file paths or other data from your database here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `infrapal-token-advisor ...`
+        2. Open ...
+        3. See ...
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `infrapal-token-advisor version`
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Linux (x86_64)
+        - Linux (arm64)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed with
+      options:
+        - Homebrew
+        - Release download
+        - Built from source
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `infrapal-token-advisor doctor`
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From `~/.ccotel/collector.err.log`. Check them for anything private first.
+      render: text
