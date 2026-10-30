@@ -189,13 +189,14 @@ func runDoctor(args []string) error {
 		fmt.Println("       hint: events are arriving but no spans yet — traces beta flag likely isn't set (CLAUDE_CODE_ENHANCED_TELEMETRY_BETA / OTEL_TRACES_EXPORTER).")
 	}
 
-	// 6. DB size, WAL size, ingest errors in the last hour.
+	// 6. DB size, WAL size, retention, ingest errors in the last hour.
 	if info, statErr := os.Stat(p.DBPath); statErr == nil {
 		fmt.Printf("[INFO] db size:  %s\n", humanBytes(info.Size()))
 	}
 	if info, statErr := os.Stat(p.DBPath + "-wal"); statErr == nil {
 		fmt.Printf("[INFO] wal size: %s\n", humanBytes(info.Size()))
 	}
+	fmt.Printf("[INFO] retention: %s\n", retentionStatus(db, cfg.RetentionMonths))
 	since := time.Now().Add(-time.Hour).UnixMilli()
 	var errCount int64
 	if err := db.QueryRow(`SELECT COUNT(*) FROM ingest_errors WHERE ts > ?`, since).Scan(&errCount); err != nil {

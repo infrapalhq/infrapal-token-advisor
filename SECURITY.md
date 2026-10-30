@@ -66,6 +66,9 @@ tool content to the local receiver.
 
 ## Removing your data
 
+- The collector deletes data older than 6 months, including raw bodies.
+  Set `retention_months` in `config.json` to change this, or `0` to keep
+  everything.
 - `token-advisor purge --before 30d` deletes data older than 30
   days (`--all` deletes everything).
 - `token-advisor uninstall` stops and removes the service,

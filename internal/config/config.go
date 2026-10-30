@@ -12,6 +12,8 @@ import (
 )
 
 const (
+	// DefaultRetentionMonths is how long captured data is kept.
+	DefaultRetentionMonths = 6
 	// DefaultOTLPPort is where the OTLP http/protobuf receiver listens.
 	DefaultOTLPPort = 4318
 	// DefaultAPIPort is where the dashboard's JSON API + embedded UI listens.
@@ -39,6 +41,10 @@ type Config struct {
 	// network-egress exception; see ResolveAnthropicAPIKey.
 	AnthropicAPIKey string `json:"anthropic_api_key,omitempty"`
 
+	// RetentionMonths is how long captured data is kept before the collector
+	// deletes it. 0 keeps everything.
+	RetentionMonths int `json:"retention_months"`
+
 	// LogLevel is the collector's log level: debug, info (the default),
 	// warn or error.
 	LogLevel string `json:"log_level,omitempty"`
@@ -58,8 +64,9 @@ func ResolveAnthropicAPIKey(cfg Config) string {
 // Default returns infrapal-token-advisor's out-of-the-box configuration.
 func Default() Config {
 	return Config{
-		OTLPPort: DefaultOTLPPort,
-		APIPort:  DefaultAPIPort,
+		OTLPPort:        DefaultOTLPPort,
+		APIPort:         DefaultAPIPort,
+		RetentionMonths: DefaultRetentionMonths,
 	}
 }
 

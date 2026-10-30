@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
@@ -55,6 +56,12 @@ func runStatus(args []string) error {
 	} else {
 		fmt.Println("last event:  none yet")
 	}
+
+	cfg, err := config.Load(p)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	fmt.Printf("retention:   %s\n", retentionStatus(db, cfg.RetentionMonths))
 
 	fmt.Printf("log:         %s\n", p.LogPath)
 	summary, err := logging.Summarize(p.LogPath, time.Now().Add(-24*time.Hour))
