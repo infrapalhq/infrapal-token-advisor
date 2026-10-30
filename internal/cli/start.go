@@ -95,6 +95,11 @@ func runStart(args []string) error {
 		spansWriterDone <- spansWriter.Run(ctx)
 	}()
 
+	go func() {
+		defer logging.Recover("retention")
+		runRetentionLoop(ctx, db, p, cfg.RetentionMonths)
+	}()
+
 	srv := otlp.NewServer(addr, writer, metricsWriter, spansWriter)
 
 	serveErr := make(chan error, 1)
