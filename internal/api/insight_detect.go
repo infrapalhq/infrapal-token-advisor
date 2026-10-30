@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Per-session detectors (SPEC §5). Every detector is a pure function over
+// Per-session detectors. Every detector is a pure function over
 // insightData and uses fixed rules: no model call, no randomness. Each emits
 // occurrences; occurrences are aggregated into items by (kind, subject) in
 // insight_items.go.
@@ -70,7 +70,8 @@ func normalizeCommand(cmd string) string {
 // still covers the same lines and nothing changed the file in between. The
 // first read is the one that was needed; each later overlapping read counts.
 // Rule-based: the "still in context" assumption is that no edit or shell
-// mutation happened between the reads (SPEC G14).
+// mutation happened between the reads, and edits made outside Claude are
+// invisible, so it stays Likely.
 func detectReRead(d *insightData) []occurrence {
 	type read struct {
 		idx         int
@@ -291,7 +292,8 @@ func detectRepeatCommand(d *insightData) []occurrence {
 }
 
 // Read-only command prefixes that are safe to suggest for permanent allow.
-// Anything not on this list is never suggested (SPEC G6).
+// Anything not on this list is never suggested, so a fix can't widen what
+// Claude may change.
 var safeBashPrefixes = map[string]bool{
 	"ls": true, "cat": true, "head": true, "tail": true, "wc": true, "grep": true,
 	"rg": true, "find": true, "pwd": true, "tree": true, "stat": true, "file": true,

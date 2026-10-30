@@ -1,7 +1,7 @@
 // Package claudesettings reads, backs up, and patches the Claude Code
 // settings.json file that infrapal-token-advisor's env vars must live in for the `claude`
-// process to pick them up (see HANDOFF.md's milestone-2 finding: exported
-// shell vars silently lose to whatever's already in settings.json).
+// process to pick them up: exported shell vars silently lose to whatever's
+// already in settings.json.
 package claudesettings
 
 import (

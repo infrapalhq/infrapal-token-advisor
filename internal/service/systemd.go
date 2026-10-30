@@ -17,8 +17,8 @@ func systemdUnitPath(home string) string {
 }
 
 // systemdUnitFile renders the user unit. Restart=always + RestartSec pair
-// with launchd's KeepAlive equivalent (spec gotcha 7: a dead collector
-// silently loses exports, so it must come back on its own).
+// with launchd's KeepAlive equivalent: a dead collector silently loses
+// exports, so it must come back on its own.
 func systemdUnitFile(p Paths) []byte {
 	return []byte(fmt.Sprintf(`[Unit]
 Description=infrapal-token-advisor local Claude Code telemetry collector

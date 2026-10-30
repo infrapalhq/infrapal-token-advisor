@@ -36,6 +36,8 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
 
 ## Where things live
 
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the pieces fit together.
+
 | Path | What it is |
 | --- | --- |
 | `cmd/token-advisor` | CLI entry point |

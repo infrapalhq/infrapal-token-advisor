@@ -1,15 +1,11 @@
--- 0006_derived_views: the milestone-5 derived views, kept as plain SQL VIEWs
--- per the spec so the HTTP API layer stays thin (SELECT * FROM v_foo, no
--- business logic in Go).
+-- 0006_derived_views: derived views, kept as plain SQL VIEWs so the HTTP API
+-- layer stays thin (SELECT * FROM v_foo, no business logic in Go).
 --
--- v_skill_effectiveness (spec's "skill invocations split by
--- invocation_trigger") is deliberately NOT created here. invocation_trigger
--- doesn't exist anywhere in the current upstream schema — the only
+-- There's deliberately no view of skill invocations split by trigger.
+-- invocation_trigger doesn't exist anywhere in the upstream schema: the only
 -- skill-related fields are skill_name/skill.name, with no signal for
--- proactive vs. explicit invocation. Re-confirmed live against
--- code.claude.com/docs/en/monitoring-usage during milestone 5 planning; see
--- HANDOFF.md's "Milestone 3 design decisions, resolved" for the original
--- decision to drop this view.
+-- proactive vs. explicit invocation (see
+-- code.claude.com/docs/en/monitoring-usage).
 
 -- Per prompt_id: prompt length, LLM turn count, token/cost totals, cache hit
 -- ratio, tool call stats, and two derived booleans (triggered_compaction,
