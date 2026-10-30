@@ -13,7 +13,7 @@ opening an issue.
 You need:
 
 - Go, at the version in [`go.mod`](go.mod)
-- Node.js 24 (only if you change the dashboard under `web/`)
+- Node.js 24 (only if you want the real dashboard, or change `web/`)
 
 ```sh
 git clone https://github.com/infrapalhq/infrapal-token-advisor.git
@@ -27,6 +27,7 @@ first (`init` registers the binary's own path as the background service, so
 don't use `go run` for it):
 
 ```sh
+scripts/build-web.sh                # builds the dashboard; skip it for a placeholder page
 go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
 ./token-advisor init                # patches ~/.claude/settings.json, installs the service
 ./token-advisor ui                  # opens the dashboard
@@ -45,7 +46,7 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
 | `internal/ai` | Optional AI Mode (Anthropic API) |
 | `internal/service` | launchd / systemd service install |
 | `web/` | React dashboard (see [web/README.md](web/README.md)) |
-| `internal/webui/dist` | Built dashboard, embedded into the binary |
+| `internal/webui/dist` | Built dashboard, embedded into the binary (git-ignored) |
 
 ## Making a change
 
@@ -59,9 +60,7 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
    go test -race ./...
    ```
 
-4. If you changed anything under `web/`, rebuild the embedded dashboard and
-   commit `internal/webui/dist` **in the same PR** as the source change. CI
-   fails if they differ.
+4. If you changed anything under `web/`, check that it builds and lints:
 
    ```sh
    scripts/build-web.sh

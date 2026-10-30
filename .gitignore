@@ -1,4 +1,6 @@
 /token-advisor
+/internal/webui/dist/*
+!/internal/webui/dist/.gitkeep
 /dist/
 web/node_modules/
 web/dist/
