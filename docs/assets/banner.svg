@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" role="img" aria-label="infrapal token advisor">
+  <rect width="960" height="240" rx="16" fill="#000"/>
+  <rect x="64" y="84" width="72" height="72" rx="16" fill="#fff"/>
+  <text x="164" y="118" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1.5" fill="#fff">infrapal</text>
+  <text x="166" y="154" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24" fill="#bdbdbd">token advisor</text>
+  <g fill="#fff">
+    <rect x="600" y="132" width="26" height="44"/>
+    <rect x="636" y="112" width="26" height="64"/>
+    <rect x="672" y="124" width="26" height="52"/>
+    <rect x="708" y="84" width="26" height="92"/>
+    <rect x="744" y="100" width="26" height="76" fill="#6b6b6b"/>
+    <rect x="780" y="68" width="26" height="108"/>
+    <rect x="816" y="92" width="26" height="84" fill="#6b6b6b"/>
+    <rect x="852" y="120" width="26" height="56" fill="#6b6b6b"/>
+  </g>
+  <rect x="600" y="180" width="278" height="2" fill="#fff"/>
+</svg>
