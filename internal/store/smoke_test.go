@@ -8,7 +8,7 @@ import (
 
 func TestOpenAndMigrate(t *testing.T) {
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "ccotel.db")
+	dbPath := filepath.Join(dir, "token-advisor.db")
 
 	db, err := Open(dbPath)
 	if err != nil {

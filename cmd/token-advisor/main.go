@@ -1,4 +1,4 @@
-// Command infrapal-token-advisor is a local OTLP receiver that captures Claude Code's
+// Command token-advisor is a local OTLP receiver that captures Claude Code's
 // telemetry into SQLite and serves an embedded dashboard for exploring it.
 package main
 
@@ -11,7 +11,7 @@ import (
 
 func main() {
 	if err := cli.Run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "infrapal-token-advisor:", err)
+		fmt.Fprintln(os.Stderr, "token-advisor:", err)
 		os.Exit(1)
 	}
 }

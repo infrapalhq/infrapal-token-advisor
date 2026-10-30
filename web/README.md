@@ -1,6 +1,6 @@
 # Dashboard (web/)
 
-The React dashboard served by `infrapal-token-advisor ui`. It is built with
+The React dashboard served by `token-advisor ui`. It is built with
 Vite and embedded into the Go binary from `internal/webui/dist`.
 
 ## Layout
@@ -16,7 +16,7 @@ Start the API, then the Vite dev server. Vite proxies `/api` to
 `127.0.0.1:4319`, so the app talks to the real API with hot reload.
 
 ```sh
-go run ./cmd/infrapal-token-advisor ui
+go run ./cmd/token-advisor ui
 npm --prefix web install
 npm --prefix web run dev
 ```

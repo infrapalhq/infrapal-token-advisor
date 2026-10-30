@@ -1,7 +1,7 @@
-// Package service manages ccotel's background collector as a per-user OS
+// Package service manages infrapal-token-advisor's background collector as a per-user OS
 // service: a launchd agent on macOS, a systemd user unit on Linux. Neither
 // requires root — both are installed entirely inside the user's home
-// directory, matching ccotel's single-user, no-elevated-privileges design.
+// directory, matching infrapal-token-advisor's single-user, no-elevated-privileges design.
 package service
 
 import (
@@ -25,7 +25,7 @@ type Status struct {
 	Detail    string // human-readable state, e.g. "running (pid 1234)", "not loaded", "failed"
 }
 
-// Service manages ccotel's own background collector process.
+// Service manages infrapal-token-advisor's own background collector process.
 type Service interface {
 	// Install writes the service definition and starts it immediately.
 	Install() error
@@ -37,7 +37,7 @@ type Service interface {
 }
 
 // Paths bundles the filesystem locations a Service implementation needs:
-// the ccotel binary to invoke, and where to send its stdout/stderr since a
+// the infrapal-token-advisor binary to invoke, and where to send its stdout/stderr since a
 // backgrounded service has no terminal to write to.
 type Paths struct {
 	ExecPath  string

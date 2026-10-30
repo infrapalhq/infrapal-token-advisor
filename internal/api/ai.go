@@ -73,7 +73,7 @@ func (s *Server) handleGetAIRecommendations(w http.ResponseWriter, r *http.Reque
 }
 
 // handlePostAIRecommendations handles POST /api/ai/recommendations, body
-// {"since": "30d", "force": false}. This is one of ccotel's two deliberate
+// {"since": "30d", "force": false}. This is one of infrapal-token-advisor's two deliberate
 // exceptions to read-only/local-only (see the package doc) — it runs only
 // in direct response to a user-triggered request, which the frontend only
 // ever sends from the Trace page's "Explain this trace" action.

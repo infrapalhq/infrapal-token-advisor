@@ -1,7 +1,7 @@
-// Package config manages ccotel's own persisted settings, distinct from the
+// Package config manages infrapal-token-advisor's own persisted settings, distinct from the
 // Claude Code settings.json that init patches. It lives at
-// ~/.ccotel/config.json and holds the handful of choices that change
-// ccotel's own behavior (ports, raw-body capture).
+// ~/.infrapal-token-advisor/config.json and holds the handful of choices that change
+// infrapal-token-advisor's own behavior (ports, raw-body capture).
 package config
 
 import (
@@ -18,7 +18,7 @@ const (
 	DefaultAPIPort = 4319
 )
 
-// Config is ccotel's own settings, persisted as JSON.
+// Config is infrapal-token-advisor's own settings, persisted as JSON.
 type Config struct {
 	OTLPPort int `json:"otlp_port"`
 	APIPort  int `json:"api_port"`
@@ -28,14 +28,14 @@ type Config struct {
 	RawBodies bool `json:"raw_bodies"`
 
 	// SettingsBackupPath is the ~/.claude/settings.json backup init made
-	// before patching it, e.g. "settings.json.ccotel-backup-1234567890".
+	// before patching it, e.g. "settings.json.infrapal-token-advisor-backup-1234567890".
 	// Empty if init never ran, or settings.json didn't exist yet at init
 	// time. uninstall uses this to restore settings.json byte-for-byte.
 	SettingsBackupPath string `json:"settings_backup_path"`
 
 	// AnthropicAPIKey is the user's own key, pasted into the AI Mode
 	// settings panel. Used only in direct response to the "Generate"
-	// button (internal/ai, internal/api/ai.go) — ccotel's one deliberate
+	// button (internal/ai, internal/api/ai.go) — infrapal-token-advisor's one deliberate
 	// network-egress exception; see ResolveAnthropicAPIKey.
 	AnthropicAPIKey string `json:"anthropic_api_key,omitempty"`
 }
@@ -51,7 +51,7 @@ func ResolveAnthropicAPIKey(cfg Config) string {
 	return cfg.AnthropicAPIKey
 }
 
-// Default returns ccotel's out-of-the-box configuration.
+// Default returns infrapal-token-advisor's out-of-the-box configuration.
 func Default() Config {
 	return Config{
 		OTLPPort: DefaultOTLPPort,
@@ -75,7 +75,7 @@ func Load(p paths.Paths) (Config, error) {
 	return cfg, nil
 }
 
-// Save writes cfg to config.json inside the ccotel base directory.
+// Save writes cfg to config.json inside the infrapal-token-advisor base directory.
 func Save(p paths.Paths, cfg Config) error {
 	if err := p.EnsureBaseDir(); err != nil {
 		return err
@@ -90,6 +90,6 @@ func Save(p paths.Paths, cfg Config) error {
 	// config.json can now hold a secret (AnthropicAPIKey). WriteFile only
 	// applies FileMode when creating the file, so explicitly chmod to
 	// tighten a pre-existing looser-mode file too — mirrors store.Open's
-	// belt-and-suspenders chmod on ccotel.db.
+	// belt-and-suspenders chmod on token-advisor.db.
 	return os.Chmod(p.ConfigPath, paths.FileMode)
 }

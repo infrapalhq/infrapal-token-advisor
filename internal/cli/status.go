@@ -79,7 +79,7 @@ func serviceStatusLine(p paths.Paths) string {
 	}
 	switch {
 	case !st.Installed:
-		return "not installed — run `infrapal-token-advisor init`"
+		return "not installed — run `token-advisor init`"
 	case st.Running:
 		return "running — " + st.Detail
 	default:

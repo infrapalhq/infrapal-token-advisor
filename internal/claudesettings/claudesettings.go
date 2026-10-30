@@ -1,5 +1,5 @@
 // Package claudesettings reads, backs up, and patches the Claude Code
-// settings.json file that ccotel's env vars must live in for the `claude`
+// settings.json file that infrapal-token-advisor's env vars must live in for the `claude`
 // process to pick them up (see HANDOFF.md's milestone-2 finding: exported
 // shell vars silently lose to whatever's already in settings.json).
 package claudesettings
@@ -14,7 +14,7 @@ import (
 )
 
 // Doc is a settings.json document, kept as a generic map so that keys
-// ccotel doesn't know about (and doesn't need to) round-trip untouched.
+// infrapal-token-advisor doesn't know about (and doesn't need to) round-trip untouched.
 // This does not preserve original key order or formatting — Go's
 // map[string]any has no stable order, so a merged file's key order can
 // differ from the original even though every original key and value not
@@ -24,7 +24,7 @@ type Doc map[string]any
 
 // Load reads path and parses it as a Doc. If the file doesn't exist, Load
 // returns an empty Doc and existed=false rather than an error, since
-// settings.json is not guaranteed to exist before `ccotel init` runs.
+// settings.json is not guaranteed to exist before `token-advisor init` runs.
 func Load(path string) (doc Doc, existed bool, err error) {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -42,7 +42,7 @@ func Load(path string) (doc Doc, existed bool, err error) {
 	return doc, true, nil
 }
 
-// Backup copies path to path+".ccotel-backup-<unix-timestamp>" and returns
+// Backup copies path to path+".infrapal-token-advisor-backup-<unix-timestamp>" and returns
 // the backup's path. If path doesn't exist yet, there's nothing to back up
 // and Backup returns "" with no error.
 func Backup(path string, now time.Time) (string, error) {
@@ -53,7 +53,7 @@ func Backup(path string, now time.Time) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}
-	backupPath := fmt.Sprintf("%s.ccotel-backup-%d", path, now.Unix())
+	backupPath := fmt.Sprintf("%s.infrapal-token-advisor-backup-%d", path, now.Unix())
 	if err := os.WriteFile(backupPath, data, 0o600); err != nil {
 		return "", fmt.Errorf("write backup %s: %w", backupPath, err)
 	}
@@ -62,7 +62,7 @@ func Backup(path string, now time.Time) (string, error) {
 
 // EnvBlock returns doc's "env" sub-object, creating it if absent. Panics if
 // "env" exists but isn't a JSON object — that would mean a hand-edited
-// settings.json is already malformed in a way ccotel can't safely merge
+// settings.json is already malformed in a way infrapal-token-advisor can't safely merge
 // into, so the caller should surface that as an error before calling this.
 func (doc Doc) EnvBlock() (map[string]any, error) {
 	raw, ok := doc["env"]
@@ -110,7 +110,7 @@ func MergeEnv(doc Doc, wanted map[string]string) ([]Change, error) {
 	return changes, nil
 }
 
-// Change describes one env key ccotel added or overwrote in settings.json.
+// Change describes one env key infrapal-token-advisor added or overwrote in settings.json.
 type Change struct {
 	Key      string
 	OldValue any // nil if the key didn't exist before
@@ -133,7 +133,7 @@ func Save(path string, doc Doc) error {
 }
 
 // Restore overwrites path with the contents of backupPath, used by
-// `ccotel uninstall` to put settings.json back the way init found it.
+// `token-advisor uninstall` to put settings.json back the way init found it.
 func Restore(path, backupPath string) error {
 	data, err := os.ReadFile(backupPath)
 	if err != nil {

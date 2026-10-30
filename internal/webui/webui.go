@@ -1,4 +1,4 @@
-// Package webui embeds the built React dashboard (web/dist) into the ccotel
+// Package webui embeds the built React dashboard (web/dist) into the infrapal-token-advisor
 // binary. dist/ here starts as a checked-in placeholder — go:embed requires
 // at least one file to exist at compile time — and scripts/build-web.sh
 // overwrites it with the real Vite build output before a release build.
