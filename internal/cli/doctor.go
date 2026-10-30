@@ -12,6 +12,7 @@ import (
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
 
@@ -69,7 +70,7 @@ func runDoctor(args []string) error {
 
 	// Is the dashboard up? The service runs it alongside the collector.
 	ok(dashboardRunning(cfg.APIPort), fmt.Sprintf("dashboard answering on 127.0.0.1:%d", cfg.APIPort),
-		fmt.Sprintf("check %s for why it didn't start, or run `token-advisor ui`", filepath.Join(p.BaseDir, "collector.err.log")))
+		"run `token-advisor logs --errors` to see why it didn't start, or run `token-advisor ui`")
 
 	// Will the service come back after a restart?
 	if sp, err := servicePaths(p); err == nil {
@@ -88,6 +89,24 @@ func runDoctor(args []string) error {
 		if linger, err := service.LingerEnabled(); err == nil && !linger {
 			fmt.Println("[INFO] the service runs only while you're logged in — to keep it running after logout, run `loginctl enable-linger` (init tries this, but it can be blocked by system policy)")
 		}
+	}
+
+	// Has anything gone wrong lately?
+	logSummary, err := logging.Summarize(p.LogPath, time.Now().Add(-24*time.Hour))
+	if err != nil {
+		return fmt.Errorf("read log: %w", err)
+	}
+	ok(logSummary.Errors == 0, fmt.Sprintf("%d error(s) logged in the last 24 hours", logSummary.Errors),
+		"run `token-advisor logs --errors` for details")
+	ok(logSummary.Panics == 0, fmt.Sprintf("%d crash(es) in the last 24 hours", logSummary.Panics),
+		"run `token-advisor logs --errors` for the stack trace, and include it in a bug report")
+	if logSummary.Unclean > 0 {
+		fmt.Printf("[INFO] %d unclean shutdown(s) in the last 24 hours — a crash, a kill or a power loss\n", logSummary.Unclean)
+	}
+	errLog := filepath.Join(p.BaseDir, "collector.err.log")
+	if info, statErr := os.Stat(errLog); statErr == nil && info.Size() > 0 && time.Since(info.ModTime()) < 24*time.Hour {
+		ok(false, "no fatal output from the service in the last 24 hours",
+			fmt.Sprintf("see %s — it holds startup failures and Go runtime crashes", errLog))
 	}
 
 	// 2. Does settings.json contain our env block, endpoint matching our port?

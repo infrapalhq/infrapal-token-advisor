@@ -38,6 +38,10 @@ type Config struct {
 	// button (internal/ai, internal/api/ai.go) — infrapal-token-advisor's one deliberate
 	// network-egress exception; see ResolveAnthropicAPIKey.
 	AnthropicAPIKey string `json:"anthropic_api_key,omitempty"`
+
+	// LogLevel is the collector's log level: debug, info (the default),
+	// warn or error.
+	LogLevel string `json:"log_level,omitempty"`
 }
 
 // ResolveAnthropicAPIKey returns the key AI Mode should use: the

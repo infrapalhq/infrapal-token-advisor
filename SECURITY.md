@@ -47,7 +47,8 @@ Everything lives under `~/.infrapal-token-advisor/`, created with mode `0700`:
 | `token-advisor.db` (+ `-wal`, `-shm`) | Every recorded session: prompts, assistant responses, tool calls and their content, file paths, shell commands, costs | `0600` |
 | `config.json` | Ports, settings, and your Anthropic API key if you saved one in the dashboard (stored in plain text) | `0600` |
 | `bodies/` | Raw API request/response bodies, only if `raw_bodies` is turned on | `0700` dir |
-| `collector.log`, `collector.err.log` | Service output | |
+| `token-advisor.log` and rotated `.1` to `.3` | The collector's log, at most 40 MiB in all: errors, crash stack traces, counts and ids. Never prompt or response text. | `0600` |
+| `collector.log`, `collector.err.log` | Service output, kept small: startup failures and Go runtime crashes | |
 
 Treat the database as sensitive: it can contain anything you or Claude
 typed, including secrets pasted into a prompt. Set `ANTHROPIC_API_KEY` in
