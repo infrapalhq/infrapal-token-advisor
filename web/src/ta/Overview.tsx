@@ -24,6 +24,8 @@ export default function Overview() {
   const dayMax = useMemo(() => Math.max(1, ...(data?.by_day.map((d) => d.cost_usd) ?? [1])), [data]);
   const projMax = useMemo(() => Math.max(1, ...(data?.by_project.map((p) => p.cost_usd) ?? [1])), [data]);
   const problemCount = data?.fix_first.length ?? 0;
+  const recoveredUsd = (data?.recovered.usd ?? 0) >= 0.005; // would show as $0.00 otherwise
+  const recoveredMinutes = Math.round(data?.recovered.minutes ?? 0);
 
   return (
     <Shell fixesToDo={data?.fix_first.length} sessionCount={data?.sessions_count}>
@@ -48,8 +50,11 @@ export default function Overview() {
             <h1>{money(data.spend_usd)} spent {PERIODS.find((p) => p.value === range)?.label.toLowerCase() ?? "in range"}.</h1>
             <p className="lead">
               {problemCount} {problemCount === 1 ? "thing" : "things"} worth fixing
-              {data.fix_first.length > 0 && <>. Fixing the top three recovers about <strong>{money(data.recovered.usd)}</strong>
-                {data.recovered.minutes > 0 && <> and <strong>{Math.round(data.recovered.minutes)} minutes</strong></>} of waiting or spend.</>}
+              {(recoveredUsd || recoveredMinutes > 0) ? ". Fixing the top three " : "."}
+              {recoveredUsd && <>recovers about <strong>{money(data.recovered.usd)}</strong></>}
+              {recoveredUsd && recoveredMinutes > 0 && " and "}
+              {recoveredMinutes > 0 && <>saves about <strong>{recoveredMinutes} {recoveredMinutes === 1 ? "minute" : "minutes"}</strong> of waiting</>}
+              {(recoveredUsd || recoveredMinutes > 0) && "."}
             </p>
           </section>
 
