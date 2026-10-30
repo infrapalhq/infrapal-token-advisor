@@ -138,6 +138,27 @@ func TestRemoveOldBodies(t *testing.T) {
 	}
 }
 
+func TestRunRetentionRemovesOldBackups(t *testing.T) {
+	db, p := retentionDB(t)
+	now := time.Now()
+	backup := p.DBPath + ".backup-v15-1"
+	if err := os.WriteFile(backup, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := now.Add(-backupMaxAge - time.Hour)
+	if err := os.Chtimes(backup, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runRetention(db, p, 6, now); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(backup); !os.IsNotExist(err) {
+		t.Errorf("old backup still there (err=%v)", err)
+	}
+}
+
 func TestRemoveOldBodiesNoDirectory(t *testing.T) {
 	removed, err := removeOldBodies(filepath.Join(t.TempDir(), "none"), time.Now())
 	if err != nil || removed != 0 {

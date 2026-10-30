@@ -48,6 +48,7 @@ Everything lives under `~/.infrapal-token-advisor/`, created with mode `0700`:
 | `config.json` | Ports, settings, and your Anthropic API key if you saved one in the dashboard (stored in plain text) | `0600` |
 | `bodies/` | Raw API request/response bodies, only if `raw_bodies` is turned on | `0700` dir |
 | `token-advisor.log` and rotated `.1` to `.3` | The collector's log, at most 40 MiB in all: errors, crash stack traces, counts and ids. Never prompt or response text. | `0600` |
+| `token-advisor.db.backup-*` | Copies of the database from before a schema upgrade, kept for at most 30 days | `0600` |
 | `collector.log`, `collector.err.log` | Service output, kept small: startup failures and Go runtime crashes | |
 
 Treat the database as sensitive: it can contain anything you or Claude
@@ -70,7 +71,7 @@ tool content to the local receiver.
   Set `retention_months` in `config.json` to change this, or `0` to keep
   everything.
 - `token-advisor purge --before 30d` deletes data older than 30
-  days (`--all` deletes everything).
+  days (`--all` deletes everything). It also deletes database backups.
 - `token-advisor uninstall` stops and removes the service,
   restores `~/.claude/settings.json` from the backup, and deletes
   `~/.infrapal-token-advisor/`. Add `--keep-db` to keep the data.
