@@ -755,7 +755,7 @@ func fatPayloadFinding(ctx context.Context, db *sql.DB) (*Finding, error) {
 // a heuristic stand-in for a stable command "shape" — not a validated
 // Claude Code permission-rule pattern. The second token is only kept when it
 // looks like a stable subcommand name (isSubcommandLike) — otherwise (e.g.
-// "cd /Users/.../Agentic IDE Team", where the second token is an
+// "cd /Users/me/My Project", where the second token is an
 // unbounded, possibly space-escaped path) it's dropped, since including a
 // one-off path in the suggested rule would make it neither a sensible
 // generalization nor a valid copy-pasteable pattern.
