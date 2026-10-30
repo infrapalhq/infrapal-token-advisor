@@ -20,6 +20,7 @@ import (
 	"context"
 	"database/sql"
 	"io/fs"
+	"net"
 	"net/http"
 )
 
@@ -65,7 +66,7 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
-	s.http = &http.Server{Addr: addr, Handler: mux}
+	s.http = &http.Server{Addr: addr, Handler: guard(mux)}
 	return s
 }
 
@@ -105,6 +106,12 @@ func Endpoints() []string {
 // shutdown).
 func (s *Server) ListenAndServe() error {
 	return s.http.ListenAndServe()
+}
+
+// Serve is ListenAndServe over a listener the caller already bound, so a port
+// conflict can be handled before serving starts.
+func (s *Server) Serve(l net.Listener) error {
+	return s.http.Serve(l)
 }
 
 // Shutdown gracefully stops the HTTP server.

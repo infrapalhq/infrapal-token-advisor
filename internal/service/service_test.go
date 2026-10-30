@@ -102,3 +102,52 @@ func TestLaunchdPlistPath_AndSystemdUnitPath(t *testing.T) {
 		t.Errorf("systemdUnitPath = %q, want %q", got, want)
 	}
 }
+
+func TestParseLinger(t *testing.T) {
+	for out, want := range map[string]bool{"Linger=yes\n": true, "Linger=no\n": false, "": false} {
+		if got := parseLinger(out); got != want {
+			t.Errorf("parseLinger(%q) = %v, want %v", out, got, want)
+		}
+	}
+}
+
+func TestPlistExecPath(t *testing.T) {
+	p := Paths{ExecPath: "/Users/a&b/bin/token-advisor"}
+	if got := plistExecPath(string(launchdPlistXML(p))); got != p.ExecPath {
+		t.Errorf("plistExecPath = %q, want %q", got, p.ExecPath)
+	}
+	if got := plistExecPath("<plist></plist>"); got != "" {
+		t.Errorf("plistExecPath of an empty plist = %q, want empty", got)
+	}
+}
+
+func TestUnitExecPath(t *testing.T) {
+	p := Paths{ExecPath: "/usr/local/bin/token-advisor"}
+	if got := unitExecPath(string(systemdUnitFile(p))); got != p.ExecPath {
+		t.Errorf("unitExecPath = %q, want %q", got, p.ExecPath)
+	}
+}
+
+func TestLaunchdDisabled(t *testing.T) {
+	cases := map[string]bool{
+		`"com.infrapal.token-advisor" => disabled`: true,
+		`"com.infrapal.token-advisor" => true`:     true,
+		`"com.infrapal.token-advisor" => enabled`:  false,
+		`"com.other.job" => disabled`:              false,
+		"":                                         false,
+	}
+	for out, want := range cases {
+		if got := launchdDisabled(out); got != want {
+			t.Errorf("launchdDisabled(%q) = %v, want %v", out, got, want)
+		}
+	}
+}
+
+func TestCheckExecPath(t *testing.T) {
+	if err := checkExecPath("/var/folders/x/T/go-build123/b001/exe/token-advisor"); err == nil {
+		t.Error("checkExecPath accepted a go run binary")
+	}
+	if err := checkExecPath("/usr/local/bin/token-advisor"); err != nil {
+		t.Errorf("checkExecPath: %v", err)
+	}
+}

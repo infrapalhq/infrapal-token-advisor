@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
 
 // managedSettingsPath returns the platform's enterprise managed-settings.json
@@ -64,6 +66,29 @@ func runDoctor(args []string) error {
 	}
 	ok(dialErr == nil, fmt.Sprintf("collector listening on %s", addr),
 		"run `token-advisor start` (foreground) or `token-advisor init` (background service) to bring the collector up")
+
+	// Is the dashboard up? The service runs it alongside the collector.
+	ok(dashboardRunning(cfg.APIPort), fmt.Sprintf("dashboard answering on 127.0.0.1:%d", cfg.APIPort),
+		fmt.Sprintf("check %s for why it didn't start, or run `token-advisor ui`", filepath.Join(p.BaseDir, "collector.err.log")))
+
+	// Will the service come back after a restart?
+	if sp, err := servicePaths(p); err == nil {
+		if svc, err := newService(sp); err == nil {
+			autostartErr := svc.CheckAutostart()
+			ok(autostartErr == nil, "background service will restart after a reboot",
+				fmt.Sprintf("%v — run `token-advisor init` from a built binary", autostartErr))
+		}
+	}
+	if runtime.GOOS == "darwin" {
+		fmt.Println("[INFO] if it still doesn't start at login, check that token-advisor is allowed under System Settings > General > Login Items & Extensions")
+	}
+
+	// On Linux, will the service run outside a login session?
+	if runtime.GOOS == "linux" {
+		if linger, err := service.LingerEnabled(); err == nil && !linger {
+			fmt.Println("[INFO] the service runs only while you're logged in — to keep it running after logout, run `loginctl enable-linger` (init tries this, but it can be blocked by system policy)")
+		}
+	}
 
 	// 2. Does settings.json contain our env block, endpoint matching our port?
 	doc, existed, err := claudesettings.Load(p.ClaudeSettingsPath)
