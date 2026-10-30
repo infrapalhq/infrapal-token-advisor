@@ -34,6 +34,18 @@ type Service interface {
 	Start() error
 	Stop() error
 	Status() (Status, error)
+	// CheckAutostart returns nil if the service will come back after a
+	// restart, or an error saying why it won't.
+	CheckAutostart() error
+}
+
+// checkExecPath refuses a binary that won't outlive this command. `go run`
+// deletes its binary on exit, leaving a service that can never start.
+func checkExecPath(path string) error {
+	if strings.Contains(path, "/go-build") {
+		return fmt.Errorf("can't install a service for a temporary `go run` binary (%s): run `go build ./cmd/token-advisor`, then run init from that binary", path)
+	}
+	return nil
 }
 
 // Paths bundles the filesystem locations a Service implementation needs:

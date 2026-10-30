@@ -22,15 +22,16 @@ func runStart(args []string) error {
 	}
 
 	db, p, err := openDB()
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
 	if n, err := ingest.BackfillProjectDirs(db); err != nil {
 		fmt.Fprintf(os.Stderr, "token-advisor: project backfill: %v\n", err)
 	} else if n > 0 {
 		fmt.Fprintf(os.Stderr, "token-advisor: resolved project directory for %d session(s)\n", n)
 	}
-	if err != nil {
-		return fmt.Errorf("open database: %w", err)
-	}
-	defer db.Close()
 
 	cfg, err := config.Load(p)
 	if err != nil {
@@ -60,6 +61,7 @@ func runStart(args []string) error {
 
 	fmt.Printf("token-advisor collector listening on http://%s (OTLP http/protobuf: logs, metrics, traces)\n", addr)
 	fmt.Printf("writing to %s\n", p.DBPath)
+	stopDashboard := startDashboard(p, cfg.APIPort)
 	fmt.Println("press Ctrl+C to stop")
 
 	select {
@@ -73,6 +75,7 @@ func runStart(args []string) error {
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	stopDashboard(shutdownCtx)
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		fmt.Fprintf(os.Stderr, "token-advisor: error shutting down server: %v\n", err)
 	}
