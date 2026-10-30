@@ -99,6 +99,9 @@ func runInit(args []string) error {
 
 	fmt.Println()
 	fmt.Printf("data is stored at %s (0600) inside %s (0700) — this includes prompts, source fragments, shell commands, and file paths.\n", p.DBPath, p.BaseDir)
+	if cfg.RetentionMonths > 0 {
+		fmt.Printf("data older than %d months is deleted automatically — set retention_months in %s to change this, or 0 to keep everything.\n", cfg.RetentionMonths, p.ConfigPath)
+	}
 
 	return nil
 }

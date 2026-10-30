@@ -9,18 +9,21 @@ import (
 // purgeTable describes one typed table's shape for purge purposes: its
 // timestamp column (empty if it has none) and whether it carries
 // session_id, so --before/--session can be applied generically instead of
-// hand-writing a DELETE per table.
+// hand-writing a DELETE per table. beforeFilter narrows --before further.
 type purgeTable struct {
 	name         string
 	tsColumn     string
 	tsIsNanos    bool
 	hasSessionID bool
+	beforeFilter string
 }
 
 var purgeTables = []purgeTable{
 	{name: "events_raw", tsColumn: "ts", hasSessionID: true},
-	{name: "sessions", tsColumn: "started_at", hasSessionID: true},
 	{name: "interactions", tsColumn: "started_at", hasSessionID: true},
+	// After interactions, so an old session still in use keeps its row.
+	{name: "sessions", tsColumn: "started_at", hasSessionID: true,
+		beforeFilter: "session_id NOT IN (SELECT session_id FROM interactions WHERE session_id IS NOT NULL)"},
 	{name: "assistant_responses", tsColumn: "ts", hasSessionID: true},
 	{name: "api_requests", tsColumn: "ts", hasSessionID: true},
 	{name: "tool_calls", tsColumn: "ts", hasSessionID: true},
@@ -28,6 +31,8 @@ var purgeTables = []purgeTable{
 	{name: "metric_points", tsColumn: "ts", hasSessionID: true},
 	{name: "ingest_errors", tsColumn: "ts", hasSessionID: false},
 	{name: "mcp_server_connections", tsColumn: "ts", hasSessionID: true},
+	{name: "compactions", tsColumn: "ts", hasSessionID: true},
+	{name: "ai_recommendations", tsColumn: "generated_at"},
 }
 
 // purgeOnlyOnAllTables are staging tables with no ts/session_id column to
@@ -113,7 +118,11 @@ func purgeData(db *sql.DB, byBefore bool, cutoffMs int64, sessionID string, all 
 			if t.tsIsNanos {
 				cutoff = cutoffMs * int64(time.Millisecond/time.Nanosecond)
 			}
-			res, err = tx.Exec("DELETE FROM "+t.name+" WHERE "+t.tsColumn+" < ?", cutoff)
+			where := t.tsColumn + " < ?"
+			if t.beforeFilter != "" {
+				where += " AND " + t.beforeFilter
+			}
+			res, err = tx.Exec("DELETE FROM "+t.name+" WHERE "+where, cutoff)
 		default:
 			continue
 		}
