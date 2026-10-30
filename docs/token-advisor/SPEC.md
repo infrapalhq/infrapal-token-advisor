@@ -3,15 +3,15 @@
 Status: draft · Branch: `token-advisor-data-spec` · Date: 2026-10-24
 
 Companion doc: [DATA_GAPS.md](./DATA_GAPS.md) lists every UI element whose data
-ccotel cannot supply directly today, and the workaround this spec uses for it.
+token-advisor cannot supply directly today, and the workaround this spec uses for it.
 
 ## 1. Goal
 
-`~/Documents/workspace/token-advisor-ui` is a static HTML/vanilla-JS mock with
+The original design mock is a static HTML/vanilla-JS mock with
 four pages (Overview, Sessions, Session, Fixes) and every number hard-coded.
 This spec lays out how to:
 
-1. back every element in the mock with real ccotel data,
+1. back every element in the mock with real token-advisor data,
 2. compute as much as possible with **deterministic, static heuristics**
    (SQL views and Go detectors), with no LLM involved,
 3. use the user's **Anthropic API key**, entered in the UI, only for the few
@@ -37,9 +37,9 @@ Out of scope: visual design changes. The mock is the design.
 - **Local by default.** With no key set, nothing leaves the machine. The
   sidebar's "Local only" badge must change when a key is active (§7.3).
 
-## 3. What ccotel already has (verified against the live DB)
+## 3. What token-advisor already has (verified against the live DB)
 
-Verified on 2026-10-24 against `~/.ccotel/ccotel.db`: 18 sessions, 108
+Verified on 2026-10-24 against `~/.infrapal-token-advisor/token-advisor.db`: 18 sessions, 108
 prompts, 1,771 API requests, 1,793 tool calls, ~2 months of history.
 
 | Source | Gives the UI | Coverage |
@@ -344,8 +344,8 @@ technique for live proof".
 
 ## 10. Open decisions (need the user)
 
-1. Should `ccotel init` install a `SessionStart` hook that posts `cwd` to
-   ccotel? That gives exact project names for all future sessions (see G1),
+1. Should `token-advisor init` install a `SessionStart` hook that posts `cwd` to
+   token-advisor? That gives exact project names for all future sessions (see G1),
    at the cost of one more edit to `~/.claude/settings.json`.
 2. M1 (background calls on Sonnet): show it as a stat only until a real
    config lever is confirmed, or drop the "Smaller model for background
