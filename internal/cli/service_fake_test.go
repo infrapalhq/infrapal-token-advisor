@@ -48,6 +48,8 @@ func (f *fakeService) Stop() error {
 	return nil
 }
 
+func (f *fakeService) CheckAutostart() error { return nil }
+
 func (f *fakeService) Status() (service.Status, error) {
 	detail := "not loaded"
 	if f.running {

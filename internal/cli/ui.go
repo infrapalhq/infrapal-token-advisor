@@ -37,6 +37,22 @@ func runUI(args []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
+	// The background service normally has the dashboard up already, so there
+	// is nothing to serve. The service can't see this shell's environment.
+	if *port == 0 && dashboardRunning(cfg.APIPort) {
+		url := fmt.Sprintf("http://127.0.0.1:%d", cfg.APIPort)
+		fmt.Printf("token-advisor dashboard: %s\n", url)
+		if os.Getenv("ANTHROPIC_API_KEY") != "" && cfg.AnthropicAPIKey == "" {
+			fmt.Println("note: the background service can't see ANTHROPIC_API_KEY from this shell — save the key in Settings to use AI Mode")
+		}
+		if !*noBrowser {
+			if err := openBrowser(url); err != nil {
+				fmt.Fprintf(os.Stderr, "token-advisor: couldn't open a browser automatically (%v) — open %s yourself\n", err, url)
+			}
+		}
+		return nil
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

@@ -93,7 +93,7 @@ func runInit(args []string) error {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	if err := installService(p); err != nil {
+	if err := installService(p, cfg); err != nil {
 		return err
 	}
 
@@ -149,7 +149,7 @@ var newService = service.New
 // installService installs and starts the background collector service,
 // printing manual instructions instead of failing on platforms with no
 // supported service manager.
-func installService(p paths.Paths) error {
+func installService(p paths.Paths, cfg config.Config) error {
 	sp, err := servicePaths(p)
 	if err != nil {
 		return err
@@ -166,5 +166,6 @@ func installService(p paths.Paths) error {
 		return fmt.Errorf("install background service: %w", err)
 	}
 	fmt.Println("background collector service installed and started")
+	fmt.Printf("dashboard: http://127.0.0.1:%d\n", cfg.APIPort)
 	return nil
 }
