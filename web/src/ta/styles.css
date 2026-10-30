@@ -320,6 +320,9 @@ button, select, input { font: inherit; }
   border-bottom: 1.5px solid #000;
 }
 .bars .day-col { flex: 1; display: flex; flex-direction: column; }
+.bars { position: relative; }
+.bars-line { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.bars-line polyline { fill: none; stroke: #000; stroke-width: 2.5; vector-effect: non-scaling-stroke; }
 .bars .day-col .solid { flex: 1; background: #000; }
 .bars .day-col .hatch-part { border: 1px solid #000; border-bottom: 0; }
 .bars .day-col .none { flex: 1; }

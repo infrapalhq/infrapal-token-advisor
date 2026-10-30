@@ -72,6 +72,16 @@ export default function Fixes() {
                   <span className="num">{last ? `${Math.round(last.healthy_pct * 100)}%` : "—"}</span>
                   <span className="num-label">healthy sessions</span>
                 </div>
+                {weeks.length > 0 && (
+                  <div className="rows-bars" role="img" aria-label="Healthy sessions by week">
+                    {weeks.slice(-4).map((w) => (
+                      <div className="r-line" key={w.week}>
+                        <span className="mono">{dayShort(Date.parse(w.week))}</span>
+                        <div className="mix"><div className="ok-part" style={{ width: `${Math.round(w.healthy_pct * 100)}%` }} /></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="stat-grid">
                 <div className="stat">
@@ -111,6 +121,11 @@ export default function Fixes() {
                     <div className="hatch-part hatch" style={{ height: "100%" }} />
                   </div>
                 ))}
+                {weeks.length > 1 && (
+                  <svg className="bars-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points={weeks.map((w, i) => `${((i + 0.5) / weeks.length) * 100},${100 - w.healthy_pct * 100}`).join(" ")} />
+                  </svg>
+                )}
               </div>
               <div className="axis-x">
                 {weeks.map((w) => (
