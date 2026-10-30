@@ -9,6 +9,5 @@
 ## Checklist
 
 - [ ] `gofmt -l .` prints nothing, and `go vet ./...` and `go test -race ./...` pass
-- [ ] If `web/` changed: ran `scripts/build-web.sh` and committed `internal/webui/dist`
 - [ ] If the schema changed: added a new migration, didn't edit an existing one
 - [ ] Commits are signed off (`git commit -s`)

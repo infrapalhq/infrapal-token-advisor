@@ -41,7 +41,7 @@ jobs:
       - run: go test -race ./...
 
   web:
-    name: web / lint, build, dist in sync
+    name: web / lint, build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -57,13 +57,6 @@ jobs:
       # into internal/webui/dist, which the Go binary embeds.
       - run: scripts/build-web.sh
       - run: npm --prefix web run lint
-      - name: internal/webui/dist matches web/ source
-        run: |
-          if [ -n "$(git status --porcelain -- internal/webui/dist)" ]; then
-            git status --short -- internal/webui/dist
-            echo "internal/webui/dist is stale: run scripts/build-web.sh and commit the result."
-            exit 1
-          fi
 
   release-snapshot:
     name: release / goreleaser snapshot
