@@ -47,7 +47,6 @@ var commands = map[string]func(args []string) error{
 	"purge":     runPurge,
 	"update":    runUpdate,
 	"uninstall": runUninstall,
-	"replay":    runReplay, // hidden: not listed in usage, fixture-driven ingest testing
 }
 
 // Run dispatches args (os.Args[1:]) to the matching subcommand.
@@ -72,13 +71,6 @@ func Run(args []string) error {
 		return fmt.Errorf("unknown command %q", args[0])
 	}
 	return handler(args[1:])
-}
-
-// notImplemented prints a stub message for commands whose real behavior
-// arrives in a later build milestone, per the project's build order.
-func notImplemented(name string, milestone string) error {
-	fmt.Printf("token-advisor %s: not implemented yet — arrives in milestone %s\n", name, milestone)
-	return nil
 }
 
 // newFlagSet builds a FlagSet that prints usage to stdout on -h, matching
