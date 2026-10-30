@@ -3,6 +3,51 @@
 Local-only token advisor for Claude Code. Collects Claude Code's OpenTelemetry
 output into SQLite and serves a local dashboard.
 
+## Install
+
+macOS, with Homebrew:
+
+```sh
+brew install --cask infrapalhq/tap/infrapal-token-advisor
+```
+
+Linux or macOS, without Homebrew. This installs to `~/.local/bin`, or to
+`INSTALL_DIR` if you set it, and checks the download's checksum:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
+```
+
+Then start collecting. This patches `~/.claude/settings.json`, keeping a backup,
+and installs the background service:
+
+```sh
+token-advisor init
+```
+
+Restart any running Claude Code sessions so they pick up the new settings.
+
+## Update
+
+```sh
+token-advisor update --check   # is there a newer release?
+token-advisor update           # install it and restart the service
+```
+
+With Homebrew, use `brew upgrade --cask infrapal-token-advisor`, then
+`token-advisor restart`. A database is backed up before any schema upgrade; see
+[docs/SCHEMA.md](docs/SCHEMA.md).
+
+## Uninstall
+
+```sh
+token-advisor uninstall             # restores settings.json and deletes all data
+token-advisor uninstall --keep-db   # the same, keeping ~/.infrapal-token-advisor
+```
+
+This doesn't remove the binary. Delete it, or run
+`brew uninstall --cask infrapal-token-advisor`.
+
 ## Background service
 
 `token-advisor init` installs a user service that runs the collector and the
