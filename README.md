@@ -30,6 +30,13 @@ three old files kept. `token-advisor doctor` and `token-advisor status` report
 recent errors and crashes. Set `"log_level"` in `config.json` to `debug`,
 `info`, `warn` or `error`, then restart the service.
 
+## Data retention
+
+The collector deletes data older than 6 months, checking once a day. That covers
+the database and any raw bodies. To change it, set `"retention_months"` in
+`~/.infrapal-token-advisor/config.json`, or `0` to keep everything, then restart
+the service. `token-advisor status` shows the setting and the last cleanup.
+
 ## Development
 
 ```sh
