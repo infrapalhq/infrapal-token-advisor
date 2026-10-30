@@ -1,4 +1,4 @@
--- 0001_init: base schema for ccotel's OTLP-derived tables.
+-- 0001_init: base schema for token-advisor's OTLP-derived tables.
 --
 -- Two-phase write model: events_raw is the catch-all landing zone written
 -- before projection into the typed tables below. Typed columns are allowed

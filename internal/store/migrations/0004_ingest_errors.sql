@@ -1,4 +1,4 @@
--- 0004_ingest_errors: records batch-write failures so `ccotel doctor`
+-- 0004_ingest_errors: records batch-write failures so `token-advisor doctor`
 -- (a fresh, short-lived process with no memory of past server-log lines)
 -- can report "N ingest errors in the last hour" per its check #6, rather
 -- than that signal only ever existing in stderr.

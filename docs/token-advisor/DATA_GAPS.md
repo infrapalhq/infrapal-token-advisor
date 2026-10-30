@@ -1,8 +1,8 @@
 # Token Advisor UI: data gaps and workarounds
 
 Companion to [SPEC.md](./SPEC.md). Each entry is a UI element whose data
-ccotel cannot supply exactly as the mock shows it. Each one gives what's
-missing, the evidence (checked against the live `~/.ccotel/ccotel.db` on
+token-advisor cannot supply exactly as the mock shows it. Each one gives what's
+missing, the evidence (checked against the live `~/.infrapal-token-advisor/token-advisor.db` on
 2026-10-24), the workaround the spec uses, and how the UI should label it.
 
 Severity:
@@ -44,8 +44,8 @@ paths → common path prefix → `(unknown)`. Persist the result in
 **Caveat**: only **6 of 18** sessions still have a transcript, because Claude
 Code's `retention_sweep` deletes them after 30 days. That's why it must be
 captured at ingest. Older sessions with no file tool calls show `(unknown)`.
-**Better fix (needs a decision)**: `ccotel init` installs a `SessionStart`
-hook that sends `{session_id, cwd}` to ccotel. That's exact, but it's one
+**Better fix (needs a decision)**: `token-advisor init` installs a `SessionStart`
+hook that sends `{session_id, cwd}` to token-advisor. That's exact, but it's one
 more settings.json edit.
 **Label**: no label when the source is the transcript or a hook. With the
 git or prefix fallback, a muted "inferred" tooltip.
@@ -150,7 +150,7 @@ Likely. LLM optional.
 **(b) "Sonnet writing session titles"**: the live data contradicts the mock.
 `generate_session_title` already runs on **Haiku**. The non-Haiku background
 calls are `away_summary`, `agent_summary` and `prompt_suggestion` on Sonnet
-or Opus. ccotel's own `0011` migration notes that routing for these isn't
+or Opus. token-advisor's own `0011` migration notes that routing for these isn't
 user-configurable.
 **Workaround**: show it as a stat in the Model area, with **no fix card**,
 until a real setting is confirmed. That means the mock's "Smaller model for
@@ -158,7 +158,7 @@ background calls" fix and its "smaller bg model" annotation can't be backed
 today. Open decision in SPEC §10.
 
 ### G13 🟠 "Ran again with nothing changed" labeled Measured
-**Caveat**: ccotel sees only Claude's own Edit/Write/`fs_mutation` calls. A
+**Caveat**: token-advisor sees only Claude's own Edit/Write/`fs_mutation` calls. A
 user edit in their editor between two `terraform plan` runs is invisible.
 **Workaround**: the rule is "no Claude-side change in between".
 **Label**: Likely, not Measured as in the mock.
@@ -180,12 +180,12 @@ there whenever responses are logged. Otherwise the title falls back to
 "Session · <date>".
 
 ### G16 🔴 Run doctor, Export, collector live
-**Missing**: these exist only as CLI commands (`ccotel doctor`, `ccotel
-export`, `ccotel status`).
+**Missing**: these exist only as CLI commands (`token-advisor doctor`, `token-advisor
+export`, `token-advisor status`).
 **Workaround**: thin API wrappers that reuse the CLI packages (SPEC §8).
 
 ### G17 🟠 Dollar value of token waste
-**Missing**: no per-model price table in ccotel.
+**Missing**: no per-model price table in token-advisor.
 **Workaround**: use the install's own blended $/token per model. The real cost
 of a re-read is its tokens carried as cache reads in every later request of
 the session, so the simple "tokens × rate" understates it. The spec keeps the
