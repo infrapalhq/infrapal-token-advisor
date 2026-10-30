@@ -19,7 +19,7 @@ var sensitiveFixtureStrings = []string{
 	"how do I center a div in css please",
 	"use flexbox and a wrapper div",
 	"rm -rf /some/secret/path --force",
-	"/Users/shamik/secret-project/config.yaml",
+	"/home/user/private-project/config.yaml",
 }
 
 // seedDB builds a temp SQLite DB with one session/interaction/tool_call

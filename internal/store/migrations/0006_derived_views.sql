@@ -111,7 +111,7 @@ GROUP BY i.session_id, day;
 -- tool identity in the current schema — there's no stable shape descriptor
 -- for e.g. a Bash command's arguments. Interpreted here as (tool_name,
 -- mcp_server_name, mcp_tool_name), which is the closest thing to a stable
--- "shape" ccotel actually has: it distinguishes MCP tools by server+tool
+-- "shape" token-advisor actually has: it distinguishes MCP tools by server+tool
 -- identity while still grouping built-in tools like Edit/Bash by name alone.
 --
 -- Also carries success_count/error_count/avg_duration_ms: the spec's Tools &
