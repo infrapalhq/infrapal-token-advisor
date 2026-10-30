@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// timelineRow is one line of a session's thread (SPEC §4.3). Kind is div |
+// timelineRow is one line of a session's thread. Kind is div |
 // you | claude | tool | event. Flag/FlagLabel are set when an occurrence
 // points at this row, so the UI can show a "!" and jump to its issue.
 type timelineRow struct {

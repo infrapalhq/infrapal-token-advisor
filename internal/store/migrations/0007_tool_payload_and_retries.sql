@@ -1,5 +1,5 @@
 -- 0007_tool_payload_and_retries: two views for token-reduction analysis,
--- additive to the milestone-5 views in 0006. Neither changes an existing
+-- additive to the views in 0006. Neither changes an existing
 -- table or view — both are new SELECT surfaces over columns already
 -- ingested (tool_calls.input_size_bytes/result_size_bytes/result_tokens,
 -- api_requests.attempt), just never aggregated before.

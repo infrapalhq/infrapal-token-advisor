@@ -234,6 +234,7 @@ Not at the moment. It supports macOS and Linux.
 - [Operating guide](docs/OPERATIONS.md): the service, logs, settings, retention
   and troubleshooting
 - [How accurate the numbers are](docs/ACCURACY.md)
+- [Architecture](docs/ARCHITECTURE.md)
 - [Database schema and migrations](docs/SCHEMA.md)
 - [Security](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)

@@ -28,7 +28,7 @@ const resourceLogsFieldNumber = protowire.Number(1)
 // Nothing here interprets the event beyond the handful of correlation
 // fields (event_name, session_id, prompt_id, seq, ts) that events_raw
 // indexes on — the full decoded record goes into Body verbatim so
-// projection (milestone 3) can read anything else it needs, and so
+// projection can read anything else it needs, and so
 // nothing is lost if Claude Code adds an attribute we don't know about yet.
 func decodeLogsRequest(data []byte) ([]ingest.RawEvent, error) {
 	var events []ingest.RawEvent

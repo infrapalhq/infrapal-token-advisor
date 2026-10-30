@@ -55,8 +55,8 @@ var viewsWithSince = map[string]sinceColumn{
 }
 
 // handleView handles GET /api/views/{name}, a generic pass-through to one
-// of the six derived views, per the spec's "thin API" instruction — no
-// business logic here, the views already shape the data.
+// of the derived views. There's no business logic here: the views already
+// shape the data.
 func (s *Server) handleView(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	table, ok := viewTable[name]

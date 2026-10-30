@@ -67,7 +67,7 @@ func deadMCPOccurrences(ctx context.Context, db *sql.DB) ([]occurrence, error) {
 	return out, rows.Err()
 }
 
-// sessionCard is one row of the Sessions page (SPEC §4.1).
+// sessionCard is one row of the Sessions page.
 type sessionCard struct {
 	ID        string    `json:"id"`
 	Project   string    `json:"project"`
