@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 const (
@@ -24,6 +25,9 @@ const (
 	// vacuumFreeRatio is the share of the database that must be free pages
 	// before cleanup rewrites the file. Below it, SQLite just reuses them.
 	vacuumFreeRatio = 0.25
+
+	// backupMaxAge is how long a pre-migration backup is kept.
+	backupMaxAge = 30 * 24 * time.Hour
 
 	retentionLastRunKey     = "retention_last_run"
 	retentionLastDeletedKey = "retention_last_deleted"
@@ -73,6 +77,10 @@ func runRetention(db *sql.DB, p paths.Paths, months int, now time.Time) error {
 	files, err := removeOldBodies(p.BodiesDir, cutoff)
 	if err != nil {
 		return fmt.Errorf("remove old bodies: %w", err)
+	}
+	// A backup holds data as old as the database did, so it can't stay long.
+	if _, err := store.RemoveBackups(p.DBPath, now.Add(-backupMaxAge)); err != nil {
+		return fmt.Errorf("remove old database backups: %w", err)
 	}
 	// Disk space is a bonus: the data is already gone, so don't fail on this.
 	vacuumed, err := vacuumIfWorthwhile(db)
