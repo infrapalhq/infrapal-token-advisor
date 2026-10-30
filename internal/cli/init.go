@@ -137,12 +137,34 @@ func servicePaths(p paths.Paths) (service.Paths, error) {
 	if err != nil {
 		return service.Paths{}, fmt.Errorf("resolve own executable path: %w", err)
 	}
+	execPath = stableExecPath(execPath, os.Getenv("PATH"))
 	return service.Paths{
 		ExecPath:  execPath,
 		StdoutLog: filepath.Join(p.BaseDir, "collector.log"),
 		StderrLog: filepath.Join(p.BaseDir, "collector.err.log"),
 		Home:      p.Home,
 	}, nil
+}
+
+// stableExecPath returns the name on path that runs the same file as exe, if
+// there is one. Homebrew keeps binaries in a versioned folder and links them
+// into its bin directory, so a service pointing at the real file would break
+// at the next upgrade, when that folder is deleted.
+func stableExecPath(exe, path string) string {
+	real, err := filepath.EvalSymlinks(exe)
+	if err != nil {
+		return exe
+	}
+	for _, dir := range filepath.SplitList(path) {
+		if !filepath.IsAbs(dir) {
+			continue
+		}
+		candidate := filepath.Join(dir, "token-advisor")
+		if resolved, err := filepath.EvalSymlinks(candidate); err == nil && resolved == real {
+			return candidate
+		}
+	}
+	return exe
 }
 
 // newService is service.New behind a seam so tests can substitute a fake

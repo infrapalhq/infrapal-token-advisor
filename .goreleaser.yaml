@@ -44,16 +44,25 @@ changelog:
       - "^test:"
       - "^chore:"
 
-brews:
+homebrew_casks:
   - name: infrapal-token-advisor
+    binaries:
+      - token-advisor
     repository:
       owner: infrapalhq
       name: homebrew-tap
-    directory: Formula
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
     homepage: "https://github.com/infrapalhq/infrapal-token-advisor"
     description: "Local-only OTLP receiver, SQLite store, and dashboard for Claude Code telemetry"
-    license: "MIT"
-    install: |
-      bin.install "token-advisor"
-    test: |
-      assert_match "token-advisor", shell_output("#{bin}/token-advisor version")
+    caveats: |
+      Run `token-advisor init` to start collecting.
+      After upgrading, run `token-advisor restart`.
+    hooks:
+      post:
+        # The binary isn't signed yet, and macOS refuses to run a quarantined
+        # unsigned download.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/token-advisor"]
+          end

@@ -34,9 +34,10 @@ AI Mode sending more than described below.
 | --- | --- | --- |
 | Telemetry receiver | Listens on `127.0.0.1:4318` only | Nothing. Claude Code on the same machine sends to it. |
 | Dashboard and API | Listens on `127.0.0.1:4319` only, while the collector runs. Refuses requests whose `Host` isn't localhost and writes from other sites, so web pages can't reach your data. | Nothing. |
+| `token-advisor update` | `api.github.com` and `github.com`, only when you run it | Nothing but ordinary requests for the release files. |
 | AI Mode (off by default) | `https://api.anthropic.com` with your own API key, only when you press **Generate** | Aggregated figures and labels: costs, token and call counts, error and retry rates, tool and MCP server names, model names, session and prompt ids, and the dashboard's insight titles and details. **Never** prompt or response text, tool input or output, file paths or shell commands. |
 
-There is no usage telemetry, update check or crash reporting.
+There is no usage telemetry, automatic update check or crash reporting.
 
 ## What is stored locally
 

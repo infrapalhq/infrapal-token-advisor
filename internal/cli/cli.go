@@ -13,12 +13,14 @@ Usage:
   token-advisor init            patch ~/.claude/settings.json, create DB, install background service
   token-advisor start           run collector and dashboard in foreground (what the service invokes)
   token-advisor stop            stop the background service
+  token-advisor restart         restart the background service, e.g. after an upgrade
   token-advisor status          is the service up, DB size, event count, last event timestamp
   token-advisor ui              open the dashboard, serving it here if the service isn't running
   token-advisor doctor          diagnose why no data is arriving
   token-advisor logs            show the collector's log (-n 100, --errors, -f)
   token-advisor export          export captured data (--format jsonl|csv --since 7d)
   token-advisor purge           delete captured data (--before 30d | --session <id> | --all)
+  token-advisor update          install the latest release (--check only reports it)
   token-advisor uninstall       revert settings.json from backup, remove service
   token-advisor version         print the token-advisor version
 
@@ -36,12 +38,14 @@ var commands = map[string]func(args []string) error{
 	"init":      runInit,
 	"start":     runStart,
 	"stop":      runStop,
+	"restart":   runRestart,
 	"status":    runStatus,
 	"ui":        runUI,
 	"doctor":    runDoctor,
 	"logs":      runLogs,
 	"export":    runExport,
 	"purge":     runPurge,
+	"update":    runUpdate,
 	"uninstall": runUninstall,
 	"replay":    runReplay, // hidden: not listed in usage, fixture-driven ingest testing
 }
