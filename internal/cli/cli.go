@@ -11,10 +11,10 @@ const usage = `token-advisor — local Claude Code telemetry collector
 
 Usage:
   token-advisor init            patch ~/.claude/settings.json, create DB, install background service
-  token-advisor start           run collector in foreground (what the service invokes)
+  token-advisor start           run collector and dashboard in foreground (what the service invokes)
   token-advisor stop            stop the background service
   token-advisor status          is the service up, DB size, event count, last event timestamp
-  token-advisor ui              start API + serve embedded React app, open browser
+  token-advisor ui              open the dashboard, serving it here if the service isn't running
   token-advisor doctor          diagnose why no data is arriving
   token-advisor export          export captured data (--format jsonl|csv --since 7d)
   token-advisor purge           delete captured data (--before 30d | --session <id> | --all)

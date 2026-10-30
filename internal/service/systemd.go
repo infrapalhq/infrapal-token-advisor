@@ -1,9 +1,11 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -39,6 +41,9 @@ type systemdService struct {
 }
 
 func (s *systemdService) Install() error {
+	if err := checkExecPath(s.p.ExecPath); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(s.unitPath), 0o755); err != nil {
 		return fmt.Errorf("create systemd user dir: %w", err)
 	}
@@ -48,7 +53,14 @@ func (s *systemdService) Install() error {
 	if err := runCommand("systemctl", "--user", "daemon-reload"); err != nil {
 		return err
 	}
-	return runCommand("systemctl", "--user", "enable", "--now", systemdUnitName)
+	if err := runCommand("systemctl", "--user", "enable", systemdUnitName); err != nil {
+		return err
+	}
+	// Best-effort: without linger, systemd stops user services at logout and
+	// doesn't start them until the next login. doctor reports it if this fails.
+	_ = runCommand("loginctl", "enable-linger")
+	// restart, not start, so a repeat init picks up the current binary.
+	return runCommand("systemctl", "--user", "restart", systemdUnitName)
 }
 
 func (s *systemdService) Uninstall() error {
@@ -69,6 +81,56 @@ func (s *systemdService) Start() error {
 
 func (s *systemdService) Stop() error {
 	return runCommand("systemctl", "--user", "stop", systemdUnitName)
+}
+
+// CheckAutostart looks for what stops systemd starting the unit at login.
+func (s *systemdService) CheckAutostart() error {
+	data, err := os.ReadFile(s.unitPath)
+	if os.IsNotExist(err) {
+		return errors.New("service isn't installed")
+	}
+	if err != nil {
+		return err
+	}
+	if path := unitExecPath(string(data)); path == "" {
+		return errors.New("can't read the binary path from " + s.unitPath)
+	} else if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("the service runs %s, which no longer exists", path)
+	}
+	out, _ := exec.Command("systemctl", "--user", "is-enabled", systemdUnitName).Output()
+	if state := strings.TrimSpace(string(out)); state != "" && state != "enabled" {
+		return fmt.Errorf("the service is %s in systemd, so it won't start at login", state)
+	}
+	return nil
+}
+
+// unitExecPath returns the binary a unit file runs, or "" if it can't be found.
+func unitExecPath(unit string) string {
+	for _, line := range strings.Split(unit, "\n") {
+		if cmd, ok := strings.CutPrefix(line, "ExecStart="); ok {
+			return strings.TrimSuffix(cmd, " start")
+		}
+	}
+	return ""
+}
+
+// LingerEnabled reports whether systemd keeps this user's services running
+// with no login session. Without it they start at login and stop at logout.
+func LingerEnabled() (bool, error) {
+	u, err := user.Current()
+	if err != nil {
+		return false, err
+	}
+	out, err := exec.Command("loginctl", "show-user", u.Username, "--property=Linger").Output()
+	if err != nil {
+		return false, err
+	}
+	return parseLinger(string(out)), nil
+}
+
+// parseLinger reads `loginctl show-user --property=Linger` output.
+func parseLinger(out string) bool {
+	return strings.TrimSpace(out) == "Linger=yes"
 }
 
 func (s *systemdService) Status() (Status, error) {

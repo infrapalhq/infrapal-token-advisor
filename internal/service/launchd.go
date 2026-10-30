@@ -2,10 +2,13 @@ package service
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -61,12 +64,18 @@ type launchdService struct {
 }
 
 func (s *launchdService) Install() error {
+	if err := checkExecPath(s.p.ExecPath); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(s.plistPath), 0o755); err != nil {
 		return fmt.Errorf("create LaunchAgents dir: %w", err)
 	}
 	if err := os.WriteFile(s.plistPath, launchdPlistXML(s.p), 0o644); err != nil {
 		return fmt.Errorf("write plist: %w", err)
 	}
+	// Best-effort unload so a repeat init restarts on the current binary;
+	// load alone leaves an already-loaded job running as it was.
+	_ = runCommand("launchctl", "unload", s.plistPath)
 	return runCommand("launchctl", "load", "-w", s.plistPath)
 }
 
@@ -74,7 +83,7 @@ func (s *launchdService) Uninstall() error {
 	// Best-effort unload: if it's already unloaded (e.g. after a crash),
 	// launchctl exits non-zero and that's fine — the file removal below is
 	// what actually matters for uninstall to succeed.
-	_ = runCommand("launchctl", "unload", "-w", s.plistPath)
+	_ = runCommand("launchctl", "unload", s.plistPath)
 	if err := os.Remove(s.plistPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove plist: %w", err)
 	}
@@ -85,8 +94,58 @@ func (s *launchdService) Start() error {
 	return runCommand("launchctl", "load", "-w", s.plistPath)
 }
 
+// Stop leaves out -w: that would mark the job disabled, and launchd skips
+// disabled jobs at login, so one stop would turn the service off for good.
 func (s *launchdService) Stop() error {
-	return runCommand("launchctl", "unload", "-w", s.plistPath)
+	return runCommand("launchctl", "unload", s.plistPath)
+}
+
+// CheckAutostart looks for what stops launchd starting the job at login.
+func (s *launchdService) CheckAutostart() error {
+	data, err := os.ReadFile(s.plistPath)
+	if os.IsNotExist(err) {
+		return errors.New("service isn't installed")
+	}
+	if err != nil {
+		return err
+	}
+	if path := plistExecPath(string(data)); path == "" {
+		return errors.New("can't read the binary path from " + s.plistPath)
+	} else if _, err := os.Stat(path); err != nil {
+		return fmt.Errorf("the service runs %s, which no longer exists", path)
+	}
+	domain := "gui/" + strconv.Itoa(os.Getuid())
+	out, err := exec.Command("launchctl", "print-disabled", domain).Output()
+	if err != nil {
+		return nil // can't tell, and the job may well be fine
+	}
+	if launchdDisabled(string(out)) {
+		return errors.New("the service is disabled in launchd, so it won't start at login")
+	}
+	return nil
+}
+
+var plistExecRE = regexp.MustCompile(`<key>ProgramArguments</key>\s*<array>\s*<string>([^<]*)</string>`)
+
+// plistExecPath returns the binary a plist runs, or "" if it can't be found.
+func plistExecPath(plist string) string {
+	m := plistExecRE.FindStringSubmatch(plist)
+	if m == nil {
+		return ""
+	}
+	return html.UnescapeString(m[1])
+}
+
+// launchdDisabled reports whether `launchctl print-disabled` output lists our
+// job as disabled. Older macOS versions print "true" rather than "disabled".
+func launchdDisabled(out string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, `"`+launchdLabel+`"`) &&
+			(strings.Contains(line, "=> disabled") || strings.Contains(line, "=> true")) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *launchdService) Status() (Status, error) {
