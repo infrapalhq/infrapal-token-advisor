@@ -1,0 +1,48 @@
+name: dependency-audit
+
+# Known-vulnerability checks for Go modules (including the Go standard
+# library) and the dashboard's npm packages. Runs weekly as well, because
+# new advisories appear without any change to this repo.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Uses the toolchain directive in go.mod, so a stdlib advisory fails
+      # here until that version is bumped.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  npm-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # Only runtime dependencies end up in the shipped dashboard; dev
+      # tooling (vite, tsc, oxlint) is kept current by Dependabot.
+      - run: npm --prefix web audit --omit=dev --audit-level=high
