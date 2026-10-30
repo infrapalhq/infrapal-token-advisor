@@ -80,3 +80,44 @@ jobs:
         with:
           version: v2.19.0
           args: release --snapshot --clean
+      - uses: actions/upload-artifact@v7
+        with:
+          name: snapshot
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+          retention-days: 1
+
+  clean-machine:
+    name: install / ${{ matrix.os }}
+    needs: release-snapshot
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: snapshot
+          path: snapshot
+      - name: Install from the snapshot with scripts/install.sh
+        run: |
+          version=$(ls snapshot/*.tar.gz | head -1 | sed -E 's/.*advisor_(.*)_(darwin|linux)_.*/\1/')
+          TOKEN_ADVISOR_VERSION=$version \
+            TOKEN_ADVISOR_BASE_URL=file://$PWD/snapshot \
+            sh scripts/install.sh
+      - name: Run the installed binary on a machine with nothing set up
+        run: |
+          export PATH=$HOME/.local/bin:$PATH
+          token-advisor version
+          token-advisor start &
+          sleep 3
+          curl -fsS -o /dev/null http://127.0.0.1:4319/
+          curl -fsS http://127.0.0.1:4319/ | grep -q 'id="root"'
+          token-advisor status
+          token-advisor logs --errors
