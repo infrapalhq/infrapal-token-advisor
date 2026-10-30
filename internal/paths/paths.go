@@ -25,6 +25,7 @@ type Paths struct {
 	DBPath     string // ~/.infrapal-token-advisor/token-advisor.db
 	BodiesDir  string // ~/.infrapal-token-advisor/bodies — raw API bodies in file: mode
 	ConfigPath string // ~/.infrapal-token-advisor/config.json
+	LogPath    string // ~/.infrapal-token-advisor/token-advisor.log
 
 	ClaudeSettingsPath string // ~/.claude/settings.json
 }
@@ -43,6 +44,7 @@ func Resolve() (Paths, error) {
 		DBPath:             filepath.Join(base, "token-advisor.db"),
 		BodiesDir:          filepath.Join(base, "bodies"),
 		ConfigPath:         filepath.Join(base, "config.json"),
+		LogPath:            filepath.Join(base, "token-advisor.log"),
 		ClaudeSettingsPath: filepath.Join(home, ".claude", "settings.json"),
 	}, nil
 }

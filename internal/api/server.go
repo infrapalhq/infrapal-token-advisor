@@ -20,8 +20,11 @@ import (
 	"context"
 	"database/sql"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 )
 
 // Server is infrapal-token-advisor's local HTTP API, read-only over the SQLite database.
@@ -66,7 +69,11 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
-	s.http = &http.Server{Addr: addr, Handler: guard(mux)}
+	s.http = &http.Server{
+		Addr:     addr,
+		Handler:  logging.RecoverHTTP("api", guard(mux)),
+		ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn),
+	}
 	return s
 }
 

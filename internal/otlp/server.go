@@ -4,10 +4,11 @@ import (
 	"compress/gzip"
 	"context"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 )
 
 // Server is the local OTLP http/protobuf receiver, implementing the logs,
@@ -27,7 +28,11 @@ func NewServer(addr string, w *ingest.Writer, mw *ingest.MetricsWriter, sw *inge
 	mux.HandleFunc("/v1/logs", s.handleLogs)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/v1/traces", s.handleTraces)
-	s.http = &http.Server{Addr: addr, Handler: mux}
+	s.http = &http.Server{
+		Addr:     addr,
+		Handler:  logging.RecoverHTTP("otlp", mux),
+		ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn),
+	}
 	return s
 }
 
@@ -57,12 +62,12 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 
 	events, err := decodeLogsRequest(body)
 	if err != nil {
-		log.Printf("otlp: failed to decode /v1/logs payload: %v", err)
+		slog.Warn("otlp: failed to decode payload", "path", "/v1/logs", "err", err)
 		http.Error(w, "invalid protobuf", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("otlp: /v1/logs received %d bytes, decoded %d events", len(body), len(events))
+	slog.Debug("otlp: received", "path", "/v1/logs", "bytes", len(body), "events", len(events))
 	for _, e := range events {
 		s.writer.Enqueue(e)
 	}
@@ -84,12 +89,12 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	points, err := decodeMetricsRequest(body)
 	if err != nil {
-		log.Printf("otlp: failed to decode /v1/metrics payload: %v", err)
+		slog.Warn("otlp: failed to decode payload", "path", "/v1/metrics", "err", err)
 		http.Error(w, "invalid protobuf", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("otlp: /v1/metrics received %d bytes, decoded %d points", len(body), len(points))
+	slog.Debug("otlp: received", "path", "/v1/metrics", "bytes", len(body), "points", len(points))
 	for _, p := range points {
 		s.metricsWriter.Enqueue(p)
 	}
@@ -111,12 +116,12 @@ func (s *Server) handleTraces(w http.ResponseWriter, r *http.Request) {
 
 	spans, err := decodeTracesRequest(body)
 	if err != nil {
-		log.Printf("otlp: failed to decode /v1/traces payload: %v", err)
+		slog.Warn("otlp: failed to decode payload", "path", "/v1/traces", "err", err)
 		http.Error(w, "invalid protobuf", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("otlp: /v1/traces received %d bytes, decoded %d spans", len(body), len(spans))
+	slog.Debug("otlp: received", "path", "/v1/traces", "bytes", len(body), "spans", len(spans))
 	for _, sp := range spans {
 		s.spansWriter.Enqueue(sp)
 	}

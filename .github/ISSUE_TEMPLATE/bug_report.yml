@@ -58,5 +58,5 @@ body:
     id: logs
     attributes:
       label: Relevant log lines
-      description: From `~/.infrapal-token-advisor/collector.err.log`. Check them for anything private first.
+      description: Output of `token-advisor logs --errors`. Check it for anything private first.
       render: text
