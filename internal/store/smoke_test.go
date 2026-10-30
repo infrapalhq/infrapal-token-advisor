@@ -20,8 +20,8 @@ func TestOpenAndMigrate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CurrentVersion: %v", err)
 	}
-	if v != 16 {
-		t.Fatalf("expected version 16, got %d", v)
+	if want := latestVersion(t); v != want {
+		t.Fatalf("expected version %d, got %d", want, v)
 	}
 
 	info, err := os.Stat(dbPath)
@@ -65,7 +65,7 @@ func TestOpenAndMigrate(t *testing.T) {
 	}
 	defer db2.Close()
 	v2, err := CurrentVersion(db2)
-	if err != nil || v2 != 16 {
-		t.Fatalf("expected version 16 after reopen, got %d, err %v", v2, err)
+	if err != nil || v2 != v {
+		t.Fatalf("expected version %d after reopen, got %d, err %v", v, v2, err)
 	}
 }
