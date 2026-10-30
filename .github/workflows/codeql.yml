@@ -47,11 +47,6 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          # The built dashboard is minified output of web/src, which is
-          # scanned directly.
-          config: |
-            paths-ignore:
-              - internal/webui/dist
       - name: Build Go for extraction
         if: matrix.language == 'go'
         run: go build ./...

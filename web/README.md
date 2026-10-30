@@ -28,13 +28,15 @@ npm --prefix web run lint    # oxlint
 npm --prefix web run build   # tsc type check + production build
 ```
 
-## Ship a change
+## Try it in the binary
 
-The Go binary embeds `internal/webui/dist`, not `web/dist`. After changing
-anything under `web/`, rebuild and copy it from the repo root:
+The Go binary embeds `internal/webui/dist`, not `web/dist`. To see a change
+there, rebuild and copy it from the repo root, then build the binary:
 
 ```sh
 scripts/build-web.sh
+go build ./cmd/token-advisor
 ```
 
-Commit the updated `internal/webui/dist` in the same PR as the source change.
+`internal/webui/dist` is git-ignored, so there's nothing to commit. Release
+builds run the script themselves.
