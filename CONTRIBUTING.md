@@ -68,7 +68,8 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
    ```
 
 5. Schema changes go in a **new** migration file with the next number.
-   Never edit a migration that has already been released.
+   Never edit a migration that has already been released. See
+   [docs/SCHEMA.md](docs/SCHEMA.md#adding-a-migration).
 
 ## Commit messages
 

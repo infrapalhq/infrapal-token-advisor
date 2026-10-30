@@ -2,6 +2,7 @@ package cli
 
 import (
 	"database/sql"
+	"os"
 	"testing"
 	"time"
 )
@@ -228,5 +229,26 @@ func TestRunPurge_BeforeLeavesStagingTablesAlone(t *testing.T) {
 
 	if got := countRows(t, db, "pending_interaction_spans"); got != 1 {
 		t.Errorf("pending_interaction_spans: %d rows after --before, want 1 (staging tables only clear on --all)", got)
+	}
+}
+
+func TestRunPurge_RemovesBackups(t *testing.T) {
+	withFakeHome(t)
+	db, p, err := openDB()
+	if err != nil {
+		t.Fatalf("openDB: %v", err)
+	}
+	db.Close()
+	backup := p.DBPath + ".backup-v15-1"
+	if err := os.WriteFile(backup, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := runPurge([]string{"--all"}); err != nil {
+		t.Fatalf("runPurge: %v", err)
+	}
+
+	if _, err := os.Stat(backup); !os.IsNotExist(err) {
+		t.Errorf("backup survived a purge (err=%v)", err)
 	}
 }

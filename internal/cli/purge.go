@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"time"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
 // purgeTable describes one typed table's shape for purge purposes: its
@@ -87,6 +89,13 @@ func runPurge(args []string) error {
 
 	if _, err := db.Exec("VACUUM"); err != nil {
 		return fmt.Errorf("vacuum: %w", err)
+	}
+
+	// A backup still holds what was just deleted.
+	if removed, err := store.RemoveBackups(p.DBPath, time.Now()); err != nil {
+		return fmt.Errorf("remove database backups: %w", err)
+	} else if removed > 0 {
+		fmt.Printf("removed %d database backup(s), which still held that data\n", removed)
 	}
 
 	fmt.Printf("deleted %d rows from %s\n", deleted, p.DBPath)
