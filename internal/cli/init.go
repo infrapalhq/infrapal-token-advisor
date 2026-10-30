@@ -107,8 +107,7 @@ func runInit(args []string) error {
 }
 
 // wantedEnv builds the fixed set of settings.json env keys infrapal-token-advisor's init
-// wants present, per prompt.md's init specifics. Values are all strings,
-// matching the JSON sample.
+// wants present. Values are all strings, as settings.json expects.
 func wantedEnv(cfg config.Config) map[string]string {
 	return map[string]string{
 		"CLAUDE_CODE_ENABLE_TELEMETRY":        "1",

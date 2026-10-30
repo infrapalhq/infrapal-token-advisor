@@ -36,7 +36,7 @@ func projectLogEvent(tx *sql.Tx, e RawEvent) error {
 
 // normalizeEventName strips an optional "claude_code." prefix so dispatch
 // matches regardless of which form the connected client sends. The docs
-// (and prompt.md) describe event.name as always "claude_code.<event>", but
+// describe event.name as always "claude_code.<event>", but
 // a live 2.1.212 session was observed sending the bare form
 // ("user_prompt", not "claude_code.user_prompt") — events_raw.event_name
 // stores whatever arrived verbatim, this normalization only affects

@@ -24,9 +24,8 @@ func launchdPlistPath(home string) string {
 
 // launchdPlistXML renders the LaunchAgent property list. RunAtLoad +
 // KeepAlive together mean launchd starts the collector on login and
-// restarts it if it ever exits — the spec calls this out explicitly
-// (gotcha 7: Claude Code doesn't buffer exports to disk, so a dead
-// collector silently loses data).
+// restarts it if it ever exits: Claude Code doesn't buffer exports to disk,
+// so a dead collector silently loses data.
 func launchdPlistXML(p Paths) []byte {
 	esc := xml.EscapeText
 	var execPath, stdoutLog, stderrLog strings.Builder

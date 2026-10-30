@@ -128,7 +128,7 @@ func aggregateItems(occ []occurrence, rate float64) []*insightItem {
 	return out
 }
 
-// priorityScore is SPEC §5: (usd + minutes × 0.10) × confidence × log2(1+n).
+// priorityScore is (usd + minutes × 0.10) × confidence × log2(1+n).
 // The 0.10 $/min weight only ranks items; it is never shown as money.
 func priorityScore(it *insightItem) float64 {
 	var usd, minutes float64
@@ -200,7 +200,7 @@ type fixBaseline struct {
 	Minutes     *float64 `json:"minutes,omitempty"`
 }
 
-// markDuration is the minimum measuring window after a mark (SPEC §8).
+// markDuration is the minimum measuring window after a mark.
 const markDuration = 7 * 24 * time.Hour
 
 // recordMark appends a fixed/reverted row for item key, capturing the baseline

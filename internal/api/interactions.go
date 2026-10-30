@@ -85,7 +85,7 @@ func (s *Server) handleListInteractions(w http.ResponseWriter, r *http.Request) 
 // arrays of its spans/api_requests/tool_calls/assistant_responses — each span already carries
 // agent_id/parent_agent_id/parent_span_id (plus tool_use_id, extracted from
 // its attrs JSON, so the client can join a "claude_code.tool" span back to
-// its richer tool_calls row), so the client (milestone 6) reconstructs the
+// its richer tool_calls row), so the client reconstructs the
 // subagent tree itself; this API stays thin and does not nest the response.
 func (s *Server) handleGetInteraction(w http.ResponseWriter, r *http.Request) {
 	promptID := r.PathValue("prompt_id")

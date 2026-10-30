@@ -14,7 +14,7 @@ import (
 
 // ErrUnsupported is returned by New on platforms with no supported service
 // manager (anything but macOS/Linux). Callers should fall back to printing
-// manual instructions rather than failing outright, per the spec.
+// manual instructions rather than failing outright.
 var ErrUnsupported = errors.New("service: no supported service manager on this platform")
 
 // Status reports whether the service is installed (its unit/plist file
