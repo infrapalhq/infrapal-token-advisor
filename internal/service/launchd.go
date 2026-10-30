@@ -13,7 +13,7 @@ import (
 // launchdLabel is the launchd service identifier: the plist filename (sans
 // extension) and the Label key inside it, and what `launchctl list` looks
 // it up by.
-const launchdLabel = "com.ccotel.collector"
+const launchdLabel = "com.infrapal.token-advisor"
 
 func launchdPlistPath(home string) string {
 	return filepath.Join(home, "Library", "LaunchAgents", launchdLabel+".plist")

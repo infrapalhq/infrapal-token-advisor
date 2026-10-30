@@ -40,8 +40,8 @@ func TestRunUninstall_RestoresSettingsAndRemovesBaseDir(t *testing.T) {
 		t.Errorf("settings.json = %q, want restored original %q", restored, original)
 	}
 
-	if _, err := os.Stat(filepath.Join(home, ".ccotel")); !os.IsNotExist(err) {
-		t.Errorf(".ccotel still exists after uninstall (err=%v), want removed", err)
+	if _, err := os.Stat(filepath.Join(home, ".infrapal-token-advisor")); !os.IsNotExist(err) {
+		t.Errorf(".infrapal-token-advisor still exists after uninstall (err=%v), want removed", err)
 	}
 }
 
@@ -56,8 +56,8 @@ func TestRunUninstall_KeepDB(t *testing.T) {
 		t.Fatalf("runUninstall: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(home, ".ccotel")); err != nil {
-		t.Errorf(".ccotel removed despite --keep-db: %v", err)
+	if _, err := os.Stat(filepath.Join(home, ".infrapal-token-advisor")); err != nil {
+		t.Errorf(".infrapal-token-advisor removed despite --keep-db: %v", err)
 	}
 }
 

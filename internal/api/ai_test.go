@@ -8,7 +8,7 @@ import (
 )
 
 func TestAIConfig_GetPutRoundTrip(t *testing.T) {
-	// Isolate ~/.ccotel so this test doesn't touch the real machine's config.
+	// Isolate ~/.infrapal-token-advisor so this test doesn't touch the real machine's config.
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("ANTHROPIC_API_KEY", "")
 

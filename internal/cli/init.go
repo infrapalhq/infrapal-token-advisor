@@ -45,7 +45,11 @@ func runInit(args []string) error {
 	}
 	if backupPath != "" {
 		fmt.Printf("backed up %s to %s\n", p.ClaudeSettingsPath, backupPath)
-		cfg.SettingsBackupPath = backupPath
+		// Keep the first backup across repeat inits: a later one already
+		// holds our changes, so uninstall couldn't restore from it.
+		if cfg.SettingsBackupPath == "" {
+			cfg.SettingsBackupPath = backupPath
+		}
 	}
 
 	doc, _, err := claudesettings.Load(p.ClaudeSettingsPath)
@@ -72,7 +76,7 @@ func runInit(args []string) error {
 	}
 
 	if len(changes) == 0 {
-		fmt.Println("settings.json already had everything infrapal-token-advisor wants — nothing changed")
+		fmt.Println("settings.json already had everything token-advisor wants — nothing changed")
 	} else {
 		fmt.Println("changed in", p.ClaudeSettingsPath+":")
 		for _, c := range changes {
@@ -99,7 +103,7 @@ func runInit(args []string) error {
 	return nil
 }
 
-// wantedEnv builds the fixed set of settings.json env keys ccotel's init
+// wantedEnv builds the fixed set of settings.json env keys infrapal-token-advisor's init
 // wants present, per prompt.md's init specifics. Values are all strings,
 // matching the JSON sample.
 func wantedEnv(cfg config.Config) map[string]string {
@@ -123,7 +127,7 @@ func wantedEnv(cfg config.Config) map[string]string {
 	}
 }
 
-// servicePaths builds the service.Paths ccotel's own commands need to
+// servicePaths builds the service.Paths infrapal-token-advisor's own commands need to
 // dispatch to the platform-specific Service implementation.
 func servicePaths(p paths.Paths) (service.Paths, error) {
 	execPath, err := os.Executable()
@@ -152,7 +156,7 @@ func installService(p paths.Paths) error {
 	}
 	svc, err := newService(sp)
 	if err == service.ErrUnsupported {
-		fmt.Println("no supported service manager on this platform — run `infrapal-token-advisor start` yourself (e.g. via cron @reboot or your own supervisor) to keep the collector running")
+		fmt.Println("no supported service manager on this platform — run `token-advisor start` yourself (e.g. via cron @reboot or your own supervisor) to keep the collector running")
 		return nil
 	}
 	if err != nil {

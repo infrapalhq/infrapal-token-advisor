@@ -19,14 +19,14 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Run `infrapal-token-advisor ...`
+        1. Run `token-advisor ...`
         2. Open ...
         3. See ...
   - type: input
     id: version
     attributes:
       label: Version
-      description: Output of `infrapal-token-advisor version`
+      description: Output of `token-advisor version`
     validations:
       required: true
   - type: dropdown
@@ -52,11 +52,11 @@ body:
   - type: textarea
     id: doctor
     attributes:
-      label: Output of `infrapal-token-advisor doctor`
+      label: Output of `token-advisor doctor`
       render: text
   - type: textarea
     id: logs
     attributes:
       label: Relevant log lines
-      description: From `~/.ccotel/collector.err.log`. Check them for anything private first.
+      description: From `~/.infrapal-token-advisor/collector.err.log`. Check them for anything private first.
       render: text

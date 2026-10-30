@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewForGOOS_Dispatch(t *testing.T) {
-	p := Paths{ExecPath: "/usr/local/bin/ccotel", Home: "/home/u"}
+	p := Paths{ExecPath: "/usr/local/bin/token-advisor", Home: "/home/u"}
 
 	darwin, err := newForGOOS("darwin", p)
 	if err != nil {
@@ -31,22 +31,22 @@ func TestNewForGOOS_Dispatch(t *testing.T) {
 
 func TestLaunchdPlistXML_ContainsExecAndLogPaths(t *testing.T) {
 	p := Paths{
-		ExecPath:  "/usr/local/bin/ccotel",
-		StdoutLog: "/home/u/.ccotel/collector.log",
-		StderrLog: "/home/u/.ccotel/collector.err.log",
+		ExecPath:  "/usr/local/bin/token-advisor",
+		StdoutLog: "/home/u/.infrapal-token-advisor/collector.log",
+		StderrLog: "/home/u/.infrapal-token-advisor/collector.err.log",
 		Home:      "/home/u",
 	}
 	xml := string(launchdPlistXML(p))
 
 	for _, want := range []string{
 		launchdLabel,
-		"<string>/usr/local/bin/ccotel</string>",
+		"<string>/usr/local/bin/token-advisor</string>",
 		"<string>start</string>",
 		"<key>RunAtLoad</key>",
 		"<true/>",
 		"<key>KeepAlive</key>",
-		"/home/u/.ccotel/collector.log",
-		"/home/u/.ccotel/collector.err.log",
+		"/home/u/.infrapal-token-advisor/collector.log",
+		"/home/u/.infrapal-token-advisor/collector.err.log",
 	} {
 		if !strings.Contains(xml, want) {
 			t.Errorf("plist XML missing %q\n---\n%s", want, xml)
@@ -56,18 +56,18 @@ func TestLaunchdPlistXML_ContainsExecAndLogPaths(t *testing.T) {
 
 func TestSystemdUnitFile_ContainsExecAndRestart(t *testing.T) {
 	p := Paths{
-		ExecPath:  "/usr/local/bin/ccotel",
-		StdoutLog: "/home/u/.ccotel/collector.log",
-		StderrLog: "/home/u/.ccotel/collector.err.log",
+		ExecPath:  "/usr/local/bin/token-advisor",
+		StdoutLog: "/home/u/.infrapal-token-advisor/collector.log",
+		StderrLog: "/home/u/.infrapal-token-advisor/collector.err.log",
 	}
 	unit := string(systemdUnitFile(p))
 
 	for _, want := range []string{
-		"ExecStart=/usr/local/bin/ccotel start",
+		"ExecStart=/usr/local/bin/token-advisor start",
 		"Restart=always",
 		"WantedBy=default.target",
-		"/home/u/.ccotel/collector.log",
-		"/home/u/.ccotel/collector.err.log",
+		"/home/u/.infrapal-token-advisor/collector.log",
+		"/home/u/.infrapal-token-advisor/collector.err.log",
 	} {
 		if !strings.Contains(unit, want) {
 			t.Errorf("unit file missing %q\n---\n%s", want, unit)
@@ -81,9 +81,9 @@ func TestParseLaunchctlPID(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"running", "{\n\t\"PID\" = 4242;\n\t\"Label\" = \"com.ccotel.collector\";\n}", "4242"},
+		{"running", "{\n\t\"PID\" = 4242;\n\t\"Label\" = \"com.infrapal.token-advisor\";\n}", "4242"},
 		{"loaded-not-running", "{\n\t\"PID\" = 0;\n\t\"LastExitStatus\" = 0;\n}", "0"},
-		{"no-pid-field", "{\n\t\"Label\" = \"com.ccotel.collector\";\n}", ""},
+		{"no-pid-field", "{\n\t\"Label\" = \"com.infrapal.token-advisor\";\n}", ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -95,10 +95,10 @@ func TestParseLaunchctlPID(t *testing.T) {
 }
 
 func TestLaunchdPlistPath_AndSystemdUnitPath(t *testing.T) {
-	if got, want := launchdPlistPath("/home/u"), "/home/u/Library/LaunchAgents/com.ccotel.collector.plist"; got != want {
+	if got, want := launchdPlistPath("/home/u"), "/home/u/Library/LaunchAgents/com.infrapal.token-advisor.plist"; got != want {
 		t.Errorf("launchdPlistPath = %q, want %q", got, want)
 	}
-	if got, want := systemdUnitPath("/home/u"), "/home/u/.config/systemd/user/ccotel.service"; got != want {
+	if got, want := systemdUnitPath("/home/u"), "/home/u/.config/systemd/user/infrapal-token-advisor.service"; got != want {
 		t.Errorf("systemdUnitPath = %q, want %q", got, want)
 	}
 }

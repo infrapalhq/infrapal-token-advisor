@@ -1,4 +1,4 @@
-// Package cli implements ccotel's subcommand dispatch. Each subcommand
+// Package cli implements infrapal-token-advisor's subcommand dispatch. Each subcommand
 // lives in its own file; this file only wires argv to the right handler.
 package cli
 
@@ -7,24 +7,24 @@ import (
 	"fmt"
 )
 
-const usage = `infrapal-token-advisor — local Claude Code telemetry collector
+const usage = `token-advisor — local Claude Code telemetry collector
 
 Usage:
-  infrapal-token-advisor init            patch ~/.claude/settings.json, create DB, install background service
-  infrapal-token-advisor start           run collector in foreground (what the service invokes)
-  infrapal-token-advisor stop            stop the background service
-  infrapal-token-advisor status          is the service up, DB size, event count, last event timestamp
-  infrapal-token-advisor ui              start API + serve embedded React app, open browser
-  infrapal-token-advisor doctor          diagnose why no data is arriving
-  infrapal-token-advisor export          export captured data (--format jsonl|csv --since 7d)
-  infrapal-token-advisor purge           delete captured data (--before 30d | --session <id> | --all)
-  infrapal-token-advisor uninstall       revert settings.json from backup, remove service
-  infrapal-token-advisor version       print the infrapal-token-advisor version
+  token-advisor init            patch ~/.claude/settings.json, create DB, install background service
+  token-advisor start           run collector in foreground (what the service invokes)
+  token-advisor stop            stop the background service
+  token-advisor status          is the service up, DB size, event count, last event timestamp
+  token-advisor ui              start API + serve embedded React app, open browser
+  token-advisor doctor          diagnose why no data is arriving
+  token-advisor export          export captured data (--format jsonl|csv --since 7d)
+  token-advisor purge           delete captured data (--before 30d | --session <id> | --all)
+  token-advisor uninstall       revert settings.json from backup, remove service
+  token-advisor version         print the token-advisor version
 
-Run "infrapal-token-advisor <command> -h" for flags on a specific command.
+Run "token-advisor <command> -h" for flags on a specific command.
 `
 
-// Version is ccotel's build version, overridden at release build time via
+// Version is infrapal-token-advisor's build version, overridden at release build time via
 // -ldflags "-X .../internal/cli.Version=...". "dev" identifies a build made
 // with plain `go build`/`go run` outside the goreleaser release process.
 var Version = "dev"
@@ -56,7 +56,7 @@ func Run(args []string) error {
 		fmt.Print(usage)
 		return nil
 	case "-v", "--version", "version":
-		fmt.Println("infrapal-token-advisor " + Version)
+		fmt.Println("token-advisor " + Version)
 		return nil
 	}
 
@@ -71,7 +71,7 @@ func Run(args []string) error {
 // notImplemented prints a stub message for commands whose real behavior
 // arrives in a later build milestone, per the project's build order.
 func notImplemented(name string, milestone string) error {
-	fmt.Printf("infrapal-token-advisor %s: not implemented yet — arrives in milestone %s\n", name, milestone)
+	fmt.Printf("token-advisor %s: not implemented yet — arrives in milestone %s\n", name, milestone)
 	return nil
 }
 

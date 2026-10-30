@@ -23,7 +23,7 @@ func runStop(args []string) error {
 	}
 	svc, err := newService(sp)
 	if err == service.ErrUnsupported {
-		fmt.Println("no supported service manager on this platform — kill the `infrapal-token-advisor start` process yourself")
+		fmt.Println("no supported service manager on this platform — kill the `token-advisor start` process yourself")
 		return nil
 	}
 	if err != nil {

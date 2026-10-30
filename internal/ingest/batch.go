@@ -8,7 +8,7 @@ import (
 )
 
 // recordIngestError persists a batch-write failure to ingest_errors so
-// `ccotel doctor` (a fresh process with no view of past log lines) can
+// `token-advisor doctor` (a fresh process with no view of past log lines) can
 // report ingest errors in the last hour. Best-effort: if the DB itself is
 // the problem, this insert can fail too — that failure only reaches the
 // existing stderr log, not a second table row, to avoid recursing.

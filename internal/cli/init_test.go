@@ -10,7 +10,7 @@ import (
 )
 
 // withFakeHome points $HOME at a fresh temp dir for the duration of a test,
-// so paths.Resolve() (and everything ccotel writes) stays isolated from the
+// so paths.Resolve() (and everything infrapal-token-advisor writes) stays isolated from the
 // real user environment.
 func withFakeHome(t *testing.T) string {
 	t.Helper()
@@ -21,7 +21,7 @@ func withFakeHome(t *testing.T) string {
 
 func readConfig(t *testing.T, home string) config.Config {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(home, ".ccotel", "config.json"))
+	data, err := os.ReadFile(filepath.Join(home, ".infrapal-token-advisor", "config.json"))
 	if err != nil {
 		t.Fatalf("read config.json: %v", err)
 	}
@@ -132,6 +132,35 @@ func TestRunInit_BacksUpAndPreservesExistingSettings(t *testing.T) {
 	}
 }
 
+func TestRunInit_KeepsFirstBackupOnRepeatRuns(t *testing.T) {
+	home := withFakeHome(t)
+	withFakeService(t)
+
+	base := filepath.Join(home, ".infrapal-token-advisor")
+	if err := os.MkdirAll(base, 0o700); err != nil {
+		t.Fatalf("mkdir base dir: %v", err)
+	}
+	cfgJSON := `{"otlp_port":4318,"api_port":4319,"settings_backup_path":"/original/backup"}`
+	if err := os.WriteFile(filepath.Join(base, "config.json"), []byte(cfgJSON), 0o600); err != nil {
+		t.Fatalf("write config.json fixture: %v", err)
+	}
+	claudeDir := filepath.Join(home, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o700); err != nil {
+		t.Fatalf("mkdir .claude: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.json"), []byte(`{}`), 0o600); err != nil {
+		t.Fatalf("write settings.json fixture: %v", err)
+	}
+
+	if err := runInit(nil); err != nil {
+		t.Fatalf("runInit: %v", err)
+	}
+
+	if got := readConfig(t, home).SettingsBackupPath; got != "/original/backup" {
+		t.Errorf("SettingsBackupPath = %q, want the first backup kept", got)
+	}
+}
+
 func TestRunInit_RawBodies(t *testing.T) {
 	home := withFakeHome(t)
 	withFakeService(t)
@@ -145,7 +174,7 @@ func TestRunInit_RawBodies(t *testing.T) {
 		t.Error("RawBodies = false, want true with --raw-bodies")
 	}
 
-	bodiesDir := filepath.Join(home, ".ccotel", "bodies")
+	bodiesDir := filepath.Join(home, ".infrapal-token-advisor", "bodies")
 	if info, err := os.Stat(bodiesDir); err != nil || !info.IsDir() {
 		t.Errorf("bodies dir %s not created: %v", bodiesDir, err)
 	}
