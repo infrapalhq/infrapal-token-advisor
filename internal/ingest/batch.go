@@ -3,7 +3,7 @@ package ingest
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 	"time"
 )
 
@@ -11,13 +11,13 @@ import (
 // `token-advisor doctor` (a fresh process with no view of past log lines) can
 // report ingest errors in the last hour. Best-effort: if the DB itself is
 // the problem, this insert can fail too — that failure only reaches the
-// existing stderr log, not a second table row, to avoid recursing.
+// log file, not a second table row, to avoid recursing.
 func recordIngestError(db *sql.DB, signal string, cause error) {
 	if _, err := db.Exec(
 		`INSERT INTO ingest_errors (ts, signal, message) VALUES (?, ?, ?)`,
 		time.Now().UnixMilli(), signal, cause.Error(),
 	); err != nil {
-		log.Printf("ingest: failed to record ingest error for signal %q: %v", signal, err)
+		slog.Error("ingest: failed to record ingest error", "signal", signal, "err", err)
 	}
 }
 
@@ -69,7 +69,7 @@ func (w *batchWriter[T]) Enqueue(item T) {
 	select {
 	case w.ch <- item:
 	default:
-		log.Printf("ingest: buffer full, dropping item %s — DB is falling behind", w.describe(item))
+		slog.Warn("ingest: buffer full, dropping item — DB is falling behind", "item", w.describe(item))
 	}
 }
 
@@ -87,7 +87,7 @@ func (w *batchWriter[T]) Run(ctx context.Context) error {
 			return
 		}
 		if err := w.write(w.db, batch); err != nil {
-			log.Printf("ingest: write batch of %d %s items failed: %v", len(batch), w.signal, err)
+			slog.Error("ingest: write batch failed", "signal", w.signal, "items", len(batch), "err", err)
 			recordIngestError(w.db, w.signal, err)
 		}
 		batch = batch[:0]
