@@ -1,0 +1,12 @@
+# Text files check out with LF everywhere, so gofmt and the dist build
+# check don't see spurious diffs on Windows checkouts.
+* text=auto eol=lf
+
+*.png binary
+*.ico binary
+
+# Built dashboard and lockfiles: collapse them in GitHub diffs and keep
+# them out of the repo's language stats.
+internal/webui/dist/** linguist-generated=true
+web/package-lock.json linguist-generated=true
+go.sum linguist-generated=true
