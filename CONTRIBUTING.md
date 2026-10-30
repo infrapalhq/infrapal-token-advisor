@@ -27,17 +27,17 @@ first (`init` registers the binary's own path as the background service, so
 don't use `go run` for it):
 
 ```sh
-go build ./cmd/infrapal-token-advisor        # writes ./infrapal-token-advisor (git-ignored)
-./infrapal-token-advisor init                # patches ~/.claude/settings.json, installs the service
-./infrapal-token-advisor ui                  # opens the dashboard
-./infrapal-token-advisor uninstall --keep-db # undo, keeping your data
+go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
+./token-advisor init                # patches ~/.claude/settings.json, installs the service
+./token-advisor ui                  # opens the dashboard
+./token-advisor uninstall --keep-db # undo, keeping your data
 ```
 
 ## Where things live
 
 | Path | What it is |
 | --- | --- |
-| `cmd/infrapal-token-advisor` | CLI entry point |
+| `cmd/token-advisor` | CLI entry point |
 | `internal/otlp` | OTLP/HTTP receiver for Claude Code telemetry |
 | `internal/ingest` | Turns OTLP logs, metrics and spans into rows |
 | `internal/store` | SQLite store and numbered migrations (`migrations/NNNN_*.sql`) |

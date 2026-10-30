@@ -60,7 +60,7 @@ type Requester interface {
 }
 
 // Client calls the Anthropic Messages API directly via net/http — no SDK
-// dependency, matching ccotel's minimal-deps go.mod.
+// dependency, matching infrapal-token-advisor's minimal-deps go.mod.
 type Client struct {
 	APIKey string
 	// BaseURL overrides the Messages API endpoint, for tests. Defaults to
@@ -149,7 +149,7 @@ var recommendationsTool = map[string]any{
 
 // RequestRecommendations sends bundle as the sole user-turn content
 // (JSON-marshaled) and forces the submit_recommendations tool. This is
-// ccotel's only outbound network call, and only ever runs synchronously
+// infrapal-token-advisor's only outbound network call, and only ever runs synchronously
 // inside a request initiated in direct response to the user's own Generate
 // click (POST /api/ai/recommendations).
 func (c *Client) RequestRecommendations(ctx context.Context, bundle Context) ([]Recommendation, bool, error) {

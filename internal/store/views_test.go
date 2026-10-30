@@ -8,7 +8,7 @@ import (
 
 func openViewsTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := Open(filepath.Join(t.TempDir(), "ccotel.db"))
+	db, err := Open(filepath.Join(t.TempDir(), "token-advisor.db"))
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}

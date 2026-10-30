@@ -10,7 +10,7 @@ import (
 
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "ccotel.db"))
+	db, err := store.Open(filepath.Join(t.TempDir(), "token-advisor.db"))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

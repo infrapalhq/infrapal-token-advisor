@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-const systemdUnitName = "ccotel.service"
+const systemdUnitName = "infrapal-token-advisor.service"
 
 func systemdUnitPath(home string) string {
 	return filepath.Join(home, ".config", "systemd", "user", systemdUnitName)
@@ -19,7 +19,7 @@ func systemdUnitPath(home string) string {
 // silently loses exports, so it must come back on its own).
 func systemdUnitFile(p Paths) []byte {
 	return []byte(fmt.Sprintf(`[Unit]
-Description=ccotel local Claude Code telemetry collector
+Description=infrapal-token-advisor local Claude Code telemetry collector
 
 [Service]
 ExecStart=%s start

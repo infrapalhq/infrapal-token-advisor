@@ -17,7 +17,7 @@ import (
 // generated title and the project directory.
 func insightDB(t *testing.T) func(method, path, body string) (int, map[string]any) {
 	t.Helper()
-	db, err := store.Open(filepath.Join(t.TempDir(), "ccotel.db"))
+	db, err := store.Open(filepath.Join(t.TempDir(), "token-advisor.db"))
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)
 	}

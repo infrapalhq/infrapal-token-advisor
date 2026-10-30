@@ -25,7 +25,7 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
-	// SQLite allows only one writer at a time; ccotel's three ingest
+	// SQLite allows only one writer at a time; infrapal-token-advisor's three ingest
 	// writers (logs, metrics, spans) flush concurrently on independent
 	// tickers. Without this, database/sql opens multiple connections and
 	// two concurrent write transactions race for the same file lock,
