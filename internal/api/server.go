@@ -1,4 +1,4 @@
-// Package api implements ccotel's HTTP API over the captured telemetry:
+// Package api implements infrapal-token-advisor's HTTP API over the captured telemetry:
 // sessions, interaction waterfalls, full-text search, and the derived views
 // from migration 0006. Business logic lives in SQL (the views); handlers
 // here stay thin — decode params, run one query, encode JSON.
@@ -23,7 +23,7 @@ import (
 	"net/http"
 )
 
-// Server is ccotel's local HTTP API, read-only over the SQLite database.
+// Server is infrapal-token-advisor's local HTTP API, read-only over the SQLite database.
 type Server struct {
 	db   *sql.DB
 	http *http.Server
@@ -70,7 +70,7 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 }
 
 // Endpoints lists every route this server exposes, for printing to the user
-// (e.g. from `ccotel ui`).
+// (e.g. from `token-advisor ui`).
 func Endpoints() []string {
 	return []string{
 		"GET /api/sessions",

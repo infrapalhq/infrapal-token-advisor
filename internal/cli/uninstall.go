@@ -29,7 +29,7 @@ func runUninstall(args []string) error {
 	svc, err := newService(sp)
 	switch {
 	case err == service.ErrUnsupported:
-		fmt.Println("no supported service manager on this platform — stop and remove the `infrapal-token-advisor start` process yourself")
+		fmt.Println("no supported service manager on this platform — stop and remove the `token-advisor start` process yourself")
 	case err != nil:
 		return err
 	default:

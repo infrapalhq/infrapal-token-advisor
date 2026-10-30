@@ -126,7 +126,7 @@ func (s *Server) handleFindings(w http.ResponseWriter, r *http.Request) {
 
 // handlePostFindingState handles POST /api/findings/{id}/state, body
 // {"state": "dismissed"|"snoozed"|"fixed", "snooze_days": 7}. This is
-// ccotel's first write endpoint over an otherwise read-only API — see the
+// infrapal-token-advisor's first write endpoint over an otherwise read-only API — see the
 // package doc.
 func (s *Server) handlePostFindingState(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")

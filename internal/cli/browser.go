@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-// openBrowser best-effort opens url in the user's default browser. ccotel
+// openBrowser best-effort opens url in the user's default browser. infrapal-token-advisor
 // only ships service-install support for darwin/linux (see
 // internal/service), so that's the scope here too — failure is non-fatal,
 // the caller just prints the URL for the user to open by hand.

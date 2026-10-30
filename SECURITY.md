@@ -14,7 +14,7 @@ reporting.
 **Do not open a public issue.** Report it privately through
 [GitHub private vulnerability reporting](https://github.com/infrapalhq/infrapal-token-advisor/security/advisories/new).
 
-Include the version (`infrapal-token-advisor version`), your OS, and steps
+Include the version (`token-advisor version`), your OS, and steps
 to reproduce. We aim to:
 
 - acknowledge the report within 3 business days
@@ -40,11 +40,11 @@ There is no usage telemetry, update check or crash reporting.
 
 ## What is stored locally
 
-Everything lives under `~/.ccotel/`, created with mode `0700`:
+Everything lives under `~/.infrapal-token-advisor/`, created with mode `0700`:
 
 | File | Contents | Mode |
 | --- | --- | --- |
-| `ccotel.db` (+ `-wal`, `-shm`) | Every recorded session: prompts, assistant responses, tool calls and their content, file paths, shell commands, costs | `0600` |
+| `token-advisor.db` (+ `-wal`, `-shm`) | Every recorded session: prompts, assistant responses, tool calls and their content, file paths, shell commands, costs | `0600` |
 | `config.json` | Ports, settings, and your Anthropic API key if you saved one in the dashboard (stored in plain text) | `0600` |
 | `bodies/` | Raw API request/response bodies, only if `raw_bodies` is turned on | `0700` dir |
 | `collector.log`, `collector.err.log` | Service output | |
@@ -65,8 +65,8 @@ tool content to the local receiver.
 
 ## Removing your data
 
-- `infrapal-token-advisor purge --before 30d` deletes data older than 30
+- `token-advisor purge --before 30d` deletes data older than 30
   days (`--all` deletes everything).
-- `infrapal-token-advisor uninstall` stops and removes the service,
+- `token-advisor uninstall` stops and removes the service,
   restores `~/.claude/settings.json` from the backup, and deletes
-  `~/.ccotel/`. Add `--keep-db` to keep the data.
+  `~/.infrapal-token-advisor/`. Add `--keep-db` to keep the data.

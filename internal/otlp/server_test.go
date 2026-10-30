@@ -17,7 +17,7 @@ import (
 )
 
 func TestHandleLogs_EndToEnd(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "ccotel.db")
+	dbPath := filepath.Join(t.TempDir(), "token-advisor.db")
 	db, err := store.Open(dbPath)
 	if err != nil {
 		t.Fatalf("store.Open: %v", err)

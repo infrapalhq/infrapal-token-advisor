@@ -56,7 +56,7 @@ func runUI(args []string) error {
 	go func() { serveErr <- srv.ListenAndServe() }()
 
 	url := fmt.Sprintf("http://%s", addr)
-	fmt.Printf("infrapal-token-advisor dashboard: %s\n", url)
+	fmt.Printf("token-advisor dashboard: %s\n", url)
 	fmt.Println("API endpoints:")
 	for _, ep := range api.Endpoints() {
 		method, path, ok := strings.Cut(ep, " ")
@@ -73,7 +73,7 @@ func runUI(args []string) error {
 
 	if !*noBrowser {
 		if err := openBrowser(url); err != nil {
-			fmt.Fprintf(os.Stderr, "infrapal-token-advisor: couldn't open a browser automatically (%v) — open %s yourself\n", err, url)
+			fmt.Fprintf(os.Stderr, "token-advisor: couldn't open a browser automatically (%v) — open %s yourself\n", err, url)
 		}
 	}
 
@@ -89,7 +89,7 @@ func runUI(args []string) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		fmt.Fprintf(os.Stderr, "infrapal-token-advisor: error shutting down server: %v\n", err)
+		fmt.Fprintf(os.Stderr, "token-advisor: error shutting down server: %v\n", err)
 	}
 
 	return nil

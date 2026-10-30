@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds web/ (the React dashboard) and copies the output into
-# internal/webui/dist, where go:embed picks it up for the ccotel binary.
+# internal/webui/dist, where go:embed picks it up for the token-advisor binary.
 # Run this before `go build`/`go install`/a release build whenever web/
 # has changed — internal/webui/dist otherwise still holds the placeholder
 # checked into git.

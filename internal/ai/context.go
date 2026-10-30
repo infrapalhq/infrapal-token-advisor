@@ -1,6 +1,6 @@
-// Package ai implements ccotel's optional AI Mode: a Claude Haiku call that
+// Package ai implements infrapal-token-advisor's optional AI Mode: a Claude Haiku call that
 // proposes recommendations on top of the same aggregated telemetry the rest
-// of the dashboard already exposes. This is ccotel's one deliberate
+// of the dashboard already exposes. This is infrapal-token-advisor's one deliberate
 // network-egress exception (see internal/api/ai.go) — everything in this
 // package works only with numbers, names, and ids already vetted by the
 // existing derived views and insight checks; it never touches raw prompt
@@ -170,7 +170,7 @@ type Context struct {
 	Caveats    []string      `json:"data_caveats"`
 }
 
-// dataCaveats restates ccotel's README "gotchas" as instructions the model
+// dataCaveats restates infrapal-token-advisor's README "gotchas" as instructions the model
 // must respect, so it doesn't state false precision. Fixed, not
 // data-dependent, so it never perturbs Context.Hash.
 func dataCaveats() []string {
@@ -196,7 +196,7 @@ func sinceFilter(col string, cutoffMs int64, haveCutoff bool) (string, []any) {
 // insights is the already-computed, already-vetted fact list (converted
 // from api.computeInsights's []Insight by the caller) — reused, never
 // recomputed here, so this package inherits the same deterministic
-// "don't fabricate" checks the rest of ccotel relies on. cutoffMs/haveCutoff
+// "don't fabricate" checks the rest of infrapal-token-advisor relies on. cutoffMs/haveCutoff
 // mirror the ?since= cutoff every other view/insight query already uses.
 func BuildContext(ctx context.Context, db *sql.DB, sinceRange string, cutoffMs int64, haveCutoff bool, insights []InsightFact) (Context, error) {
 	c := Context{

@@ -63,7 +63,7 @@ func runDoctor(args []string) error {
 		conn.Close()
 	}
 	ok(dialErr == nil, fmt.Sprintf("collector listening on %s", addr),
-		"run `infrapal-token-advisor start` (foreground) or `infrapal-token-advisor init` (background service) to bring the collector up")
+		"run `token-advisor start` (foreground) or `token-advisor init` (background service) to bring the collector up")
 
 	// 2. Does settings.json contain our env block, endpoint matching our port?
 	doc, existed, err := claudesettings.Load(p.ClaudeSettingsPath)
@@ -96,8 +96,8 @@ func runDoctor(args []string) error {
 			settingsOK = true
 		}
 	}
-	ok(settingsOK, fmt.Sprintf("%s has infrapal-token-advisor's env block", p.ClaudeSettingsPath),
-		fmt.Sprintf("%s — run `infrapal-token-advisor init` to fix", settingsDetail))
+	ok(settingsOK, fmt.Sprintf("%s has token-advisor's env block", p.ClaudeSettingsPath),
+		fmt.Sprintf("%s — run `token-advisor init` to fix", settingsDetail))
 
 	// 3. Conflicting OTEL_*/CLAUDE_CODE_* vars in doctor's own shell env.
 	var conflicting []string
@@ -111,7 +111,7 @@ func runDoctor(args []string) error {
 		ok(true, "no OTEL_*/CLAUDE_CODE_* vars exported in this shell", "")
 	} else {
 		ok(false, "no OTEL_*/CLAUDE_CODE_* vars exported in this shell",
-			fmt.Sprintf("this shell exports: %s — these can override settings.json for any `claude` launched from here; unset them or reconcile with `infrapal-token-advisor init`'s values. Note: this only reflects the shell doctor was invoked from, not every shell you might launch `claude` from.", strings.Join(conflicting, ", ")))
+			fmt.Sprintf("this shell exports: %s — these can override settings.json for any `claude` launched from here; unset them or reconcile with `token-advisor init`'s values. Note: this only reflects the shell doctor was invoked from, not every shell you might launch `claude` from.", strings.Join(conflicting, ", ")))
 	}
 
 	// 4. Managed settings file present (strips developer-set OTLP endpoints)?
@@ -119,7 +119,7 @@ func runDoctor(args []string) error {
 		fmt.Printf("[SKIP] managed settings check — no known path for GOOS=%s\n", runtime.GOOS)
 	} else if _, statErr := os.Stat(mp); statErr == nil {
 		ok(false, fmt.Sprintf("no managed settings file at %s", mp),
-			"a managed-settings.json is present and can strip developer-set OTLP endpoint/protocol at startup — check it with `claude --debug` and coordinate with whoever manages it if telemetry isn't reaching ccotel")
+			"a managed-settings.json is present and can strip developer-set OTLP endpoint/protocol at startup — check it with `claude --debug` and coordinate with whoever manages it if telemetry isn't reaching token-advisor")
 	} else {
 		ok(true, fmt.Sprintf("no managed settings file at %s", mp), "")
 	}

@@ -9,8 +9,8 @@ before:
 
 builds:
   - id: infrapal-token-advisor
-    main: ./cmd/infrapal-token-advisor
-    binary: infrapal-token-advisor
+    main: ./cmd/token-advisor
+    binary: token-advisor
     # modernc.org/sqlite is pure Go, so CGO stays off — one static binary
     # per platform, no libsqlite3 to link against on the build or install
     # machine.
@@ -54,6 +54,6 @@ brews:
     description: "Local-only OTLP receiver, SQLite store, and dashboard for Claude Code telemetry"
     license: "MIT"
     install: |
-      bin.install "infrapal-token-advisor"
+      bin.install "token-advisor"
     test: |
-      assert_match "infrapal-token-advisor", shell_output("#{bin}/infrapal-token-advisor version")
+      assert_match "token-advisor", shell_output("#{bin}/token-advisor version")

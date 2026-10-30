@@ -7,7 +7,7 @@ import (
 	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
-// openDB resolves ccotel's paths, ensures the base directory exists, and
+// openDB resolves infrapal-token-advisor's paths, ensures the base directory exists, and
 // opens (creating + migrating if necessary) the SQLite database. Shared by
 // every subcommand that needs the DB.
 func openDB() (*sql.DB, paths.Paths, error) {
