@@ -16,6 +16,7 @@ Usage:
   token-advisor status          is the service up, DB size, event count, last event timestamp
   token-advisor ui              open the dashboard, serving it here if the service isn't running
   token-advisor doctor          diagnose why no data is arriving
+  token-advisor logs            show the collector's log (-n 100, --errors, -f)
   token-advisor export          export captured data (--format jsonl|csv --since 7d)
   token-advisor purge           delete captured data (--before 30d | --session <id> | --all)
   token-advisor uninstall       revert settings.json from backup, remove service
@@ -38,6 +39,7 @@ var commands = map[string]func(args []string) error{
 	"status":    runStatus,
 	"ui":        runUI,
 	"doctor":    runDoctor,
+	"logs":      runLogs,
 	"export":    runExport,
 	"purge":     runPurge,
 	"uninstall": runUninstall,

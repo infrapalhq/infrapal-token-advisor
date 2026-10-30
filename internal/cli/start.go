@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,7 +14,9 @@ import (
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/otlp"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
 
 func runStart(args []string) error {
@@ -21,21 +25,50 @@ func runStart(args []string) error {
 		return err
 	}
 
-	db, p, err := openDB()
+	p, err := paths.Resolve()
 	if err != nil {
+		return err
+	}
+	if err := p.EnsureBaseDir(); err != nil {
+		return fmt.Errorf("create %s: %w", p.BaseDir, err)
+	}
+	cfg, err := config.Load(p)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	level, levelOK := logging.ParseLevel(cfg.LogLevel)
+	logFile, err := logging.Setup(p.LogPath, level, consoleWriter())
+	if err != nil {
+		return fmt.Errorf("open log file: %w", err)
+	}
+	defer logFile.Close()
+	defer logging.Recover("collector")
+	if !levelOK {
+		slog.Warn("unknown log_level in config.json, using info", "log_level", cfg.LogLevel)
+	}
+	if sp, err := servicePaths(p); err == nil {
+		for _, path := range []string{sp.StdoutLog, sp.StderrLog} {
+			if err := logging.TrimFile(path); err != nil {
+				slog.Warn("couldn't trim service output", "path", path, "err", err)
+			}
+		}
+	}
+
+	addr := fmt.Sprintf("127.0.0.1:%d", cfg.OTLPPort)
+	logging.Started(p.LogPath, "version", Version, "otlp", addr)
+
+	db, err := openDBAt(p)
+	if err != nil {
+		slog.Error("open database", "err", err)
 		return fmt.Errorf("open database: %w", err)
 	}
 	defer db.Close()
 
 	if n, err := ingest.BackfillProjectDirs(db); err != nil {
-		fmt.Fprintf(os.Stderr, "token-advisor: project backfill: %v\n", err)
+		slog.Error("project backfill", "err", err)
 	} else if n > 0 {
-		fmt.Fprintf(os.Stderr, "token-advisor: resolved project directory for %d session(s)\n", n)
-	}
-
-	cfg, err := config.Load(p)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
+		slog.Info("resolved project directories", "sessions", n)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -43,17 +76,25 @@ func runStart(args []string) error {
 
 	writer := ingest.NewWriter(db)
 	writerDone := make(chan error, 1)
-	go func() { writerDone <- writer.Run(ctx) }()
+	go func() {
+		defer logging.Recover("logs writer")
+		writerDone <- writer.Run(ctx)
+	}()
 
 	metricsWriter := ingest.NewMetricsWriter(db)
 	metricsWriterDone := make(chan error, 1)
-	go func() { metricsWriterDone <- metricsWriter.Run(ctx) }()
+	go func() {
+		defer logging.Recover("metrics writer")
+		metricsWriterDone <- metricsWriter.Run(ctx)
+	}()
 
 	spansWriter := ingest.NewSpansWriter(db)
 	spansWriterDone := make(chan error, 1)
-	go func() { spansWriterDone <- spansWriter.Run(ctx) }()
+	go func() {
+		defer logging.Recover("spans writer")
+		spansWriterDone <- spansWriter.Run(ctx)
+	}()
 
-	addr := fmt.Sprintf("127.0.0.1:%d", cfg.OTLPPort)
 	srv := otlp.NewServer(addr, writer, metricsWriter, spansWriter)
 
 	serveErr := make(chan error, 1)
@@ -69,6 +110,7 @@ func runStart(args []string) error {
 		fmt.Println("\nshutting down...")
 	case err := <-serveErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("collector server", "err", err)
 			return fmt.Errorf("collector server: %w", err)
 		}
 	}
@@ -77,19 +119,29 @@ func runStart(args []string) error {
 	defer cancel()
 	stopDashboard(shutdownCtx)
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		fmt.Fprintf(os.Stderr, "token-advisor: error shutting down server: %v\n", err)
+		slog.Error("shutting down server", "err", err)
 	}
 
 	stop() // ensure writers' context is cancelled so they drain and exit
 	if err := <-writerDone; err != nil {
-		fmt.Fprintf(os.Stderr, "token-advisor: error draining logs writer: %v\n", err)
+		slog.Error("draining writer", "signal", "logs", "err", err)
 	}
 	if err := <-metricsWriterDone; err != nil {
-		fmt.Fprintf(os.Stderr, "token-advisor: error draining metrics writer: %v\n", err)
+		slog.Error("draining writer", "signal", "metrics", "err", err)
 	}
 	if err := <-spansWriterDone; err != nil {
-		fmt.Fprintf(os.Stderr, "token-advisor: error draining spans writer: %v\n", err)
+		slog.Error("draining writer", "signal", "spans", "err", err)
 	}
 
+	logging.Stopped()
+	return nil
+}
+
+// consoleWriter returns stderr when it's a terminal, so a foreground run shows
+// its log. Under the service it's a file, which the log mustn't fill again.
+func consoleWriter() io.Writer {
+	if info, err := os.Stderr.Stat(); err == nil && info.Mode()&os.ModeCharDevice != 0 {
+		return os.Stderr
+	}
 	return nil
 }

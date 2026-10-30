@@ -17,6 +17,19 @@ On macOS, make sure token-advisor is allowed under System Settings > General >
 Login Items & Extensions. On Linux, `init` enables lingering so the service
 keeps running after you log out.
 
+## Logs
+
+```sh
+token-advisor logs            # the last 100 lines
+token-advisor logs --errors   # errors and crashes only
+token-advisor logs -f         # follow new lines
+```
+
+The log is `~/.infrapal-token-advisor/token-advisor.log`, rotated at 10 MiB with
+three old files kept. `token-advisor doctor` and `token-advisor status` report
+recent errors and crashes. Set `"log_level"` in `config.json` to `debug`,
+`info`, `warn` or `error`, then restart the service.
+
 ## Development
 
 ```sh

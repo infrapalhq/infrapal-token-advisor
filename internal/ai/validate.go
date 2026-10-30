@@ -1,7 +1,7 @@
 package ai
 
 import (
-	"log"
+	"log/slog"
 	"math"
 	"strconv"
 	"strings"
@@ -26,7 +26,7 @@ func ValidateEvidence(bundle Context, recs []Recommendation) (kept []Recommendat
 	for _, r := range recs {
 		if bad, ok := firstUngroundedFact(known, r.Evidence); ok {
 			dropped = append(dropped, DroppedRecommendation{Recommendation: r, Reason: "evidence fact not found in input: " + bad})
-			log.Printf("ai: dropped ungrounded recommendation %q: evidence fact not found in input: %s", r.Title, bad)
+			slog.Warn("ai: dropped ungrounded recommendation", "title", r.Title, "fact", bad)
 			continue
 		}
 		kept = append(kept, r)
