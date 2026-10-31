@@ -57,8 +57,47 @@ export const SYMPTOM_LABEL: Record<string, string> = {
   failed: "Failed tool calls",
   waits: "Long approval waits",
   repeats: "Repeated reads or commands",
+  bloated: "Bloated context",
+  many_calls: "Many tool calls",
+  spikes: "Large tool results",
+  rejected: "Rejected tool calls",
 };
 
 export function pipClass(sev: string | undefined): string {
   return sev === "full" ? "full" : sev === "half" ? "half" : "";
+}
+
+export function sessionCount(n: number): string {
+  return `${n} session${n === 1 ? "" : "s"}`;
+}
+
+// itemSessions labels how widely a fix applies. An item with no sessions belongs
+// to its scope if it has one, such as a project, and otherwise to the install,
+// such as an MCP server that loads into every session.
+export function itemSessions(n: number, scope?: string): string {
+  return n === 0 ? scope || "All sessions" : sessionCount(n);
+}
+
+// sessionTime is how long a session was worked on. Open time is only a fallback,
+// since a window left open for days says nothing about the work.
+export function sessionTime(s: { active_s: number; duration_s: number }): string {
+  return s.active_s > 0 ? `${durationS(s.active_s)} active` : durationS(s.duration_s);
+}
+
+// isEmptySession mirrors the API's rule: nothing billed, nothing flagged.
+export function isEmptySession(s: { tokens: number; issues: number }): boolean {
+  return s.tokens === 0 && s.issues === 0;
+}
+
+// areaCounts is an Overview problem card's line: session issues and setup issues
+// are counted apart, since setup issues belong to no session.
+export function areaCounts(issues: number, sessions: number, setup: number): string {
+  const parts: string[] = [];
+  if (issues > 0) parts.push(`${issues} issue${issues === 1 ? "" : "s"} · ${sessionCount(sessions)}`);
+  if (setup > 0) parts.push(`${setup} setup issue${setup === 1 ? "" : "s"}`);
+  return parts.join(" · ") || "No issues";
+}
+
+export function areaLink(sessions: number, setup: number): string {
+  return sessions === 0 && setup > 0 ? "See fixes" : sessionCount(sessions);
 }

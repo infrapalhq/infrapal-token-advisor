@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Overview as OverviewData, type Range } from "./api";
 import { Shell } from "./Shell";
-import { AREA_NAME, dayShort, money, pipClass, tokensHuman, waitMs } from "./format";
+import { AREA_NAME, areaCounts, areaLink, dayShort, itemSessions, money, pipClass, tokensHuman, waitMs } from "./format";
 
 const PERIODS: { value: Range; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
@@ -92,11 +92,11 @@ export default function Overview() {
                   <span className={`pip ${pipClass(it.severity)}`} />
                   <span>
                     <strong>{it.title}</strong>
-                    <small>{it.sessions} session{it.sessions === 1 ? "" : "s"} · {it.conf}</small>
+                    <small>{itemSessions(it.sessions, it.scope)} · {it.conf}{it.spent_usd ? ` · ${money(it.spent_usd)} ${it.spent_label ?? ""}` : ""}</small>
                   </span>
                   <span className="chip">{AREA_NAME[it.area]}</span>
                   <span className="cost">{it.usd !== undefined ? `≈ ${money(it.usd)}` : it.minutes !== undefined ? `${Math.round(it.minutes)}m` : ""}</span>
-                  <Link className="btn btn-k" to="/fixes">Fix</Link>
+                  <Link className="btn btn-k" to="/fixes">{it.fix ? "Fix" : "View"}</Link>
                 </div>
               ))}
             </div>
@@ -113,14 +113,14 @@ export default function Overview() {
             </div>
             <div className="cores">
               {data.areas.map((a) => (
-                <Link className={`core${a.area === "context" ? " heavy" : ""}`} key={a.area} to="/sessions">
+                <Link className={`core${a.area === "context" ? " heavy" : ""}`} key={a.area} to={a.sessions === 0 && a.setup_items > 0 ? "/fixes" : "/sessions"}>
                   <div className="core-top">
                     <strong>{AREA_NAME[a.area]}</strong>
                     <span className={`pip ${pipClass(a.severity === "fine" ? "" : a.severity)}`} />
                   </div>
                   <span className="num">{a.usd > 0 ? `≈ ${money(a.usd)}` : `${a.items} open`}</span>
-                  <p>{a.items} issue{a.items === 1 ? "" : "s"} · {a.sessions} session{a.sessions === 1 ? "" : "s"}</p>
-                  <span className="go">{a.sessions} session{a.sessions === 1 ? "" : "s"} →</span>
+                  <p>{areaCounts(a.items - a.setup_items, a.sessions, a.setup_items)}</p>
+                  <span className="go">{areaLink(a.sessions, a.setup_items)} →</span>
                 </Link>
               ))}
             </div>

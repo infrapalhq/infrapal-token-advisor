@@ -8,7 +8,7 @@ export type Priority = "now" | "look" | "fine";
 export type Severity = "full" | "half";
 export type Conf = "Measured" | "Likely" | "Estimated";
 
-export type AreaPip = { area: "model" | "context" | "exec" | "perm"; severity: Severity };
+export type AreaPip = { area: "model" | "context" | "exec" | "perm"; severity: Severity; usd?: number };
 
 export type SessionCard = {
   id: string;
@@ -16,14 +16,16 @@ export type SessionCard = {
   title: string;
   started_at: number;
   duration_s: number;
+  active_s: number;
   tokens: number;
   cost_usd: number;
   wait_ms: number;
   model: string;
+  models: string[];
   areas: AreaPip[];
   priority: Priority;
   is_new: boolean;
-  symptoms: ("compacted" | "failed" | "waits" | "repeats")[];
+  symptoms: ("compacted" | "failed" | "waits" | "repeats" | "bloated" | "many_calls" | "spikes" | "rejected")[];
   issues: number;
 };
 
@@ -49,9 +51,12 @@ export type Item = {
   tokens?: number;
   usd?: number;
   minutes?: number;
+  spent_usd?: number;
+  spent_label?: string;
   fix?: string;
   fix_lang?: "bash" | "settings-json" | "claude-md";
   note?: string;
+  scope?: string;
   score: number;
   last_ts: number;
   marked: boolean;
@@ -68,7 +73,7 @@ export type Overview = {
   avoidable_usd: number;
   recovered: { usd: number; minutes: number };
   fix_first: Item[];
-  areas: { area: string; items: number; usd: number; severity: string; sessions: number }[];
+  areas: { area: string; items: number; setup_items: number; usd: number; severity: string; sessions: number }[];
   by_day: { day: string; cost_usd: number; avoidable_usd: number }[];
   by_project: { project: string; cost_usd: number; sessions: number }[];
   models: { model: string; cost_usd: number; share: number }[];
@@ -86,7 +91,7 @@ export type Fixes = {
 
 export type TimelineRow = {
   id: string;
-  kind: "div" | "you" | "claude" | "tool" | "event";
+  kind: "div" | "you" | "claude" | "tool" | "event" | "setting";
   ts: number;
   text: string;
   name?: string;
@@ -109,6 +114,8 @@ export type Occurrence = {
   Tokens?: number;
   USD?: number;
   Minutes?: number;
+  Spent?: number | null;
+  SpentLabel?: string;
   Title: string;
   Detail: string;
   Fix?: string;
@@ -121,13 +128,19 @@ export type Timeline = {
   started_at: number;
   rows: TimelineRow[];
   peak_context: number;
+  context_limit: number;
   compactions: number;
+  excluded_waits: number;
   receipt: {
     cost_usd: number;
     avoidable_usd: number;
     well_spent: number;
+    unpriced_issues: number;
     calls: number;
     tokens: { fresh_input: number; output: number; cache_read: number; cache_write: number };
+    cache_rebuilds: { count: number; cost_usd: number };
+    background_usd: number;
+    by_model: { model: string; cost_usd: number }[];
     by_area_usd: Record<string, number>;
     prompts: { prompt_id: string; label: string; cost_usd: number; tokens: number; flags: number }[];
   };

@@ -284,3 +284,37 @@ func TestProgressWeeksAndStatus(t *testing.T) {
 		t.Errorf("status should report collector_live: %v", st)
 	}
 }
+
+func TestEmptySessionIsListedButNotCounted(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "ccotel.db"))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	for _, stmt := range []string{
+		`INSERT INTO sessions (session_id, started_at, ended_at, project_dir) VALUES ('full', 1000, 2000, '/work/repo')`,
+		`INSERT INTO sessions (session_id, started_at, ended_at, project_dir) VALUES ('blank', 1000, 2000, '/work/repo')`,
+		`INSERT INTO api_requests (prompt_id, session_id, ts, model, query_source, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd_micros)
+			VALUES ('p', 'full', 1500, 'claude-opus-5-5', 'repl_main_thread', 100, 10, 0, 0, 1000)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seed %q: %v", stmt, err)
+		}
+	}
+	ts := newTestServer(t, db)
+	resp, err := http.Get(ts.URL + "/api/sessions/cards")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		CountAll int              `json:"count_all"`
+		Sessions []map[string]any `json:"sessions"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.CountAll != 1 || len(out.Sessions) != 2 {
+		t.Fatalf("want 1 counted of 2 listed: %d of %d", out.CountAll, len(out.Sessions))
+	}
+}

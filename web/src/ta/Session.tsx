@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Occurrence, type SessionCard, type Timeline, type TimelineRow } from "./api";
-import { AREA_LABEL, AREA_NAME, dayShort, durationS, money, tokensHuman } from "./format";
+import { AREA_LABEL, AREA_NAME, dayShort, isEmptySession, money, sessionTime, tokensHuman } from "./format";
 
 type Mode = "issues" | "receipt";
 type AreaKey = "context" | "exec" | "perm" | "model";
@@ -49,6 +49,7 @@ export default function SessionPage() {
   const peak = Math.max(1, timeline.peak_context);
   const ctxRows = timeline.rows.filter((r) => typeof r.context_tokens === "number");
   const bars = groupBars(ctxRows, flagged, MAX_BARS);
+  const pipState = timeline.compactions > 0 ? "full" : timeline.peak_context > timeline.context_limit ? "half" : "";
   const jump = (rowId: string) => {
     setHighlight(rowId);
     document.getElementById(`row-${rowId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -66,9 +67,10 @@ export default function SessionPage() {
           <Link to="/">Overview</Link>
           <Link className="on" to="/sessions" aria-current="page">Sessions</Link>
           <Link to="/fixes">Fixes</Link>
+          <Link to="/settings">Settings</Link>
         </nav>
         <div className="sl-group">
-          {cards.map((c) => (
+          {cards.filter((c) => c.id === id || !isEmptySession(c)).map((c) => (
             <Link key={c.id} className={`sl${c.id === id ? " on" : ""}${c.priority === "fine" ? " quiet" : ""}`} to={`/sessions/${encodeURIComponent(c.id)}`}>
               <span className={`pip ${c.priority === "now" ? "wfull" : c.priority === "look" ? "whalf" : "woff"}`} />
               <span className="name">{c.title}</span>
@@ -85,17 +87,17 @@ export default function SessionPage() {
             <h1 className="thread-title">{current?.title ?? id}</h1>
             <div className="meta-row">
               <span className="pill">{dayShort(timeline.started_at)}</span>
-              <span className="pill">{durationS(current?.duration_s ?? 0)}</span>
+              {current && <span className="pill">{sessionTime(current)}</span>}
               <span className="pill strong">{money(timeline.receipt.cost_usd)}</span>
               <span className="pill">{tokensHuman(timeline.receipt.tokens.fresh_input + timeline.receipt.tokens.output + timeline.receipt.tokens.cache_read + timeline.receipt.tokens.cache_write)} tok</span>
-              {current?.model && <span className="pill">{current.model}</span>}
+              {current?.models.map((m) => <span className="pill" key={m}>{m}</span>)}
             </div>
           </div>
           <div className="ctx-card">
             <div className="ctx-top">
               <span className="ctx-title">Context per step</span>
               <span className="ctx-state">
-                <span className={`pip ${timeline.compactions > 0 ? "full" : ""} sm`} />
+                <span className={`pip ${pipState} sm`} />
                 Peaked ~{tokensHuman(timeline.peak_context)}{timeline.compactions > 0 ? ` · compacted ${timeline.compactions}×` : ""}
               </span>
             </div>
@@ -107,7 +109,7 @@ export default function SessionPage() {
                     {bars.map((b) => (
                       <button
                         key={b.first}
-                        className={`bar${b.flagged ? " fl" : ""}${b.rows.includes(highlight ?? "") ? " on" : ""}`}
+                        className={`bar${b.flagged || b.context > timeline.context_limit ? " fl" : ""}${b.rows.includes(highlight ?? "") ? " on" : ""}`}
                         type="button"
                         aria-label={`${b.label} · ~${tokensHuman(b.context)} context`}
                         style={{ height: `${Math.max(3, Math.round((b.context / peak) * 100))}%` }}
@@ -120,7 +122,7 @@ export default function SessionPage() {
                 </div>
               </div>
             </div>
-            <span className="hint">Black bars are flagged steps. Click any bar to jump to it in the thread.</span>
+            <span className="hint">Black bars are flagged steps or over {tokensHuman(timeline.context_limit)}. Click any bar to jump to it in the thread.</span>
           </div>
         </header>
 
@@ -177,8 +179,8 @@ export default function SessionPage() {
                     </div>
                     <div className="fix-stack">
                       <p className="lbl">{o.Fix ? `Fix · ${o.FixLang === "settings-json" ? "add to settings.json" : "paste into CLAUDE.md"}` : "Habit"}</p>
-                      {o.Fix ? <pre className="code">{o.Fix}</pre> : <span className="body-copy">{o.Note || o.Detail}</span>}
-                      {o.Fix && o.Note && <span className="body-copy">{o.Note}</span>}
+                      {o.Fix ? <pre className="code">{o.Fix}</pre> : <span className="body-copy">{o.Detail}</span>}
+                      {o.Note && <span className="body-copy">{o.Note}</span>}
                     </div>
                     {marked[key] ? (
                       <div className="done" role="status"><strong>Marked as fixed</strong><span>Measuring for the next 7 days.</span></div>
@@ -197,6 +199,11 @@ export default function SessionPage() {
                   </article>
                 );
               })}
+              {area === "perm" && timeline.excluded_waits > 0 && (
+                <p className="hint-line">
+                  Not counted in Waiting: {timeline.excluded_waits === 1 ? "1 question or plan approval" : `${timeline.excluded_waits} questions and plan approvals`}.
+                </p>
+              )}
             </>
           )}
         </div>
@@ -230,7 +237,7 @@ function ThreadRow({ row, flagged, highlighted, onFlag }: { row: TimelineRow; fl
             <span className="m">{row.meta ?? ""}</span>
           </div>
         )}
-        {row.kind === "event" && <div className="event"><span className="evt">{row.text}</span></div>}
+        {(row.kind === "event" || row.kind === "setting") && <div className="event"><span className="evt">{row.text}</span></div>}
       </div>
     </div>
   );
@@ -255,13 +262,15 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
         </div>
       </div>
       <div className="rc-split">
-        <div className="rc-bar" role="img" aria-label={`${Math.round(r.well_spent * 100)}% well spent`}>
-          <div style={{ width: `${r.well_spent * 100}%`, background: "#000" }} />
-          <div className="hatch" style={{ width: `${(1 - r.well_spent) * 100}%` }} />
-        </div>
+        {r.unpriced_issues === 0 && (
+          <div className="rc-bar" role="img" aria-label={`${Math.round(r.well_spent * 100)}% well spent`}>
+            <div style={{ width: `${r.well_spent * 100}%`, background: "#000" }} />
+            <div className="hatch" style={{ width: `${(1 - r.well_spent) * 100}%` }} />
+          </div>
+        )}
         <div className="rc-row">
-          <span><b>{Math.round(r.well_spent * 100)}%</b> well spent</span>
-          <span>Avoidable (est.) <b className="mono">{money(r.avoidable_usd)}</b></span>
+          <span>{r.unpriced_issues > 0 ? <>Well spent: <b>Not estimated</b></> : <><b>{Math.round(r.well_spent * 100)}%</b> well spent</>}</span>
+          <span>Avoidable (est.) <b className="mono">{r.unpriced_issues > 0 && r.avoidable_usd === 0 ? "Not estimated" : `${money(r.avoidable_usd)}${r.unpriced_issues > 0 ? "+" : ""}`}</b></span>
         </div>
       </div>
       <div className="rsec">BY PROMPT</div>
@@ -271,6 +280,17 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
           <span className="mono">{money(p.cost_usd)}</span>
         </button>
       ))}
+      {r.by_model.length > 1 && (
+        <>
+          <div className="rsec">BY MODEL</div>
+          {r.by_model.map((m) => (
+            <div className="rl" key={m.model}>
+              <span>{m.model}</span>
+              <span className="mono">{money(m.cost_usd)}</span>
+            </div>
+          ))}
+        </>
+      )}
       <div className="rsec">AVOIDABLE, BY PROBLEM</div>
       {AREA_ORDER.filter((a) => (r.by_area_usd[a] ?? 0) > 0).map((a) => (
         <div className="rl" key={a}>
@@ -291,6 +311,18 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
         <span><span>▨ Output</span><span className="mono">{tokensHuman(r.tokens.output)}</span></span>
         <span><span><span className="soft-ink">■</span> Cache writes</span><span className="mono">{tokensHuman(r.tokens.cache_write)}</span></span>
       </div>
+      {r.cache_rebuilds.count > 0 && (
+        <div className="rl">
+          <span>Large cache rebuilds · {r.cache_rebuilds.count}</span>
+          <span className="mono">{money(r.cache_rebuilds.cost_usd)}</span>
+        </div>
+      )}
+      {r.background_usd >= 0.005 && (
+        <div className="rl">
+          <span>Background summaries, suggestions and titles</span>
+          <span className="mono">{money(r.background_usd)}</span>
+        </div>
+      )}
       <div className="torn" aria-hidden="true" />
     </article>
   );
@@ -301,7 +333,8 @@ function impactLine(o: Occurrence): string {
   if (o.Tokens) parts.push(`≈ ${tokensHuman(o.Tokens)} tok`);
   if (o.USD) parts.push(`≈ ${money(o.USD)}`);
   if (o.Minutes) parts.push(`${o.Minutes.toFixed(1)} min`);
-  return parts.join(" · ") || "no direct cost";
+  if (o.Spent) parts.push(`${money(o.Spent)} ${o.SpentLabel ?? ""}`.trim());
+  return parts.join(" · ") || "cost not estimated";
 }
 
 // MAX_BARS keeps the context chart inside its column however long the session

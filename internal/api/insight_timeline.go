@@ -6,13 +6,35 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 )
 
+// settingsCommand matches slash commands that change a setting or show
+// information, rather than ask Claude to do work.
+var settingsCommand = regexp.MustCompile(`^/(model|login|logout|plugins?|context|clear|remote-control|config|cost|status|help|mcp|permissions|theme|fast|effort|memory|resume|doctor|ide|agents|hooks)(\s|$)`)
+
+// isSettingsPrompt reports a settings command that billed nothing. A command
+// that did reach the model stays a prompt, so its cost has a place to show.
+func isSettingsPrompt(p promptRow, billed map[string]float64) bool {
+	_, ok := billed[p.PromptID]
+	return !ok && settingsCommand.MatchString(strings.TrimSpace(p.Text))
+}
+
+// backgroundSources are the requests Claude Code makes on its own: summaries,
+// suggestions and titles.
+var backgroundSources = map[string]bool{
+	"prompt_suggestion":      true,
+	"away_summary":           true,
+	"agent_summary":          true,
+	"generate_session_title": true,
+	"rename_generate_name":   true,
+}
+
 // timelineRow is one line of a session's thread (SPEC §4.3). Kind is div |
-// you | claude | tool | event. Flag/FlagLabel are set when an occurrence
+// you | claude | tool | event | setting. Flag/FlagLabel are set when an occurrence
 // points at this row, so the UI can show a "!" and jump to its issue.
 type timelineRow struct {
 	ID        string `json:"id"`
@@ -48,6 +70,13 @@ func (s *Server) handleSessionTimeline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	excludedWaits := 0
+	for _, t := range d.tools {
+		if t.SessionID == id && blockByDesignTools[t.Name] && strings.HasPrefix(t.DecisionSource, "user_") {
+			excludedWaits++
+		}
+	}
+
 	var peak int64
 	compactions := 0
 	for _, row := range rows {
@@ -59,12 +88,14 @@ func (s *Server) handleSessionTimeline(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"session_id":   id,
-		"started_at":   sess.StartedAt,
-		"rows":         rows,
-		"peak_context": peak,
-		"compactions":  compactions,
-		"receipt":      buildReceipt(d, occ, id),
+		"session_id":     id,
+		"started_at":     sess.StartedAt,
+		"rows":           rows,
+		"peak_context":   peak,
+		"context_limit":  int64(bloatedContextTokens),
+		"compactions":    compactions,
+		"excluded_waits": excludedWaits,
+		"receipt":        buildReceipt(d, occ, id),
 	})
 }
 
@@ -123,6 +154,12 @@ func buildTimeline(ctx context.Context, db *sql.DB, d *insightData, occ []occurr
 		if p.SessionID != sid {
 			continue
 		}
+		if isSettingsPrompt(p, promptCost) {
+			rows = append(rows, timelineRow{
+				ID: "s:" + p.PromptID, Kind: "setting", Ts: p.StartedAt, Text: strings.TrimSpace(p.Text), PromptID: p.PromptID,
+			})
+			continue
+		}
 		n++
 		rows = append(rows, timelineRow{
 			ID: "d:" + p.PromptID, Kind: "div", Ts: p.StartedAt,
@@ -167,14 +204,15 @@ func buildTimeline(ctx context.Context, db *sql.DB, d *insightData, occ []occurr
 		if c.SessionID != sid {
 			continue
 		}
+		pre, _ := billedCompactionSizes(d, c)
 		rows = append(rows, timelineRow{
 			ID: fmt.Sprintf("e:%d", c.ID), Kind: "event", Ts: c.Ts,
-			Text:    fmt.Sprintf("Context compacted · ~%s before", humanTokens(c.Pre)),
+			Text:    fmt.Sprintf("Context compacted · ~%s before", humanTokens(pre)),
 			Context: ctxAt(c.Ts, false),
 		})
 	}
 
-	kindOrder := map[string]int{"div": 0, "you": 1, "claude": 2, "tool": 3, "event": 4}
+	kindOrder := map[string]int{"div": 0, "you": 1, "claude": 2, "tool": 3, "event": 4, "setting": 4}
 	sort.SliceStable(rows, func(i, j int) bool {
 		if rows[i].Ts != rows[j].Ts {
 			return rows[i].Ts < rows[j].Ts
@@ -251,12 +289,22 @@ func buildReceipt(d *insightData, occ []occurrence, sid string) map[string]any {
 	var input, output, cacheRead, cacheWrite int64
 	perPrompt := map[string]float64{}
 	perPromptTokens := map[string]int64{}
-	calls := 0
+	calls, rebuilds := 0, 0
+	var rebuildCost, backgroundCost float64
+	modelCost := map[string]float64{}
 	for _, r := range d.reqs {
 		if r.SessionID != sid {
 			continue
 		}
 		calls++
+		modelCost[r.Model] += r.CostUSD
+		if backgroundSources[r.QuerySource] {
+			backgroundCost += r.CostUSD
+		}
+		if r.CacheCreate > cacheRebuildTokens {
+			rebuilds++
+			rebuildCost += r.CostUSD
+		}
 		cost += r.CostUSD
 		input += r.Input
 		output += r.Output
@@ -267,6 +315,7 @@ func buildReceipt(d *insightData, occ []occurrence, sid string) map[string]any {
 	}
 	flagged := map[string]int{}
 	byArea := map[string]float64{}
+	unpriced := 0
 	for _, o := range occ {
 		if o.SessionID != sid {
 			continue
@@ -280,6 +329,8 @@ func buildReceipt(d *insightData, occ []occurrence, sid string) map[string]any {
 			usd = *o.USD
 		case o.Tokens != nil && d.blendedRate > 0:
 			usd = float64(*o.Tokens) * d.blendedRate
+		default:
+			unpriced++
 		}
 		avoidable += usd
 		byArea[o.Area] += usd
@@ -293,7 +344,7 @@ func buildReceipt(d *insightData, occ []occurrence, sid string) map[string]any {
 	}
 	var prompts []map[string]any
 	for _, p := range d.prompts {
-		if p.SessionID != sid {
+		if p.SessionID != sid || isSettingsPrompt(p, perPrompt) {
 			continue
 		}
 		prompts = append(prompts, map[string]any{
@@ -304,13 +355,21 @@ func buildReceipt(d *insightData, occ []occurrence, sid string) map[string]any {
 			"flags":     flagged[p.PromptID],
 		})
 	}
+	byModel := []map[string]any{}
+	for _, m := range modelsBySpend(modelCost) {
+		byModel = append(byModel, map[string]any{"model": m, "cost_usd": modelCost[m]})
+	}
 	return map[string]any{
-		"cost_usd":      cost,
-		"avoidable_usd": avoidable,
-		"well_spent":    well,
-		"calls":         calls,
-		"tokens":        map[string]int64{"fresh_input": input, "output": output, "cache_read": cacheRead, "cache_write": cacheWrite},
-		"by_area_usd":   byArea,
-		"prompts":       prompts,
+		"cost_usd":        cost,
+		"avoidable_usd":   avoidable,
+		"well_spent":      well,
+		"unpriced_issues": unpriced, // issues with no dollar value, so well_spent overstates
+		"calls":           calls,
+		"tokens":          map[string]int64{"fresh_input": input, "output": output, "cache_read": cacheRead, "cache_write": cacheWrite},
+		"cache_rebuilds":  map[string]any{"count": rebuilds, "cost_usd": rebuildCost},
+		"background_usd":  backgroundCost,
+		"by_model":        byModel,
+		"by_area_usd":     byArea,
+		"prompts":         prompts,
 	}
 }

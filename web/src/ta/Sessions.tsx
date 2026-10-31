@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Range, type SessionCard, type SessionCards } from "./api";
 import { Shell } from "./Shell";
-import { AREA_LABEL, SYMPTOM_LABEL, dayShort, durationS, money, pipClass, tokensHuman, waitMs } from "./format";
+import { AREA_LABEL, SYMPTOM_LABEL, dayShort, isEmptySession, money, pipClass, sessionCount, sessionTime, tokensHuman, waitMs } from "./format";
 
 const TIMES: { value: Range; label: string }[] = [
   { value: "today", label: "Today" },
@@ -40,10 +40,11 @@ export default function Sessions() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("all");
   const [sort, setSort] = useState<Sort>("priority");
-  const [group, setGroup] = useState<"project" | "none">("project");
+  const [group, setGroup] = useState<"project" | "none">("none");
   const [query, setQuery] = useState("");
   const [areaFilter, setAreaFilter] = useState<string[]>([]);
   const [symFilter, setSymFilter] = useState<string[]>([]);
+  const [showEmpty, setShowEmpty] = useState(false);
   const [popOpen, setPopOpen] = useState(false);
 
   useEffect(() => {
@@ -51,16 +52,18 @@ export default function Sessions() {
     api.sessionCards(range).then(setData).catch((e: Error) => setError(e.message));
   }, [range]);
 
+  const listed = useMemo(() => (data?.sessions ?? []).filter((s) => showEmpty || !isEmptySession(s)), [data, showEmpty]);
+  const countNew = listed.filter((s) => s.is_new).length;
+
   const visible = useMemo(() => {
-    if (!data) return [];
     const q = query.trim().toLowerCase();
-    const list = data.sessions
+    const list = listed
       .filter((s) => !q || `${s.title} ${s.project}`.toLowerCase().includes(q))
       .filter((s) => areaFilter.length === 0 || s.areas.some((a) => areaFilter.includes(a.area)))
       .filter((s) => symFilter.every((k) => s.symptoms.includes(k as SessionCard["symptoms"][number])))
       .filter((s) => view === "all" || (view === "attn" ? s.priority !== "fine" : s.is_new));
     return [...list].sort(SORTERS[sort]);
-  }, [data, query, areaFilter, symFilter, view, sort]);
+  }, [listed, query, areaFilter, symFilter, view, sort]);
 
   const groups = useMemo(() => {
     if (group === "none") return [{ name: "", rows: visible }];
@@ -86,7 +89,7 @@ export default function Sessions() {
           <h1 className="title">Sessions</h1>
           <p className="sub">
             {data
-              ? `${data.count_all} sessions ${TIME_LABEL[range] ?? ""} · ${data.count_attention} need attention · ${data.count_new} new since your last visit`
+              ? `${sessionCount(listed.length)} ${TIME_LABEL[range] ?? ""} · ${data.count_attention} ${data.count_attention === 1 ? "needs" : "need"} attention · ${countNew} new since your last visit`
               : "Loading…"}
           </p>
         </div>
@@ -109,7 +112,7 @@ export default function Sessions() {
             {VIEWS.map((v) => (
               <button key={v.value} className={`vt${view === v.value ? " on" : ""}`} role="tab" type="button" aria-selected={view === v.value} onClick={() => setView(v.value)}>
                 {v.label}
-                <span className="cnt">{data ? (v.value === "all" ? data.count_all : v.value === "attn" ? data.count_attention : data.count_new) : "·"}</span>
+                <span className="cnt">{data ? (v.value === "all" ? listed.length : v.value === "attn" ? data.count_attention : countNew) : "·"}</span>
               </button>
             ))}
           </div>
@@ -137,13 +140,22 @@ export default function Sessions() {
               </div>
               <div>
                 <p className="ph">SYMPTOM</p>
-                {(["compacted", "failed", "waits", "repeats"] as const).map((k) => (
+                {Object.keys(SYMPTOM_LABEL).map((k) => (
                   <label className="ck" key={k}>
                     <input type="checkbox" checked={symFilter.includes(k)} onChange={(e) => setSymFilter(toggle(symFilter, k, e.target.checked))} />
                     {SYMPTOM_LABEL[k]}
                   </label>
                 ))}
               </div>
+              {data && data.sessions.length > data.count_all && (
+                <div>
+                  <p className="ph">SHOW</p>
+                  <label className="ck">
+                    <input type="checkbox" checked={showEmpty} onChange={(e) => setShowEmpty(e.target.checked)} />
+                    Empty sessions · {data.sessions.length - data.count_all}
+                  </label>
+                </div>
+              )}
               <div>
                 <p className="ph">GROUP BY</p>
                 <div className="seg-group">
@@ -155,7 +167,7 @@ export default function Sessions() {
                 </div>
               </div>
               <div className="pop-foot">
-                <button className="btn btn-q u" type="button" onClick={() => { setAreaFilter([]); setSymFilter([]); setView("all"); }}>Clear all</button>
+                <button className="btn btn-q u" type="button" onClick={() => { setAreaFilter([]); setSymFilter([]); setShowEmpty(false); setView("all"); }}>Clear all</button>
                 <button className="btn btn-k" type="button" onClick={() => setPopOpen(false)}>Done</button>
               </div>
             </div>
@@ -225,7 +237,7 @@ export default function Sessions() {
 
 function SessionRow({ s, showProject }: { s: SessionCard; showProject: boolean }) {
   const label = PRIORITY_LABEL[s.priority];
-  const meta = `${dayShort(s.started_at)} · ${durationS(s.duration_s)} · ${tokensHuman(s.tokens)} tok${showProject ? ` · ${s.project}` : ""}`;
+  const meta = `${dayShort(s.started_at)} · ${sessionTime(s)} · ${tokensHuman(s.tokens)} tok${showProject ? ` · ${s.project}` : ""}`;
   return (
     <Link className={`grid-row srow${s.priority === "fine" ? " fine" : ""}`} to={`/sessions/${encodeURIComponent(s.id)}`}>
       <span className={`pr ${s.priority}`}>{label}</span>
@@ -239,7 +251,7 @@ function SessionRow({ s, showProject }: { s: SessionCard; showProject: boolean }
           s.areas.map((a) => (
             <span className="area" key={a.area}>
               <span className={`pip ${pipClass(a.severity)}`} />
-              {AREA_LABEL[a.area]}
+              {AREA_LABEL[a.area]}{a.area === "model" && (a.usd ?? 0) >= 0.005 ? ` · ${money(a.usd ?? 0)}` : ""}
             </span>
           ))
         ) : (

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, type Fixes as FixesData, type Item, type Progress } from "./api";
 import { Shell } from "./Shell";
-import { AREA_NAME, dayShort, money } from "./format";
+import { AREA_NAME, dayShort, itemSessions, money } from "./format";
 
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -70,7 +70,7 @@ export default function Fixes() {
                 <p className="eb">Session health</p>
                 <div className="num-line">
                   <span className="num">{last ? `${Math.round(last.healthy_pct * 100)}%` : "—"}</span>
-                  <span className="num-label">healthy sessions</span>
+                  <span className="num-label">healthy sessions{last ? `, week of ${dayShort(Date.parse(last.week))}` : ""}</span>
                 </div>
               </div>
               <div className="stat-grid">
@@ -129,7 +129,7 @@ export default function Fixes() {
                   <span className="chip">{AREA_NAME[it.area]}</span>
                   <strong>{it.title}</strong>
                   <span className="sub">
-                    {it.usd !== undefined ? `≈ ${money(it.usd)}` : ""}{it.minutes !== undefined ? ` · ${Math.round(it.minutes)} min` : ""} · {it.sessions} session{it.sessions === 1 ? "" : "s"} · {it.conf}
+                    {[it.usd !== undefined && `≈ ${money(it.usd)}`, it.minutes !== undefined && `${Math.round(it.minutes)} min`, itemSessions(it.sessions, it.scope), it.conf].filter(Boolean).join(" · ")}
                   </span>
                   {it.detail && <span className="body-copy">{it.detail}</span>}
                   {it.fix && <pre className="code">{it.fix}</pre>}

@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/project"
 )
 
 // Per-session detectors (SPEC §5). Every detector is a pure function over
@@ -21,18 +23,23 @@ type occurrence struct {
 	SessionID string
 	PromptID  string
 	Ts        int64
-	Evidence  []string // row ids the UI can jump to: "t:<tool_use_id>", "e:<compaction id>", "p:<prompt id>"
+	Evidence  []string // row ids the UI can jump to: "t:<tool_use_id>", "e:<compaction id>", "u:<prompt id>"
 	Count     int      // repetitions behind this occurrence
 	Severity  string   // full | half
 	Conf      string   // Measured | Likely | Estimated
 	Tokens    *int64
 	USD       *float64
 	Minutes   *float64
-	Title     string
-	Detail    string
-	Fix       string
-	FixLang   string
-	Note      string
+	// Spent is money tied to the problem but not avoidable as such, so it ranks
+	// items and is shown with SpentLabel, but never counts as avoidable spend.
+	Spent      *float64
+	SpentLabel string
+	Title      string
+	Detail     string
+	Fix        string
+	FixLang    string
+	Note       string
+	Scope      string // where an occurrence with no session applies; "" means the whole install
 }
 
 // Thresholds. Named so the rules read as rules.
@@ -44,6 +51,14 @@ const (
 	failingMCPRate            = 0.2
 	oversizedOutputTokens     = 2000 // a whole prompt whose answer fits in this is "small"
 	oversizedMaxToolCalls     = 3
+	bloatedContextTokens      = 200_000 // context a main-thread request can read before it counts as bloated
+	manyToolCallsPerPrompt    = 50
+	compactRequestWindowMs    = 5 * 60 * 1000 // how far before a compaction event its API request can be
+	minFailedToolCalls        = 5
+	outputSpikeTokens         = 10_000 // one tool result over this is a spike
+	cacheRebuildTokens        = 50_000 // cache writes in one request that count as a large rebuild
+	minSessionsForProjectNote = 3      // sessions that read one file before it is worth a note
+	maxProjectNoteFiles       = 10     // files listed in one CLAUDE.md snippet
 )
 
 // mutatingTools change files directly.
@@ -164,24 +179,432 @@ func detectReRead(d *insightData) []occurrence {
 	return out
 }
 
+// isMainThread reports whether a request belongs to the user's conversation
+// rather than a subagent or a background call.
+func (r reqRow) isMainThread() bool {
+	return r.QuerySource == "repl_main_thread" || r.QuerySource == ""
+}
+
+// billedCompactionSizes returns a compaction's before and after sizes as the
+// API billed them: the compact request's context, then the next main-thread
+// request's. The event's own pre/post tokens are Claude Code's estimate, which
+// can run far below the billed context the chart shows, so they are only the
+// fallback when those requests are missing.
+func billedCompactionSizes(d *insightData, c compactRow) (pre, post int64) {
+	pre, post = c.Pre, c.Post
+	for _, r := range d.reqs {
+		if r.SessionID != c.SessionID {
+			continue
+		}
+		if r.Ts > c.Ts {
+			if r.isMainThread() {
+				post = r.Context
+				break
+			}
+			continue
+		}
+		if r.QuerySource == "compact" && r.Ts >= c.Ts-compactRequestWindowMs {
+			pre = r.Context
+		}
+	}
+	return pre, post
+}
+
+// overLimitLabel names the money costOverContextLimit reports.
+var overLimitLabel = fmt.Sprintf("spent on prompts over %s", humanTokens(bloatedContextTokens))
+
+// costOverContextLimit returns, per session, the full cost of the prompts whose
+// main thread went over bloatedContextTokens. Sessions with none are absent.
+func costOverContextLimit(d *insightData) map[string]*float64 {
+	promptCost := map[string]float64{}
+	over := map[string]string{} // prompt -> session
+	for _, r := range d.reqs {
+		if r.PromptID == "" {
+			continue
+		}
+		promptCost[r.PromptID] += r.CostUSD
+		if r.isMainThread() && r.Context > bloatedContextTokens {
+			over[r.PromptID] = r.SessionID
+		}
+	}
+	out := map[string]*float64{}
+	for pid, sid := range over {
+		if out[sid] == nil {
+			out[sid] = new(float64)
+		}
+		*out[sid] += promptCost[pid]
+	}
+	return out
+}
+
+// detectContextBloat flags a session whose main thread read more than
+// bloatedContextTokens at once, so a long session is caught whether or not it
+// reached a compaction. A habit: the lever is starting fresh sessions.
+func detectContextBloat(d *insightData) []occurrence {
+	spent := costOverContextLimit(d)
+	type agg struct {
+		peak, peakTs int64
+		peakPrompt   string
+		peakByPrompt map[string]int64
+	}
+	bySession := map[string]*agg{}
+	shownPeak := map[string]int64{} // every request counts here, as on the context chart
+	var order []string
+	for _, r := range d.reqs {
+		if r.Context > shownPeak[r.SessionID] {
+			shownPeak[r.SessionID] = r.Context
+		}
+		if r.PromptID == "" || !r.isMainThread() {
+			continue
+		}
+		a, ok := bySession[r.SessionID]
+		if !ok {
+			a = &agg{peakByPrompt: map[string]int64{}}
+			bySession[r.SessionID] = a
+			order = append(order, r.SessionID)
+		}
+		if r.Context > a.peakByPrompt[r.PromptID] {
+			a.peakByPrompt[r.PromptID] = r.Context
+		}
+		if r.Context > a.peak {
+			a.peak, a.peakTs, a.peakPrompt = r.Context, r.Ts, r.PromptID
+		}
+	}
+	var out []occurrence
+	for _, sid := range order {
+		a := bySession[sid]
+		if a.peak <= bloatedContextTokens {
+			continue
+		}
+		over := 0
+		for _, peak := range a.peakByPrompt {
+			if peak > bloatedContextTokens {
+				over++
+			}
+		}
+		out = append(out, occurrence{
+			Kind:       "context_bloat",
+			Area:       "context",
+			SessionID:  sid,
+			PromptID:   a.peakPrompt,
+			Ts:         a.peakTs,
+			Evidence:   []string{"u:" + a.peakPrompt},
+			Count:      over,
+			Severity:   "half",
+			Conf:       "Measured",
+			Title:      fmt.Sprintf("Context went over %s", humanTokens(bloatedContextTokens)),
+			Detail:     fmt.Sprintf("Peaked at ~%s, with %d of %d prompts over %s.", humanTokens(shownPeak[sid]), over, len(a.peakByPrompt), humanTokens(bloatedContextTokens)),
+			Note:       "Every step reads all of the context again. A fresh session per task keeps it small.",
+			Spent:      spent[sid],
+			SpentLabel: overLimitLabel,
+		})
+	}
+	return out
+}
+
+// detectManyToolCalls flags a prompt that ran manyToolCallsPerPrompt or more
+// tool calls. Measured, because the count is exact; whether the run was
+// justified is left to the reader.
+func detectManyToolCalls(d *insightData) []occurrence {
+	type agg struct {
+		session string
+		ts      int64
+		calls   int
+	}
+	byPrompt := map[string]*agg{}
+	var order []string
+	for _, t := range d.tools {
+		if t.PromptID == "" {
+			continue
+		}
+		a, ok := byPrompt[t.PromptID]
+		if !ok {
+			a = &agg{session: t.SessionID, ts: t.Ts}
+			byPrompt[t.PromptID] = a
+			order = append(order, t.PromptID)
+		}
+		a.calls++
+	}
+	var out []occurrence
+	for _, pid := range order {
+		a := byPrompt[pid]
+		if a.calls < manyToolCallsPerPrompt {
+			continue
+		}
+		out = append(out, occurrence{
+			Kind:      "many_tool_calls",
+			Area:      "exec",
+			SessionID: a.session,
+			PromptID:  pid,
+			Ts:        a.ts,
+			Evidence:  []string{"u:" + pid},
+			Count:     a.calls,
+			Severity:  "half",
+			Conf:      "Measured",
+			Title:     fmt.Sprintf("%d+ tool calls in one prompt", manyToolCallsPerPrompt),
+			Detail:    fmt.Sprintf("This prompt ran %d tool calls.", a.calls),
+			Note:      "Long runs are often loops or broad exploration. Check the thread for repeated steps.",
+		})
+	}
+	return out
+}
+
+// detectToolFailures flags a session with minFailedToolCalls or more failures,
+// however small a share of its calls they are: each one costs another attempt.
+func detectToolFailures(d *insightData) []occurrence {
+	type agg struct {
+		calls, fails int
+		ts           int64
+		ev           []string
+		byTool       map[string]int
+	}
+	bySession := map[string]*agg{}
+	var order []string
+	for _, t := range d.tools {
+		a, ok := bySession[t.SessionID]
+		if !ok {
+			a = &agg{byTool: map[string]int{}}
+			bySession[t.SessionID] = a
+			order = append(order, t.SessionID)
+		}
+		a.calls++
+		if t.Success != 0 {
+			continue
+		}
+		if a.fails == 0 {
+			a.ts = t.Ts
+		}
+		a.fails++
+		a.byTool[t.Name]++
+		a.ev = append(a.ev, "t:"+t.ID)
+	}
+	var out []occurrence
+	for _, sid := range order {
+		a := bySession[sid]
+		if a.fails < minFailedToolCalls {
+			continue
+		}
+		top, topN := "", 0
+		for name, n := range a.byTool {
+			if n > topN || (n == topN && name < top) {
+				top, topN = name, n
+			}
+		}
+		out = append(out, occurrence{
+			Kind:      "tool_failures",
+			Area:      "exec",
+			SessionID: sid,
+			Ts:        a.ts,
+			Evidence:  a.ev,
+			Count:     a.fails,
+			Severity:  "half",
+			Conf:      "Measured",
+			Title:     fmt.Sprintf("%d+ failed tool calls", minFailedToolCalls),
+			Detail:    fmt.Sprintf("%d of %d tool calls failed, most often %s (%d).", a.fails, a.calls, top, topN),
+			Note:      "Look for one cause, such as a wrong path or a missing dependency, and note the fix in CLAUDE.md.",
+		})
+	}
+	return out
+}
+
+// detectOutputSpikes flags a session's tool results over outputSpikeTokens.
+// Estimated, because result sizes are bytes / 4. Not priced: a big result can
+// still be the right one, so it never counts as avoidable.
+func detectOutputSpikes(d *insightData) []occurrence {
+	bySession := map[string][]toolRow{}
+	var order []string
+	for _, t := range d.tools {
+		if t.ResultBytes/4 <= outputSpikeTokens {
+			continue
+		}
+		if _, ok := bySession[t.SessionID]; !ok {
+			order = append(order, t.SessionID)
+		}
+		bySession[t.SessionID] = append(bySession[t.SessionID], t)
+	}
+	var out []occurrence
+	for _, sid := range order {
+		spikes := bySession[sid]
+		first, total := spikes[0].Ts, int64(0)
+		sort.SliceStable(spikes, func(i, j int) bool { return spikes[i].ResultBytes > spikes[j].ResultBytes })
+		ev := make([]string, 0, len(spikes))
+		for _, t := range spikes {
+			total += t.ResultBytes / 4
+			ev = append(ev, "t:"+t.ID)
+		}
+		out = append(out, occurrence{
+			Kind:      "output_spike",
+			Area:      "exec",
+			SessionID: sid,
+			Ts:        first,
+			Evidence:  ev,
+			Count:     len(spikes),
+			Severity:  "half",
+			Conf:      "Estimated",
+			Title:     fmt.Sprintf("Tool results over %s tokens", humanTokens(outputSpikeTokens)),
+			Detail:    fmt.Sprintf("%d results, ~%s tokens in total. The largest is ~%s, from %s.", len(spikes), humanTokens(total), humanTokens(spikes[0].ResultBytes/4), spikes[0].Name),
+			Note:      "Large results stay in context for every later step. Ask for a narrower read or search.",
+		})
+	}
+	return out
+}
+
+// detectRejectedWork flags each prompt with a refused tool call. Whatever Claude
+// did before the refusal may be lost, but how much can't be told from the data,
+// so the prompt's whole cost is shown as an upper bound and not as avoidable.
+func detectRejectedWork(d *insightData) []occurrence {
+	promptCost := map[string]float64{}
+	for _, r := range d.reqs {
+		promptCost[r.PromptID] += r.CostUSD
+	}
+	type agg struct {
+		session string
+		ts      int64
+		ev      []string
+	}
+	byPrompt := map[string]*agg{}
+	var order []string
+	for _, t := range d.tools {
+		if t.Decision != "reject" {
+			continue
+		}
+		key := t.SessionID + "|" + t.PromptID
+		a, ok := byPrompt[key]
+		if !ok {
+			a = &agg{session: t.SessionID, ts: t.Ts}
+			byPrompt[key] = a
+			order = append(order, key)
+		}
+		a.ev = append(a.ev, "t:"+t.ID)
+	}
+	var out []occurrence
+	for _, key := range order {
+		a := byPrompt[key]
+		pid := strings.TrimPrefix(key, a.session+"|")
+		o := occurrence{
+			Kind:      "rejected_work",
+			Area:      "perm",
+			SessionID: a.session,
+			PromptID:  pid,
+			Ts:        a.ts,
+			Evidence:  a.ev,
+			Count:     len(a.ev),
+			Severity:  "half",
+			Conf:      "Measured",
+			Title:     "Tool call rejected",
+			Detail:    fmt.Sprintf("%d tool call(s) refused in this prompt, by you or a permission rule.", len(a.ev)),
+			Note:      "A clearer prompt or a CLAUDE.md rule can stop Claude from trying this.",
+		}
+		if pid != "" {
+			cost := promptCost[pid]
+			o.Spent, o.SpentLabel = &cost, "whole prompt, an upper bound"
+		}
+		out = append(out, o)
+	}
+	return out
+}
+
+// detectProjectNotes flags files of one project read in several sessions, which
+// notes in CLAUDE.md could partly replace. One per project, and tied to no
+// session, since no single session did anything wrong. Unpriced: how many reads
+// a note would really save can't be known from the data.
+func detectProjectNotes(d *insightData) []occurrence {
+	type fileReads struct {
+		path     string
+		first    string // the session that read it first
+		sessions map[string]struct{}
+		tokens   int64 // read again after the first session
+	}
+	byDir := map[string]map[string]*fileReads{}
+	lastTs := map[string]int64{}
+	for _, t := range d.tools {
+		dir := d.sessions[t.SessionID].ProjectDir
+		if t.Name != "Read" || dir == "" || !strings.HasPrefix(t.File, dir+string(filepath.Separator)) || filepath.Base(t.File) == "CLAUDE.md" {
+			continue
+		}
+		if byDir[dir] == nil {
+			byDir[dir] = map[string]*fileReads{}
+		}
+		f, ok := byDir[dir][t.File]
+		if !ok {
+			f = &fileReads{path: strings.TrimPrefix(t.File, dir+string(filepath.Separator)), first: t.SessionID, sessions: map[string]struct{}{}}
+			byDir[dir][t.File] = f
+		}
+		f.sessions[t.SessionID] = struct{}{}
+		if t.SessionID != f.first {
+			f.tokens += t.ResultBytes / 4
+		}
+		if t.Ts > lastTs[dir] {
+			lastTs[dir] = t.Ts
+		}
+	}
+
+	var out []occurrence
+	for dir, files := range byDir {
+		var repeated []*fileReads
+		var tokens int64
+		for _, f := range files {
+			if len(f.sessions) >= minSessionsForProjectNote {
+				repeated = append(repeated, f)
+				tokens += f.tokens
+			}
+		}
+		if len(repeated) == 0 {
+			continue
+		}
+		sort.Slice(repeated, func(i, j int) bool {
+			if len(repeated[i].sessions) != len(repeated[j].sessions) {
+				return len(repeated[i].sessions) > len(repeated[j].sessions)
+			}
+			return repeated[i].path < repeated[j].path
+		})
+		var snippet strings.Builder
+		snippet.WriteString("## Key files\n")
+		for _, f := range repeated[:min(maxProjectNoteFiles, len(repeated))] {
+			snippet.WriteString("- " + f.path + ": <what it does>\n")
+		}
+		name := project.Name(dir)
+		out = append(out, occurrence{
+			Kind:     "project_notes",
+			Area:     "exec",
+			Subject:  dir,
+			Ts:       lastTs[dir],
+			Count:    len(repeated),
+			Severity: "half",
+			Conf:     "Likely",
+			Title:    fmt.Sprintf("Add project notes for %s · %d files read in %d+ sessions", name, len(repeated), minSessionsForProjectNote),
+			Detail:   fmt.Sprintf("About %s tokens went on reading these files again in later sessions.", humanTokens(tokens)),
+			Fix:      snippet.String(),
+			FixLang:  "claude-md",
+			Note:     "Fill in each line. Claude Code loads CLAUDE.md in every session, so short notes can spare some of these reads.",
+			Scope:    "Project " + name,
+		})
+	}
+	return out
+}
+
 // detectCompaction reports each compaction as a Measured context event. It is
 // a habit (no config lever), so it has no fix and no tokens to price.
 func detectCompaction(d *insightData) []occurrence {
+	spent := costOverContextLimit(d)
 	var out []occurrence
 	for _, c := range d.compactions {
 		sev := "full"
+		pre, post := billedCompactionSizes(d, c)
 		out = append(out, occurrence{
-			Kind:      "compaction",
-			Area:      "context",
-			Subject:   "",
-			SessionID: c.SessionID,
-			Ts:        c.Ts,
-			Evidence:  []string{fmt.Sprintf("e:%d", c.ID)},
-			Count:     1,
-			Severity:  sev,
-			Conf:      "Measured",
-			Title:     fmt.Sprintf("Context compacted: ~%dK → ~%dK", c.Pre/1000, c.Post/1000),
-			Detail:    "Claude had to summarise the conversation to keep going. A fresh session per task avoids this.",
+			Kind:       "compaction",
+			Area:       "context",
+			Subject:    "",
+			SessionID:  c.SessionID,
+			Ts:         c.Ts,
+			Evidence:   []string{fmt.Sprintf("e:%d", c.ID)},
+			Count:      1,
+			Severity:   sev,
+			Conf:       "Measured",
+			Title:      fmt.Sprintf("Context compacted: ~%dK → ~%dK", pre/1000, post/1000),
+			Detail:     "Claude had to summarise the conversation to keep going. A fresh session per task avoids this.",
+			Spent:      spent[c.SessionID],
+			SpentLabel: overLimitLabel,
 		})
 	}
 	return out
@@ -497,9 +920,10 @@ func detectFailingMCP(d *insightData) []occurrence {
 	return out
 }
 
-// detectOversizedModel flags a prompt answered on an Opus-class model whose
+// detectOversizedModel flags a prompt answered on an Opus or Sonnet model whose
 // answer was small and which used no file changes and few tools: the kind of
-// turn a smaller model would likely handle. A habit, Likely.
+// turn a smaller model would likely handle. A habit, Likely. Sonnet turns get
+// their own subject, so they aggregate apart from Opus and can point at Haiku.
 func detectOversizedModel(d *insightData) []occurrence {
 	type agg struct {
 		session, model string
@@ -512,7 +936,7 @@ func detectOversizedModel(d *insightData) []occurrence {
 	byPrompt := map[string]*agg{}
 	var order []string
 	for _, r := range d.reqs {
-		if r.PromptID == "" || r.QuerySource != "repl_main_thread" || !strings.Contains(r.Model, "opus") {
+		if r.PromptID == "" || r.QuerySource != "repl_main_thread" || !(strings.Contains(r.Model, "opus") || strings.Contains(r.Model, "sonnet")) {
 			continue
 		}
 		a, ok := byPrompt[r.PromptID]
@@ -541,21 +965,25 @@ func detectOversizedModel(d *insightData) []occurrence {
 			continue
 		}
 		usd := a.cost
+		subject, note := "", "Habit: switch to a smaller model with /model for turns like this. Spend shown is what this turn cost, not a saving."
+		if strings.Contains(a.model, "sonnet") {
+			subject, note = "sonnet", "Habit: Haiku can likely handle turns like this; switch with /model. Spend shown is what this turn cost, not a saving."
+		}
 		out = append(out, occurrence{
 			Kind:      "oversized_model",
 			Area:      "model",
-			Subject:   "",
+			Subject:   subject,
 			SessionID: a.session,
 			PromptID:  pid,
 			Ts:        a.ts,
-			Evidence:  []string{"p:" + pid},
+			Evidence:  []string{"u:" + pid},
 			Count:     1,
 			Severity:  "half",
 			Conf:      "Likely",
 			USD:       &usd,
 			Title:     fmt.Sprintf("Small turn on %s", a.model),
 			Detail:    fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn.", a.output, a.tools, a.cost),
-			Note:      "Habit: switch to a smaller model with /model for turns like this. Spend shown is what this turn cost, not a saving.",
+			Note:      note,
 		})
 	}
 	return out

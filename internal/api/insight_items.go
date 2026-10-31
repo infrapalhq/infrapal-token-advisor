@@ -27,9 +27,12 @@ type insightItem struct {
 	Tokens      *int64   `json:"tokens,omitempty"`
 	USD         *float64 `json:"usd,omitempty"`
 	Minutes     *float64 `json:"minutes,omitempty"`
+	SpentUSD    *float64 `json:"spent_usd,omitempty"`
+	SpentLabel  string   `json:"spent_label,omitempty"`
 	Fix         string   `json:"fix,omitempty"`
 	FixLang     string   `json:"fix_lang,omitempty"`
 	Note        string   `json:"note,omitempty"`
+	Scope       string   `json:"scope,omitempty"` // where an item with no sessions applies, when not the whole install
 	Score       float64  `json:"score"`
 	LastTs      int64    `json:"last_ts"`
 	Marked      bool     `json:"marked"`
@@ -61,15 +64,19 @@ func aggregateItems(occ []occurrence, rate float64) []*insightItem {
 				Fix:        o.Fix,
 				FixLang:    o.FixLang,
 				Note:       o.Note,
+				Scope:      o.Scope,
 				Severity:   o.Severity,
 				Conf:       o.Conf,
+				SpentLabel: o.SpentLabel,
 				sessionSet: map[string]struct{}{},
 			}
 			byKey[key] = it
 			order = append(order, key)
 		}
 		it.Occurrences++
-		it.sessionSet[o.SessionID] = struct{}{}
+		if o.SessionID != "" {
+			it.sessionSet[o.SessionID] = struct{}{}
+		}
 		if o.Severity == "full" {
 			it.Severity = "full"
 		}
@@ -100,6 +107,13 @@ func aggregateItems(occ []occurrence, rate float64) []*insightItem {
 			}
 			*it.Minutes += *o.Minutes
 		}
+		if o.Spent != nil {
+			if it.SpentUSD == nil {
+				var z float64
+				it.SpentUSD = &z
+			}
+			*it.SpentUSD += *o.Spent
+		}
 		if len(it.evidence) < 50 {
 			it.evidence = append(it.evidence, o.Evidence...)
 		}
@@ -128,8 +142,13 @@ func aggregateItems(occ []occurrence, rate float64) []*insightItem {
 	return out
 }
 
-// priorityScore is SPEC §5: (usd + minutes × 0.10) × confidence × log2(1+n).
-// The 0.10 $/min weight only ranks items; it is never shown as money.
+// spentRankingShare is how much of an item's related spend counts when ranking.
+// That money isn't all avoidable, so it ranks below a real saving of the same size.
+const spentRankingShare = 0.25
+
+// priorityScore is SPEC §5: (usd + minutes × 0.10) × confidence × log2(1+n),
+// plus a share of related spend. The 0.10 $/min and spentRankingShare weights
+// only rank items; neither is ever shown as money.
 func priorityScore(it *insightItem) float64 {
 	var usd, minutes float64
 	if it.USD != nil {
@@ -141,6 +160,9 @@ func priorityScore(it *insightItem) float64 {
 	w := confWeight[it.Conf]
 	if w == 0 {
 		w = 0.5
+	}
+	if it.SpentUSD != nil {
+		usd += *it.SpentUSD * spentRankingShare
 	}
 	return (usd + minutes*0.10) * w * math.Log2(1+float64(it.Occurrences))
 }
