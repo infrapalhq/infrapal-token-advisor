@@ -16,6 +16,7 @@ Usage:
   token-advisor restart         restart the background service, e.g. after an upgrade
   token-advisor status          is the service up, DB size, event count, last event timestamp
   token-advisor ui              open the dashboard, serving it here if the service isn't running
+  token-advisor mcp             serve captured metrics to Claude over MCP (stdio)
   token-advisor doctor          diagnose why no data is arriving
   token-advisor logs            show the collector's log (-n 100, --errors, -f)
   token-advisor export          export captured data (--format jsonl|csv --since 7d)
@@ -41,6 +42,7 @@ var commands = map[string]func(args []string) error{
 	"restart":   runRestart,
 	"status":    runStatus,
 	"ui":        runUI,
+	"mcp":       runMCP,
 	"doctor":    runDoctor,
 	"logs":      runLogs,
 	"export":    runExport,

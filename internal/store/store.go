@@ -5,6 +5,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -55,5 +56,25 @@ func Open(dbPath string) (*sql.DB, error) {
 		return nil, fmt.Errorf("chmod db file: %w", err)
 	}
 
+	return db, nil
+}
+
+// OpenReadOnly opens an existing database for reading only, without migrating
+// it. SQLite itself rejects writes on this connection.
+func OpenReadOnly(dbPath string) (*sql.DB, error) {
+	dsn := url.URL{
+		Scheme:   "file",
+		Path:     dbPath,
+		RawQuery: "mode=ro&_pragma=busy_timeout(5000)&_pragma=query_only(1)",
+	}
+	db, err := sql.Open("sqlite", dsn.String())
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("open db read-only: %w", err)
+	}
 	return db, nil
 }
