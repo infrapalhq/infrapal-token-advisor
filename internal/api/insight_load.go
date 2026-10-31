@@ -34,6 +34,7 @@ type toolRow struct {
 	MCPServer      string
 	File           string
 	Command        string
+	Decision       string
 	DecisionSource string
 	ResultBytes    int64
 	Success        int64 // 1 ok, 0 failed, -1 unknown
@@ -161,7 +162,7 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 	rows, err = db.QueryContext(ctx, `
 		SELECT tool_use_id, COALESCE(prompt_id,''), COALESCE(session_id,''), COALESCE(ts,0),
 			COALESCE(tool_name,''), COALESCE(mcp_server_name,''), COALESCE(file_path,''),
-			COALESCE(full_command,''), COALESCE(tool_input,''), COALESCE(decision_source,''),
+			COALESCE(full_command,''), COALESCE(tool_input,''), COALESCE(decision,''), COALESCE(decision_source,''),
 			COALESCE(result_size_bytes,0), COALESCE(success,-1)
 		FROM tool_calls
 		WHERE tool_name IS NOT NULL AND `+scope+`
@@ -173,7 +174,7 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		var t toolRow
 		var input string
 		if err := rows.Scan(&t.ID, &t.PromptID, &t.SessionID, &t.Ts, &t.Name, &t.MCPServer,
-			&t.File, &t.Command, &input, &t.DecisionSource, &t.ResultBytes, &t.Success); err != nil {
+			&t.File, &t.Command, &input, &t.Decision, &t.DecisionSource, &t.ResultBytes, &t.Success); err != nil {
 			rows.Close()
 			return nil, err
 		}

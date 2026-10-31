@@ -20,7 +20,7 @@ type progressWeek struct {
 	Week        string  `json:"week"` // Monday, YYYY-MM-DD
 	Avoidable   float64 `json:"avoidable_usd"`
 	Sessions    int     `json:"sessions"`
-	HealthyPct  float64 `json:"healthy_pct"` // share of sessions not flagged "now"
+	HealthyPct  float64 `json:"healthy_pct"` // share of sessions at priority "fine", the Sessions page's complement of "needs attention"
 	MarkedFixes int     `json:"marked_fixes"`
 }
 
@@ -67,17 +67,20 @@ func (s *Server) handleProgress(w http.ResponseWriter, r *http.Request) {
 			get(time.UnixMilli(o.Ts)).Avoidable += float64(*o.Tokens) * d.blendedRate
 		}
 	}
-	healthyNow := map[string]int{} // week -> sessions flagged "now"
+	flagged := map[string]int{} // week -> sessions that need attention
 	for _, c := range cards {
+		if c.isEmpty() {
+			continue
+		}
 		wk := get(time.UnixMilli(c.StartedAt))
 		wk.Sessions++
-		if c.Priority == "now" {
-			healthyNow[wk.Week]++
+		if c.Priority != "fine" {
+			flagged[wk.Week]++
 		}
 	}
 	for _, wk := range weeks {
 		if wk.Sessions > 0 {
-			wk.HealthyPct = 1 - float64(healthyNow[wk.Week])/float64(wk.Sessions)
+			wk.HealthyPct = 1 - float64(flagged[wk.Week])/float64(wk.Sessions)
 		}
 		wk.MarkedFixes = marks[wk.Week]
 	}

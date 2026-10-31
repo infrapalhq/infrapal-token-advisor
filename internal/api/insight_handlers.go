@@ -35,6 +35,9 @@ func (s *Server) handleSessionCards(w http.ResponseWriter, r *http.Request) {
 	}
 	var attn, fresh int
 	for _, c := range cards {
+		if c.isEmpty() {
+			continue
+		}
 		if c.Priority != "fine" {
 			attn++
 		}
@@ -45,7 +48,7 @@ func (s *Server) handleSessionCards(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"range":           token,
 		"sessions":        cards,
-		"count_all":       len(cards),
+		"count_all":       countSessions(cards),
 		"count_attention": attn,
 		"count_new":       fresh,
 	})
@@ -141,18 +144,13 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 
 	fixFirst := []*insightItem{}
 	var recoveredUSD, recoveredMin float64
-	for _, it := range open {
-		if it.Fix == "" {
-			continue
+	for _, it := range fixFirstItems(open) {
+		fixFirst = append(fixFirst, it)
+		if it.USD != nil {
+			recoveredUSD += *it.USD
 		}
-		if len(fixFirst) < 3 {
-			fixFirst = append(fixFirst, it)
-			if it.USD != nil {
-				recoveredUSD += *it.USD
-			}
-			if it.Minutes != nil {
-				recoveredMin += *it.Minutes
-			}
+		if it.Minutes != nil {
+			recoveredMin += *it.Minutes
 		}
 	}
 
@@ -205,8 +203,21 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		"by_project":     projects,
 		"models":         modelRows,
 		"review":         review,
-		"sessions_count": len(cards),
+		"sessions_count": countSessions(cards),
 	})
+}
+
+// fixFirstItems picks the Overview's top three by impact, habits included, since
+// that is often where the money is. Items of equal impact prefer a copy-paste fix.
+func fixFirstItems(open []*insightItem) []*insightItem {
+	ranked := append([]*insightItem{}, open...)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].Score != ranked[j].Score {
+			return ranked[i].Score > ranked[j].Score
+		}
+		return ranked[i].Fix != "" && ranked[j].Fix == ""
+	})
+	return ranked[:min(3, len(ranked))]
 }
 
 // dayRow is one bar of the Overview's spend-by-day chart.
@@ -228,6 +239,7 @@ type projRow struct {
 type areaSummary struct {
 	Area     string  `json:"area"`
 	Items    int     `json:"items"`
+	Setup    int     `json:"setup_items"` // items that belong to the install, not to a session
 	USD      float64 `json:"usd"`
 	Severity string  `json:"severity"`
 	Sessions int     `json:"sessions"`
@@ -246,6 +258,9 @@ func areaSummaries(open []*insightItem, occ []occurrence) []areaSummary {
 				continue
 			}
 			a.Items++
+			if it.Sessions == 0 {
+				a.Setup++
+			}
 			if it.USD != nil {
 				a.USD += *it.USD
 			}

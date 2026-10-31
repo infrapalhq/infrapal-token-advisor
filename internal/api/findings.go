@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -315,29 +316,17 @@ func computeFindings(ctx context.Context, db *sql.DB) ([]Finding, error) {
 // aggregate finding — their tool definitions ride along on every request
 // regardless of whether any one of them is called.
 func deadMCPFinding(ctx context.Context, db *sql.DB) (*Finding, error) {
-	rows, err := db.QueryContext(ctx, `
-		SELECT server_name, connection_count, tool_call_count
-		FROM v_mcp_inventory
-		WHERE connection_count > 0 AND tool_call_count = 0
-		ORDER BY connection_count DESC`)
+	dead, err := deadMCPServers(ctx, db)
 	if err != nil {
 		return nil, fmt.Errorf("dead mcp finding: %w", err)
 	}
-	defer rows.Close()
+	sort.SliceStable(dead, func(i, j int) bool { return dead[i].connections > dead[j].connections })
 
 	var servers []string
 	var points []VizPoint
-	for rows.Next() {
-		var name string
-		var connections, calls int64
-		if err := rows.Scan(&name, &connections, &calls); err != nil {
-			return nil, fmt.Errorf("dead mcp finding scan: %w", err)
-		}
-		servers = append(servers, name)
-		points = append(points, VizPoint{Label: name, A: float64(connections), B: float64(calls)})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("dead mcp finding rows: %w", err)
+	for _, srv := range dead {
+		servers = append(servers, srv.name)
+		points = append(points, VizPoint{Label: srv.name, A: float64(srv.connections), B: 0})
 	}
 	if len(servers) == 0 {
 		return nil, nil

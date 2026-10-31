@@ -585,7 +585,7 @@ button, select, input { font: inherit; }
 .brand-sm .brand-mark { width: 20px; height: 20px; border-radius: 5px; }
 .brand-sm span { font-weight: 800; font-size: 15px; }
 .side-compact .local { margin-top: auto; font-size: 12px; }
-.side-nav { display: flex; gap: 2px; padding: 0 4px; font-size: 12px; }
+.side-nav { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 4px; font-size: 12px; }
 .side-nav a { color: #BDBDBD; text-decoration: none; padding: 6px 8px; border-radius: 6px; }
 .side-nav a.on { color: #000; background: #fff; font-weight: 600; }
 .side-filters { padding: 0 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -625,6 +625,7 @@ button, select, input { font: inherit; }
 .sl.quiet .cost { color: var(--ink-5); }
 .sl.on { background: #fff; color: #000; }
 .sl.on .cost { color: #000; }
+.sl.on .name { color: #000; }
 .pip.wfull { border-color: #fff; background: #fff; }
 .pip.whalf { border-color: #fff; background: linear-gradient(90deg, #fff 50%, transparent 50%); }
 .pip.woff { border-color: var(--ink-5); }

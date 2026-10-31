@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -274,5 +275,254 @@ func TestDurationSinceRejectsUnknown(t *testing.T) {
 	}
 	if v, err := durationSince(t.Context(), db, "install"); err != nil || v != 0 {
 		t.Fatalf("install with no ui_state row = no cutoff, got %d %v", v, err)
+	}
+}
+
+func TestContextBloatFlagsSessionOverLimit(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, QuerySource: "repl_main_thread", Context: 150_000},
+		{PromptID: "p2", SessionID: "s", Ts: 2, QuerySource: "repl_main_thread", Context: 369_000},
+		{PromptID: "p2", SessionID: "s", Ts: 3, QuerySource: "repl_main_thread", Context: 250_000},
+	}, nil)
+	occ := detectContextBloat(d)
+	if len(occ) != 1 {
+		t.Fatalf("want 1 occurrence, got %d", len(occ))
+	}
+	o := occ[0]
+	if o.Area != "context" || o.Severity != "half" || o.Evidence[0] != "u:p2" || o.Count != 1 {
+		t.Fatalf("unexpected occurrence: %+v", o)
+	}
+	if !strings.Contains(o.Detail, "~369K") || !strings.Contains(o.Detail, "1 of 2 prompts") {
+		t.Fatalf("detail should give the peak and prompt share: %q", o.Detail)
+	}
+}
+
+func TestContextBloatIgnoresBackgroundRequests(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, QuerySource: "repl_main_thread", Context: 200_000},
+		{PromptID: "p1", SessionID: "s", Ts: 2, QuerySource: "prompt_suggestion", Context: 500_000},
+	}, nil)
+	if occ := detectContextBloat(d); len(occ) != 0 {
+		t.Fatalf("exactly at the limit, plus a background call, should not fire: %+v", occ)
+	}
+}
+
+func TestManyToolCallsFiresAtThreshold(t *testing.T) {
+	tools := make([]toolRow, 0, manyToolCallsPerPrompt)
+	for i := 0; i < manyToolCallsPerPrompt-1; i++ {
+		tools = append(tools, toolRow{ID: fmt.Sprintf("t%d", i), Name: "Bash"})
+	}
+	if occ := detectManyToolCalls(fixture(tools, nil, nil)); len(occ) != 0 {
+		t.Fatalf("below threshold should not fire: %+v", occ)
+	}
+	tools = append(tools, toolRow{ID: "last", Name: "Bash"})
+	occ := detectManyToolCalls(fixture(tools, nil, nil))
+	if len(occ) != 1 || occ[0].Area != "exec" || occ[0].Count != manyToolCallsPerPrompt || occ[0].Evidence[0] != "u:p1" {
+		t.Fatalf("at threshold should fire once: %+v", occ)
+	}
+}
+
+func TestCompactionUsesBilledSizes(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{SessionID: "s", Ts: 990, QuerySource: "compact", Context: 421_000},
+		{SessionID: "s", Ts: 1001, QuerySource: "prompt_suggestion", Context: 999_000},
+		{SessionID: "s", Ts: 1002, QuerySource: "repl_main_thread", Context: 70_000},
+	}, nil)
+	d.compactions = []compactRow{{ID: 1, SessionID: "s", Ts: 1000, Pre: 223_000, Post: 24_000}}
+	occ := detectCompaction(d)
+	if len(occ) != 1 || !strings.Contains(occ[0].Title, "~421K → ~70K") {
+		t.Fatalf("title should use billed sizes: %+v", occ)
+	}
+}
+
+func TestCompactionFallsBackToEventSizes(t *testing.T) {
+	d := fixture(nil, nil, nil)
+	d.compactions = []compactRow{{ID: 1, SessionID: "s", Ts: 1000, Pre: 223_000, Post: 24_000}}
+	occ := detectCompaction(d)
+	if len(occ) != 1 || !strings.Contains(occ[0].Title, "~223K → ~24K") {
+		t.Fatalf("title should fall back to the event: %+v", occ)
+	}
+}
+
+func TestAggregateItemsDoesNotCountInstallWideAsSession(t *testing.T) {
+	items := aggregateItems([]occurrence{{Kind: "dead_mcp", Subject: "x", Area: "context", Severity: "half", Conf: "Measured"}}, 0)
+	if len(items) != 1 || items[0].Sessions != 0 {
+		t.Fatalf("install-wide item should have 0 sessions: %+v", items)
+	}
+}
+
+func TestNormalizeMCPServerMatchesBothSpellings(t *testing.T) {
+	if normalizeMCPServer("claude.ai Claude Docs") != normalizeMCPServer("claude_ai_Claude_Docs") {
+		t.Fatal("connection and tool-call spellings should normalize to the same name")
+	}
+}
+
+func TestToolFailuresFiresAtThreshold(t *testing.T) {
+	var tools []toolRow
+	for i := 0; i < minFailedToolCalls; i++ {
+		tools = append(tools, bash(fmt.Sprintf("b%d", i), "go test", 0))
+	}
+	tools = append(tools, toolRow{ID: "r1", Name: "Read"})
+	d := fixture(tools, nil, nil)
+	for i := range d.tools {
+		d.tools[i].Success = 1
+		if d.tools[i].Name == "Bash" {
+			d.tools[i].Success = 0
+		}
+	}
+	occ := detectToolFailures(d)
+	if len(occ) != 1 || occ[0].Count != minFailedToolCalls || len(occ[0].Evidence) != minFailedToolCalls {
+		t.Fatalf("want one occurrence listing each failure: %+v", occ)
+	}
+	if !strings.Contains(occ[0].Detail, "5 of 6") || !strings.Contains(occ[0].Detail, "Bash (5)") {
+		t.Fatalf("detail should give share and top tool: %q", occ[0].Detail)
+	}
+	d.tools[0].Success = 1
+	if occ := detectToolFailures(d); len(occ) != 0 {
+		t.Fatalf("below threshold should not fire: %+v", occ)
+	}
+}
+
+func TestOutputSpikesListsLargestFirstAndIsUnpriced(t *testing.T) {
+	d := fixture([]toolRow{
+		read("small", "/a", outputSpikeTokens*4, 0, 0),
+		read("big", "/b", 40_004+4, 0, 0),
+		read("bigger", "/c", 120_000, 0, 0),
+	}, nil, nil)
+	occ := detectOutputSpikes(d)
+	if len(occ) != 1 || occ[0].Count != 2 || occ[0].Evidence[0] != "t:bigger" {
+		t.Fatalf("exactly at the limit shouldn't count, largest should be first: %+v", occ)
+	}
+	if occ[0].USD != nil || occ[0].Tokens != nil || occ[0].Conf != "Estimated" {
+		t.Fatalf("spikes should be Estimated and unpriced: %+v", occ[0])
+	}
+}
+
+func TestRejectedWorkShowsPromptCostAsSpentNotAvoidable(t *testing.T) {
+	d := fixture([]toolRow{
+		{ID: "t1", Name: "Bash", Decision: "reject"},
+		{ID: "t2", Name: "Bash", Decision: "accept"},
+		{ID: "t3", Name: "Bash", Decision: "reject"},
+	}, []reqRow{{PromptID: "p1", SessionID: "s", CostUSD: 2.5}}, nil)
+	occ := detectRejectedWork(d)
+	if len(occ) != 1 || occ[0].Area != "perm" || occ[0].Count != 2 || occ[0].PromptID != "p1" {
+		t.Fatalf("want one perm occurrence for the prompt: %+v", occ)
+	}
+	if occ[0].USD != nil || occ[0].Spent == nil || *occ[0].Spent != 2.5 {
+		t.Fatalf("prompt cost should be Spent, not USD: %+v", occ[0])
+	}
+}
+
+func TestOversizedModelCoversSonnetUnderItsOwnSubject(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "a", SessionID: "s", Model: "claude-opus-5", QuerySource: "repl_main_thread", Output: 100, CostUSD: 1},
+		{PromptID: "b", SessionID: "s", Model: "claude-sonnet-5", QuerySource: "repl_main_thread", Output: 100, CostUSD: 0.5},
+		{PromptID: "c", SessionID: "s", Model: "claude-haiku-5-5", QuerySource: "repl_main_thread", Output: 100, CostUSD: 0.1},
+	}, nil)
+	occ := detectOversizedModel(d)
+	if len(occ) != 2 {
+		t.Fatalf("want Opus and Sonnet flagged, not Haiku: %+v", occ)
+	}
+	if occ[0].Subject != "" || occ[1].Subject != "sonnet" || !strings.Contains(occ[1].Note, "Haiku") {
+		t.Fatalf("unexpected subjects or note: %+v", occ)
+	}
+	if occ[1].Evidence[0] != "u:b" {
+		t.Fatalf("evidence should match the prompt's thread row: %v", occ[1].Evidence)
+	}
+}
+
+func TestCompactionAndBloatCarryCostOverLimit(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, QuerySource: "repl_main_thread", Context: 100_000, CostUSD: 1},
+		{PromptID: "p2", SessionID: "s", Ts: 2, QuerySource: "repl_main_thread", Context: 300_000, CostUSD: 2},
+		{PromptID: "p2", SessionID: "s", Ts: 3, QuerySource: "repl_main_thread", Context: 150_000, CostUSD: 3},
+	}, nil)
+	d.compactions = []compactRow{{ID: 1, SessionID: "s", Ts: 4, Pre: 300_000, Post: 20_000}}
+	for name, occ := range map[string][]occurrence{"compaction": detectCompaction(d), "bloat": detectContextBloat(d)} {
+		if len(occ) != 1 || occ[0].Spent == nil || *occ[0].Spent != 5 || occ[0].USD != nil {
+			t.Fatalf("%s: want $5 of the over-limit prompt as Spent only: %+v", name, occ)
+		}
+	}
+}
+
+func TestFixFirstItemsRanksHabitsByImpact(t *testing.T) {
+	spent, usd := 20.0, 0.01
+	habit := &insightItem{Key: "habit", Conf: "Measured", Occurrences: 1, SpentUSD: &spent}
+	small := &insightItem{Key: "small", Conf: "Measured", Occurrences: 1, Fix: "x", USD: &usd}
+	dead := &insightItem{Key: "dead", Conf: "Measured", Occurrences: 1, Fix: "x"}
+	unpriced := &insightItem{Key: "unpriced", Conf: "Measured", Occurrences: 1}
+	for _, it := range []*insightItem{habit, small, dead, unpriced} {
+		it.Score = priorityScore(it)
+	}
+	got := fixFirstItems([]*insightItem{unpriced, dead, small, habit})
+	if len(got) != 3 || got[0] != habit || got[1] != small || got[2] != dead {
+		t.Fatalf("want habit, small, dead; got %s %s %s", got[0].Key, got[1].Key, got[2].Key)
+	}
+}
+
+func TestProjectNotesNeedsThreeSessionsAndSkipsOtherFiles(t *testing.T) {
+	d := &insightData{sessions: map[string]sessionRow{
+		"a": {ID: "a", ProjectDir: "/work/repo"},
+		"b": {ID: "b", ProjectDir: "/work/repo"},
+		"c": {ID: "c", ProjectDir: "/work/repo"},
+	}}
+	add := func(sid, file string) {
+		d.tools = append(d.tools, toolRow{ID: sid + file, SessionID: sid, Name: "Read", File: file, ResultBytes: 4000, Ts: int64(len(d.tools) + 1)})
+	}
+	for _, sid := range []string{"a", "b", "c"} {
+		add(sid, "/work/repo/main.go")
+		add(sid, "/work/repo/CLAUDE.md")
+		add(sid, "/elsewhere/notes.md")
+	}
+	add("a", "/work/repo/once.go")
+
+	occ := detectProjectNotes(d)
+	if len(occ) != 1 || occ[0].SessionID != "" || occ[0].Count != 1 || occ[0].USD != nil {
+		t.Fatalf("want one unpriced project-level occurrence: %+v", occ)
+	}
+	if occ[0].Fix != "## Key files\n- main.go: <what it does>\n" {
+		t.Fatalf("snippet: %q", occ[0].Fix)
+	}
+	if !strings.Contains(occ[0].Detail, "2K tokens") {
+		t.Fatalf("should count reads after the first session: %q", occ[0].Detail)
+	}
+	it := aggregateItems(occ, 0)[0]
+	if it.Sessions != 0 || it.Scope != "Project repo" {
+		t.Fatalf("item should carry the project scope: %+v", it)
+	}
+}
+
+func TestSettingsPromptNeedsACommandAndNoBilling(t *testing.T) {
+	billed := map[string]float64{"billed": 0.5}
+	for _, tc := range []struct {
+		id, text string
+		want     bool
+	}{
+		{"x", "/model opus", true},
+		{"x", " /clear ", true},
+		{"x", "/modelling is hard", false},
+		{"x", "/code-review high", false},
+		{"x", "fix the bug", false},
+		{"billed", "/model opus", false},
+	} {
+		if got := isSettingsPrompt(promptRow{PromptID: tc.id, Text: tc.text}, billed); got != tc.want {
+			t.Errorf("%s %q = %v, want %v", tc.id, tc.text, got, tc.want)
+		}
+	}
+}
+
+func TestReceiptSplitsModelsAndBackgroundSpend(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p", SessionID: "s", Model: "claude-opus-5", QuerySource: "repl_main_thread", CostUSD: 2},
+		{PromptID: "p", SessionID: "s", Model: "claude-haiku-5-5", QuerySource: "away_summary", CostUSD: 0.25},
+		{PromptID: "p", SessionID: "s", Model: "claude-haiku-5-5", QuerySource: "agent:builtin:Explore", CostUSD: 0.5},
+	}, nil)
+	r := buildReceipt(d, nil, "s")
+	if r["background_usd"] != 0.25 {
+		t.Fatalf("only Claude Code's own requests count as background: %v", r["background_usd"])
+	}
+	models := r["by_model"].([]map[string]any)
+	if len(models) != 2 || models[0]["model"] != "claude-opus-5" || models[1]["cost_usd"] != 0.75 {
+		t.Fatalf("by_model: %v", models)
 	}
 }
