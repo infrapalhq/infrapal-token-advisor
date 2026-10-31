@@ -140,6 +140,7 @@ database holds your prompts, responses, shell commands and file paths. Read
 | `token-advisor status` | Show the service, database, retention and recent errors |
 | `token-advisor doctor` | Work out why data isn't arriving, or why the service won't come back |
 | `token-advisor ui` | Open the dashboard |
+| `token-advisor mcp` | Serve metrics to Claude Code over MCP (stdio); see [below](#ask-claude-about-your-data-mcp) |
 | `token-advisor logs` | Show the log (`-n 100`, `--errors`, `-f`) |
 | `token-advisor start` | Run the collector and dashboard in the foreground |
 | `token-advisor stop` | Stop the service until your next login |
@@ -172,12 +173,28 @@ token-advisor uninstall --keep-db   # the same, keeping ~/.infrapal-token-adviso
 This doesn't remove the binary. Delete it, or run
 `brew uninstall --cask infrapal-token-advisor`.
 
+## Ask Claude about your data (MCP)
+
+`token-advisor mcp` serves the data to Claude Code over stdio. The
+Fixes page shows the exact command for your install, or run:
+
+```sh
+claude mcp add --scope user infrapal-token-advisor -- "$(command -v token-advisor)" mcp
+```
+
+Three read-only tools: `get_schema`, `run_sql` (limited to `v_*` views) and
+`get_findings`.
+
+Once you enable it, what these tools return goes to Anthropic with your
+conversation. They return metrics and ids only. Prompts, responses, file paths,
+commands, error text and user identity are withheld.
+
 ## Privacy
 
 - The collector and dashboard only listen on `127.0.0.1`, and the dashboard
   refuses requests from web pages.
-- Nothing leaves your machine unless you use AI Mode or run
-  `token-advisor update`. There's no usage telemetry, automatic update check or
+- Nothing leaves your machine unless you use AI Mode, enable the MCP server or
+  run `token-advisor update`. There's no usage telemetry, automatic update check or
   crash reporting.
 - Data older than 6 months is deleted automatically. You can change that, and
   `token-advisor purge` deletes data on demand.
@@ -189,9 +206,9 @@ This doesn't remove the binary. Delete it, or run
 <details>
 <summary><b>Does it send my prompts anywhere?</b></summary>
 <br>
-No. Telemetry goes from Claude Code to a service on your own machine. AI Mode is
-the one exception to staying local, and it only sends aggregated figures and
-labels, never prompt or response text. <a href="SECURITY.md#what-leaves-your-machine">See exactly what's sent</a>.
+No. Telemetry goes from Claude Code to a service on your own machine. AI Mode and
+the MCP server are the exceptions to staying local. Both are off by default and
+never send prompt or response text. <a href="SECURITY.md#what-leaves-your-machine">See exactly what's sent</a>.
 </details>
 
 <details>
@@ -261,6 +278,10 @@ for tests and how to send a change.
 Bug fixes, new insight checks and dashboard improvements are welcome. Start with
 [CONTRIBUTING.md](CONTRIBUTING.md). For security problems, follow
 [SECURITY.md](SECURITY.md) instead of opening an issue.
+
+The MCP server is the exception, once you enable it: what its tools return goes
+to Anthropic with your conversation. It returns metrics and ids only. Prompts,
+responses, file paths, commands, error text and user identity are withheld.
 
 ## License
 

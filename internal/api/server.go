@@ -66,6 +66,7 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	mux.HandleFunc("POST /api/ui/visit", s.handlePostUIVisit)
 	mux.HandleFunc("GET /api/progress", s.handleProgress)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
+	mux.HandleFunc("GET /api/mcp/setup", s.handleMCPSetup)
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
@@ -105,6 +106,7 @@ func Endpoints() []string {
 		"POST /api/ui/visit",
 		"GET /api/progress?since=",
 		"GET /api/status",
+		"GET /api/mcp/setup",
 	}
 }
 
