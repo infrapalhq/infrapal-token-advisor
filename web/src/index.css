@@ -1,3 +1,4 @@
 /* Token Advisor design system (the approved mock). Everything in the app
    is styled from this file; see src/ta/styles.css. */
 @import "./ta/styles.css";
+@import "./ta/dark.css";
