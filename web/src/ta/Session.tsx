@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTheme } from "./theme";
 import { api, type Occurrence, type SessionCard, type Timeline, type TimelineRow } from "./api";
 import { AREA_LABEL, AREA_NAME, dayShort, durationS, money, tokensHuman } from "./format";
 
@@ -8,6 +9,7 @@ type AreaKey = "context" | "exec" | "perm" | "model";
 const AREA_ORDER: AreaKey[] = ["context", "exec", "perm", "model"];
 
 export default function SessionPage() {
+  const [theme, toggleTheme] = useTheme();
   const { id = "" } = useParams();
   const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [issues, setIssues] = useState<Record<string, Occurrence[]>>({});
@@ -76,6 +78,9 @@ export default function SessionPage() {
             </Link>
           ))}
         </div>
+        <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+          {theme === "dark" ? "☀ Light mode" : "☾ Dark mode"}
+        </button>
       </aside>
 
       <section className="thread" aria-label="Session thread">
@@ -256,7 +261,7 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
       </div>
       <div className="rc-split">
         <div className="rc-bar" role="img" aria-label={`${Math.round(r.well_spent * 100)}% well spent`}>
-          <div style={{ width: `${r.well_spent * 100}%`, background: "#000" }} />
+          <div style={{ width: `${r.well_spent * 100}%`, background: "var(--k)" }} />
           <div className="hatch" style={{ width: `${(1 - r.well_spent) * 100}%` }} />
         </div>
         <div className="rc-row">
@@ -280,10 +285,10 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
       ))}
       <div className="rsec">WHERE THE TOKENS WENT</div>
       <div className="tokens-bar" role="img" aria-label={`Token mix: ${Math.round(cachePct)}% from cache, ${Math.round(freshPct)}% fresh input, ${Math.round(outPct)}% output`}>
-        <div style={{ width: `${cachePct}%`, background: "#FFF" }} />
-        <div style={{ width: `${freshPct}%`, background: "#000" }} />
+        <div style={{ width: `${cachePct}%`, background: "var(--w)" }} />
+        <div style={{ width: `${freshPct}%`, background: "var(--k)" }} />
         <div className="hatch" style={{ width: `${outPct}%` }} />
-        <div style={{ width: `${(r.tokens.cache_write / total) * 100}%`, background: "#8A8A8A" }} />
+        <div style={{ width: `${(r.tokens.cache_write / total) * 100}%`, background: "var(--ink-5)" }} />
       </div>
       <div className="legend-grid">
         <span><span>□ From cache</span><span className="mono">{tokensHuman(r.tokens.cache_read)}</span></span>

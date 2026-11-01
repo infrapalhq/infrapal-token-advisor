@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { api, type Status } from "./api";
+import { useTheme } from "./theme";
 
 // Shell is the sidebar layout shared by Overview, Sessions, Fixes and Settings.
 export function Shell({ children, fixesToDo, sessionCount }: { children: ReactNode; fixesToDo?: number; sessionCount?: number }) {
@@ -15,6 +16,7 @@ export function Shell({ children, fixesToDo, sessionCount }: { children: ReactNo
 export function Sidebar({ fixesToDo, sessionCount }: { fixesToDo?: number; sessionCount?: number }) {
   const status = useStatus();
   const [aiOn, setAiOn] = useState(false);
+  const [theme, toggleTheme] = useTheme();
   useEffect(() => {
     api.aiConfig().then((c) => setAiOn(c.configured)).catch(() => setAiOn(false));
   }, []);
@@ -43,6 +45,9 @@ export function Sidebar({ fixesToDo, sessionCount }: { fixesToDo?: number; sessi
           {status === null ? "Checking collector…" : status.collector_live ? "Local only · collector live" : "Local only · collector idle"}
         </span>
         <span>Prompt text: {status?.prompts_logged_7d ? "logged" : "not logged"}</span>
+        <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+          {theme === "dark" ? "☀ Light mode" : "☾ Dark mode"}
+        </button>
         <NavLink to="/settings">{aiOn ? "AI insights · On" : "AI insights · Off — add key"}</NavLink>
       </div>
     </aside>
