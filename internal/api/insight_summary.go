@@ -19,52 +19,11 @@ func computeInsights(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		return nil, nil, err
 	}
 	var occ []occurrence
-	occ = append(occ, detectReRead(d)...)
-	occ = append(occ, detectCompaction(d)...)
-	occ = append(occ, detectRepeatCommand(d)...)
-	occ = append(occ, detectRepeatApproval(d)...)
-	occ = append(occ, detectFailingMCP(d)...)
-	occ = append(occ, detectOversizedModel(d)...)
-	dead, err := deadMCPOccurrences(ctx, db)
-	if err != nil {
-		return nil, nil, err
+	for _, det := range detectors {
+		occ = append(occ, det.run(d)...)
 	}
-	occ = append(occ, dead...)
 	sortOccurrences(occ)
 	return d, occ, nil
-}
-
-// deadMCPOccurrences reports connected MCP servers that never had a tool
-// called. Install-wide (the inventory view is all-time), so it has no session.
-func deadMCPOccurrences(ctx context.Context, db *sql.DB) ([]occurrence, error) {
-	rows, err := db.QueryContext(ctx, `
-		SELECT server_name FROM v_mcp_inventory
-		WHERE connection_count > 0 AND tool_call_count = 0
-		ORDER BY server_name`)
-	if err != nil {
-		return nil, fmt.Errorf("dead mcp: %w", err)
-	}
-	defer rows.Close()
-	var out []occurrence
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		out = append(out, occurrence{
-			Kind:     "dead_mcp",
-			Area:     "context",
-			Subject:  name,
-			Count:    1,
-			Severity: "half",
-			Conf:     "Measured",
-			Title:    name + " connected but never used",
-			Detail:   "Its tool definitions ride along on every request.",
-			Fix:      fmt.Sprintf("claude mcp remove %q", name),
-			FixLang:  "bash",
-		})
-	}
-	return out, rows.Err()
 }
 
 // sessionCard is one row of the Sessions page.
