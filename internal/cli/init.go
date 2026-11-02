@@ -40,19 +40,6 @@ func runInit(args []string) error {
 	}
 	cfg.RawBodies = *rawBodies
 
-	backupPath, err := claudesettings.Backup(p.ClaudeSettingsPath, time.Now())
-	if err != nil {
-		return fmt.Errorf("back up %s: %w", p.ClaudeSettingsPath, err)
-	}
-	if backupPath != "" {
-		fmt.Printf("backed up %s to %s\n", p.ClaudeSettingsPath, backupPath)
-		// Keep the first backup across repeat inits: a later one already
-		// holds our changes, so uninstall couldn't restore from it.
-		if cfg.SettingsBackupPath == "" {
-			cfg.SettingsBackupPath = backupPath
-		}
-	}
-
 	doc, _, err := claudesettings.Load(p.ClaudeSettingsPath)
 	if err != nil {
 		return err
@@ -72,13 +59,27 @@ func runInit(args []string) error {
 		return fmt.Errorf("merge settings.json env block: %w", err)
 	}
 
-	if err := claudesettings.Save(p.ClaudeSettingsPath, doc); err != nil {
-		return fmt.Errorf("write %s: %w", p.ClaudeSettingsPath, err)
-	}
-
+	// Leave the file alone when there's nothing to change: rewriting it would
+	// reorder the user's keys, and a backup would only be another copy of it.
 	if len(changes) == 0 {
 		fmt.Println("settings.json already had everything token-advisor wants — nothing changed")
 	} else {
+		backupPath, err := claudesettings.Backup(p.ClaudeSettingsPath, time.Now())
+		if err != nil {
+			return fmt.Errorf("back up %s: %w", p.ClaudeSettingsPath, err)
+		}
+		if backupPath != "" {
+			fmt.Printf("backed up %s to %s\n", p.ClaudeSettingsPath, backupPath)
+			// Keep the first backup across repeat inits: a later one already
+			// holds our changes, so uninstall couldn't restore from it.
+			if cfg.SettingsBackupPath == "" {
+				cfg.SettingsBackupPath = backupPath
+			}
+		}
+		if err := claudesettings.Save(p.ClaudeSettingsPath, doc); err != nil {
+			return fmt.Errorf("write %s: %w", p.ClaudeSettingsPath, err)
+		}
+
 		fmt.Println("changed in", p.ClaudeSettingsPath+":")
 		for _, c := range changes {
 			if !c.Existed {
