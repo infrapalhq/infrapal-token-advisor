@@ -68,6 +68,9 @@ To add support for another coding agent, see
    golangci-lint run     # needs golangci-lint v2: https://golangci-lint.run/docs/welcome/install/
    ```
 
+   If you changed code that reads outside input, run its fuzz test for a while,
+   such as `go test ./internal/otlp -run '^$' -fuzz FuzzDecodeLogsRequest -fuzztime 1m`.
+
 4. If you changed anything under `web/`, check that it builds and lints:
 
    ```sh
