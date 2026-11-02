@@ -16,21 +16,23 @@ import (
 // aggregated into items by (kind, subject) in insight_items.go.
 
 // detector is one check. A check reads tool categories rather than tool names,
-// so it works for any agent.
+// so it works for any agent. It only sees sessions from agents that have what
+// it needs, so that "no problems" never means "couldn't look".
 type detector struct {
-	kind string
-	run  func(d *insightData) []occurrence
+	kind  string
+	needs agent.Capability
+	run   func(d *insightData) []occurrence
 }
 
 // detectors lists every check. To add one, write its function and add a line.
 var detectors = []detector{
-	{"re_read", detectReRead},
-	{"compaction", detectCompaction},
-	{"repeat_cmd", detectRepeatCommand},
-	{"repeat_approval", detectRepeatApproval},
-	{"failing_mcp", detectFailingMCP},
-	{"oversized_model", detectOversizedModel},
-	{"dead_mcp", detectDeadMCP},
+	{"re_read", agent.CapFilePaths, detectReRead},
+	{"compaction", agent.CapCompaction, detectCompaction},
+	{"repeat_cmd", agent.CapCommands, detectRepeatCommand},
+	{"repeat_approval", agent.CapApprovalWait, detectRepeatApproval},
+	{"failing_mcp", 0, detectFailingMCP},
+	{"oversized_model", 0, detectOversizedModel},
+	{"dead_mcp", agent.CapMCPConnections, detectDeadMCP},
 }
 
 // occurrence is one instance of a detected problem in one session.
@@ -513,7 +515,7 @@ func detectFailingMCP(d *insightData) []occurrence {
 	return out
 }
 
-// detectOversizedModel flags a prompt answered on an Opus-class model whose
+// detectOversizedModel flags a prompt answered on a premium model whose
 // answer was small and which used no file changes and few tools: the kind of
 // turn a smaller model would likely handle. A habit, Likely.
 func detectOversizedModel(d *insightData) []occurrence {
@@ -528,7 +530,7 @@ func detectOversizedModel(d *insightData) []occurrence {
 	byPrompt := map[string]*agg{}
 	var order []string
 	for _, r := range d.reqs {
-		if r.PromptID == "" || r.QuerySource != "repl_main_thread" || !strings.Contains(r.Model, "opus") {
+		if r.PromptID == "" || r.QuerySource != agent.MainQuerySource || !d.premiumModel(r) {
 			continue
 		}
 		a, ok := byPrompt[r.PromptID]

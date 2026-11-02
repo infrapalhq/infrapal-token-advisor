@@ -186,7 +186,7 @@ func TestAgentEvents_PromptsResponsesCompactionsAndMCP(t *testing.T) {
 	if n := count(t, db, `SELECT COUNT(*) FROM interactions WHERE prompt_id = 'p2' AND prompt_text IS NULL`); n != 1 {
 		t.Error("a prompt with no captured text should stay NULL")
 	}
-	if n := count(t, db, `SELECT COUNT(*) FROM assistant_responses WHERE message_uuid = 'r1' AND query_source = ?`, queryMain); n != 1 {
+	if n := count(t, db, `SELECT COUNT(*) FROM assistant_responses WHERE message_uuid = 'r1' AND query_source = ?`, agent.MainQuerySource); n != 1 {
 		t.Error("response not written")
 	}
 	if n := count(t, db, `SELECT pre_tokens FROM compactions WHERE session_id = 's'`); n != 900 {

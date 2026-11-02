@@ -150,3 +150,13 @@ func TestManagedSettingsPath(t *testing.T) {
 		t.Errorf("windows: %+v, want skipped", c)
 	}
 }
+
+func TestPremiumModel(t *testing.T) {
+	a := New(t.TempDir())
+	if !a.PremiumModel("claude-opus-5-5") {
+		t.Error("Opus should be premium")
+	}
+	if a.PremiumModel("claude-sonnet-5-5") {
+		t.Error("Sonnet shouldn't be premium")
+	}
+}

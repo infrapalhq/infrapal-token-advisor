@@ -67,6 +67,11 @@ func (a *Agent) ToolCategory(name string) agent.ToolCategory {
 	return agent.ToolOther
 }
 
+// PremiumModel implements agent.Agent.
+func (a *Agent) PremiumModel(model string) bool {
+	return strings.Contains(model, "opus")
+}
+
 // TelemetryEnv is the env block that makes Claude Code report to the collector.
 // Values are all strings, as settings.json expects.
 func TelemetryEnv(otlpPort int) map[string]string {

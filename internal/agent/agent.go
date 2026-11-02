@@ -22,6 +22,9 @@ type Agent interface {
 	// ToolCategory says what a tool does, given the agent's own name for it.
 	// A tool the adapter doesn't recognise is ToolOther.
 	ToolCategory(name string) ToolCategory
+	// PremiumModel reports whether a model is this agent's most expensive
+	// tier, where small tasks are worth moving to something cheaper.
+	PremiumModel(model string) bool
 	// Connect sets the agent up to report to the collector, describing what
 	// it did on w. Running it again must be safe.
 	Connect(w io.Writer, opts ConnectOptions) (Connection, error)
