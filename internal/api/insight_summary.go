@@ -126,7 +126,7 @@ func loadLastVisit(ctx context.Context, db *sql.DB) int64 {
 		return 0
 	}
 	var ms int64
-	fmt.Sscan(v, &ms)
+	_, _ = fmt.Sscan(v, &ms) // an unreadable value counts as never visited
 	return ms
 }
 
@@ -140,14 +140,14 @@ func buildCards(ctx context.Context, db *sql.DB, d *insightData, occ []occurrenc
 
 	// per-session aggregates
 	type agg struct {
-		tokens, cost, waitMs int64
-		costF                float64
-		modelCost            map[string]float64
-		tools, toolFails     int
-		compacted            bool
-		longWait, repeats    bool
-		areaSev              map[string]string
-		issues               int
+		tokens, waitMs    int64
+		costF             float64
+		modelCost         map[string]float64
+		tools, toolFails  int
+		compacted         bool
+		longWait, repeats bool
+		areaSev           map[string]string
+		issues            int
 	}
 	aggs := map[string]*agg{}
 	get := func(sid string) *agg {

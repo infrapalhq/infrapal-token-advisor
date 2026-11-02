@@ -38,7 +38,31 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
       - run: go vet ./...
-      - run: go test -race ./...
+      - name: go test
+        run: |
+          go test -race -covermode=atomic -coverprofile=coverage.out ./...
+          {
+            echo '### Test coverage'
+            echo
+            echo '```'
+            go tool cover -func=coverage.out | tail -1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  lint:
+    name: go / golangci-lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
 
   web:
     name: web / lint, build

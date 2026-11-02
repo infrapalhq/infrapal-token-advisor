@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -93,7 +94,7 @@ func GetCached(ctx context.Context, db *sql.DB, sinceRange string) (GenerateResu
 		`SELECT batch_id, generated_at FROM ai_recommendations
 			WHERE since_range = ? ORDER BY generated_at DESC LIMIT 1`, sinceRange,
 	).Scan(&batchID, &generatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return GenerateResult{Recommendations: []StoredRecommendation{}}, nil
 	}
 	if err != nil {
@@ -121,7 +122,7 @@ func loadCachedBatch(ctx context.Context, db *sql.DB, sinceRange, hash string) (
 		`SELECT batch_id, generated_at FROM ai_recommendations
 			WHERE since_range = ? AND input_hash = ? ORDER BY generated_at DESC LIMIT 1`, sinceRange, hash,
 	).Scan(&batchID, &generatedAt)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return GenerateResult{}, false, nil
 	}
 	if err != nil {

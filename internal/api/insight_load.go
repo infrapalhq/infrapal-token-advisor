@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -138,7 +139,11 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		}
 		d.sessions[s.ID] = s
 	}
+	err = rows.Err()
 	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	// prompts
 	rows, err = db.QueryContext(ctx, `
@@ -155,7 +160,11 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		}
 		d.prompts = append(d.prompts, p)
 	}
+	err = rows.Err()
 	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	// tools
 	rows, err = db.QueryContext(ctx, `
@@ -181,7 +190,11 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		d.tools = append(d.tools, t)
 		d.toolByID[t.ID] = t
 	}
+	err = rows.Err()
 	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	// api requests
 	rows, err = db.QueryContext(ctx, `
@@ -207,7 +220,11 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		usd += r.CostUSD
 		tokens += r.Tokens()
 	}
+	err = rows.Err()
 	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 	if tokens > 0 {
 		d.blendedRate = usd / float64(tokens)
 	}
@@ -227,7 +244,11 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		}
 		d.compactions = append(d.compactions, c)
 	}
+	err = rows.Err()
 	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	// hand-approval waits, from the view so the rule lives in one place
 	rows, err = db.QueryContext(ctx, `
@@ -243,7 +264,11 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		}
 		d.waits[w.ToolUseID] = w
 	}
+	err = rows.Err()
 	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 
 	return d, nil
 }
@@ -289,7 +314,7 @@ func durationSince(ctx context.Context, db *sql.DB, token string) (int64, error)
 	case "install":
 		var v sql.NullString
 		err := db.QueryRowContext(ctx, `SELECT value FROM ui_state WHERE key='install_at'`).Scan(&v)
-		if err == sql.ErrNoRows || !v.Valid {
+		if errors.Is(err, sql.ErrNoRows) || !v.Valid {
 			return 0, nil
 		}
 		if err != nil {
@@ -297,7 +322,7 @@ func durationSince(ctx context.Context, db *sql.DB, token string) (int64, error)
 		}
 		var ms int64
 		if _, err := fmt.Sscan(v.String, &ms); err != nil {
-			return 0, nil
+			return 0, nil //nolint:nilerr // an unreadable install time means no cutoff
 		}
 		return ms, nil
 	}
