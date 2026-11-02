@@ -9,6 +9,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
 )
 
 // timelineRow is one line of a session's thread. Kind is div |
@@ -224,7 +226,7 @@ func toolLabel(t toolRow) string {
 	switch {
 	case t.File != "":
 		return filepath.Base(t.File)
-	case t.Name == "Bash" && t.Command != "":
+	case t.Category == agent.ToolShell && t.Command != "":
 		return truncate(normalizeCommand(t.Command), 60)
 	case t.MCPServer != "":
 		return t.MCPServer

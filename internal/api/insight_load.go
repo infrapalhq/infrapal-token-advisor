@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/durfmt"
 )
 
@@ -32,6 +34,7 @@ type toolRow struct {
 	SessionID      string
 	Ts             int64
 	Name           string
+	Category       agent.ToolCategory
 	MCPServer      string
 	File           string
 	Command        string
@@ -77,6 +80,7 @@ type sessionRow struct {
 	StartedAt  int64
 	EndedAt    int64
 	ProjectDir string
+	Agent      agent.ID
 }
 
 // waitRow is one hand-approval wait, from v_user_waits.
@@ -97,7 +101,42 @@ type insightData struct {
 	reqs        []reqRow
 	compactions []compactRow
 	waits       map[string]waitRow // keyed by tool_use_id
+	deadMCP     []string           // connected MCP servers that were never used
 	blendedRate float64            // USD per token, this install's own rate
+}
+
+// toolCategory asks a session's agent what one of its tools does. A session
+// from an agent this build doesn't know has no categories to give.
+func toolCategory(id agent.ID, name string) agent.ToolCategory {
+	if id == "" {
+		id = all.Default("").ID()
+	}
+	a, ok := all.Find("", id)
+	if !ok {
+		return agent.ToolOther
+	}
+	return a.ToolCategory(name)
+}
+
+// loadDeadMCP lists connected MCP servers that never had a tool called.
+func loadDeadMCP(ctx context.Context, db *sql.DB) ([]string, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT server_name FROM v_mcp_inventory
+		WHERE connection_count > 0 AND tool_call_count = 0
+		ORDER BY server_name`)
+	if err != nil {
+		return nil, fmt.Errorf("dead mcp: %w", err)
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
 }
 
 // scopeClause restricts a table's session_id column to sessions started at or
@@ -126,14 +165,14 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		sessWhere, sessArgs = "started_at >= ?", []any{cutoffMs}
 	}
 	rows, err := db.QueryContext(ctx, `
-		SELECT session_id, COALESCE(started_at,0), COALESCE(ended_at,0), COALESCE(project_dir,'')
+		SELECT session_id, COALESCE(started_at,0), COALESCE(ended_at,0), COALESCE(project_dir,''), agent
 		FROM sessions WHERE `+sessWhere, sessArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("load sessions: %w", err)
 	}
 	for rows.Next() {
 		var s sessionRow
-		if err := rows.Scan(&s.ID, &s.StartedAt, &s.EndedAt, &s.ProjectDir); err != nil {
+		if err := rows.Scan(&s.ID, &s.StartedAt, &s.EndedAt, &s.ProjectDir, &s.Agent); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -187,6 +226,7 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 			return nil, err
 		}
 		parseToolInput(input, &t)
+		t.Category = toolCategory(d.sessions[t.SessionID].Agent, t.Name)
 		d.tools = append(d.tools, t)
 		d.toolByID[t.ID] = t
 	}
@@ -270,6 +310,10 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 		return nil, err
 	}
 
+	d.deadMCP, err = loadDeadMCP(ctx, db)
+	if err != nil {
+		return nil, err
+	}
 	return d, nil
 }
 

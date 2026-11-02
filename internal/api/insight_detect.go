@@ -7,12 +7,31 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
 )
 
-// Per-session detectors. Every detector is a pure function over
-// insightData and uses fixed rules: no model call, no randomness. Each emits
-// occurrences; occurrences are aggregated into items by (kind, subject) in
-// insight_items.go.
+// Detectors. Every detector is a pure function over insightData and uses fixed
+// rules: no model call, no randomness. Each emits occurrences; occurrences are
+// aggregated into items by (kind, subject) in insight_items.go.
+
+// detector is one check. A check reads tool categories rather than tool names,
+// so it works for any agent.
+type detector struct {
+	kind string
+	run  func(d *insightData) []occurrence
+}
+
+// detectors lists every check. To add one, write its function and add a line.
+var detectors = []detector{
+	{"re_read", detectReRead},
+	{"compaction", detectCompaction},
+	{"repeat_cmd", detectRepeatCommand},
+	{"repeat_approval", detectRepeatApproval},
+	{"failing_mcp", detectFailingMCP},
+	{"oversized_model", detectOversizedModel},
+	{"dead_mcp", detectDeadMCP},
+}
 
 // occurrence is one instance of a detected problem in one session.
 type occurrence struct {
@@ -47,18 +66,15 @@ const (
 	oversizedMaxToolCalls     = 3
 )
 
-// mutatingTools change files directly.
-var mutatingTools = map[string]bool{"Edit": true, "Write": true, "MultiEdit": true, "NotebookEdit": true}
-
 // mutatingBash matches shell commands that change files or repo state.
 var mutatingBash = regexp.MustCompile(`(^|[;&|]\s*)(rm|mv|cp|touch|mkdir|tee|chmod|chown)\b|\bsed\s+-i\b|\bgit\s+(checkout|restore|commit|add|reset|rebase|merge|stash|apply|cherry-pick|switch)\b|\bterraform\s+(apply|destroy)\b|>`)
 
 // isMutation reports whether a tool call may have changed files.
 func isMutation(t toolRow) bool {
-	if mutatingTools[t.Name] {
+	if t.Category == agent.ToolEdit {
 		return true
 	}
-	return t.Name == "Bash" && mutatingBash.MatchString(t.Command)
+	return t.Category == agent.ToolShell && mutatingBash.MatchString(t.Command)
 }
 
 // normalizeCommand collapses whitespace so "terraform  plan" and
@@ -101,7 +117,7 @@ func detectReRead(d *insightData) []occurrence {
 		} else if isMutation(t) {
 			lastMutAny = i
 		}
-		if t.Name != "Read" || t.File == "" {
+		if t.Category != agent.ToolRead || t.File == "" {
 			continue
 		}
 		key := t.PromptID + "|" + t.File
@@ -212,7 +228,7 @@ func detectRepeatCommand(d *insightData) []occurrence {
 			seq++
 			continue
 		}
-		if t.Name != "Bash" || t.Command == "" {
+		if t.Category != agent.ToolShell || t.Command == "" {
 			continue
 		}
 		k := key{t.PromptID, normalizeCommand(t.Command)}
@@ -238,7 +254,7 @@ func detectRepeatCommand(d *insightData) []occurrence {
 	extBySession := map[string]string{}
 	extCount := map[string]map[string]int{}
 	for _, t := range d.tools {
-		if (t.Name == "Edit" || t.Name == "Write" || t.Name == "MultiEdit") && t.File != "" {
+		if t.Category == agent.ToolEdit && t.File != "" {
 			ext := strings.TrimPrefix(filepath.Ext(t.File), ".")
 			if ext == "" {
 				continue
@@ -315,9 +331,6 @@ var unsafeBashMarkers = []string{">", "`", "$(", "-delete", "-exec", "sed -i", "
 // segment must be read-only on its own.
 var pipelineSplit = regexp.MustCompile(`\|\||&&|\||;`)
 
-// safeToolNames are non-Bash tools that only read.
-var safeToolNames = map[string]bool{"Read": true, "Glob": true, "Grep": true}
-
 // bashPattern is the permission pattern a Bash approval would allow. A
 // read-only command reduces to its name (so "ls -la modules" and "ls -la
 // modules/db" are both "ls"); a two-word read-only prefix ("git status") keeps
@@ -341,8 +354,8 @@ func bashPattern(cmd string) string {
 // no segment of it writes: every piped or chained command must itself be a
 // read-only pattern, and the command must not redirect output to a file.
 func isSafePattern(t toolRow) bool {
-	if t.Name != "Bash" {
-		return safeToolNames[t.Name]
+	if t.Category != agent.ToolShell {
+		return t.Category == agent.ToolRead || t.Category == agent.ToolSearch
 	}
 	cmd := strings.TrimSpace(t.Command)
 	for _, r := range harmlessRedirects {
@@ -365,7 +378,7 @@ func isSafePattern(t toolRow) bool {
 
 // approvalPattern is the settings.json-style pattern an approval would allow.
 func approvalPattern(t toolRow) string {
-	if t.Name == "Bash" {
+	if t.Category == agent.ToolShell {
 		return fmt.Sprintf("Bash(%s:*)", bashPattern(t.Command))
 	}
 	if t.MCPServer != "" {
@@ -559,6 +572,27 @@ func detectOversizedModel(d *insightData) []occurrence {
 			Title:     fmt.Sprintf("Small turn on %s", a.model),
 			Detail:    fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn.", a.output, a.tools, a.cost),
 			Note:      "Habit: switch to a smaller model with /model for turns like this. Spend shown is what this turn cost, not a saving.",
+		})
+	}
+	return out
+}
+
+// detectDeadMCP reports connected MCP servers that never had a tool called.
+// Install-wide (the inventory view is all-time), so it has no session.
+func detectDeadMCP(d *insightData) []occurrence {
+	var out []occurrence
+	for _, name := range d.deadMCP {
+		out = append(out, occurrence{
+			Kind:     "dead_mcp",
+			Area:     "context",
+			Subject:  name,
+			Count:    1,
+			Severity: "half",
+			Conf:     "Measured",
+			Title:    name + " connected but never used",
+			Detail:   "Its tool definitions ride along on every request.",
+			Fix:      fmt.Sprintf("claude mcp remove %q", name),
+			FixLang:  "bash",
 		})
 	}
 	return out

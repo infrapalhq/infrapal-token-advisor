@@ -90,6 +90,9 @@ waits behind a cleanup, where a second handle could time out and lose a batch.
 
 Most figures come from SQL views, the `v_*` views, which keeps handlers thin.
 
+To add a check, write a function and add a line to `detectors`. Checks read tool
+categories such as `agent.ToolRead`, not tool names, so they work for any agent.
+
 Detectors in `internal/api/insight_detect.go` are pure functions over one
 session's data. Each emits *occurrences*, which are grouped into items by kind and
 subject. Items are ranked by:
