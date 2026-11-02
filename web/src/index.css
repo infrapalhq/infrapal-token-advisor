@@ -1,3 +1,13 @@
 /* Token Advisor design system (the approved mock). Everything in the app
    is styled from this file; see src/ta/styles.css. */
+/* Fonts ship inside the binary, so the dashboard makes no outside requests. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
 @import "./ta/styles.css";
+@import "./ta/dark.css";
