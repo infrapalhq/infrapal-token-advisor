@@ -63,7 +63,7 @@ func TestSystemdUnitFile_ContainsExecAndRestart(t *testing.T) {
 	unit := string(systemdUnitFile(p))
 
 	for _, want := range []string{
-		"ExecStart=/usr/local/bin/token-advisor start",
+		`ExecStart="/usr/local/bin/token-advisor" start`,
 		"Restart=always",
 		"WantedBy=default.target",
 		"/home/u/.infrapal-token-advisor/collector.log",
@@ -122,9 +122,39 @@ func TestPlistExecPath(t *testing.T) {
 }
 
 func TestUnitExecPath(t *testing.T) {
-	p := Paths{ExecPath: "/usr/local/bin/token-advisor"}
-	if got := unitExecPath(string(systemdUnitFile(p))); got != p.ExecPath {
-		t.Errorf("unitExecPath = %q, want %q", got, p.ExecPath)
+	for _, path := range []string{
+		"/usr/local/bin/token-advisor",
+		"/home/a b/bin/token-advisor",
+		`/home/100%/$HOME/"x"/back\slash/token-advisor`,
+	} {
+		unit := string(systemdUnitFile(Paths{ExecPath: path}))
+		if got := unitExecPath(unit); got != path {
+			t.Errorf("unitExecPath = %q, want %q\n%s", got, path, unit)
+		}
+	}
+}
+
+func TestUnitExecPath_ReadsOlderUnquotedUnits(t *testing.T) {
+	unit := "[Service]\nExecStart=/usr/local/bin/token-advisor start\n"
+	if got, want := unitExecPath(unit), "/usr/local/bin/token-advisor"; got != want {
+		t.Errorf("unitExecPath = %q, want %q", got, want)
+	}
+}
+
+func TestSystemdUnitFile_EscapesPaths(t *testing.T) {
+	unit := string(systemdUnitFile(Paths{
+		ExecPath:  "/home/a b/100%/$x/token-advisor",
+		StdoutLog: "/home/100%/out.log",
+		StderrLog: "/home/100%/err.log",
+	}))
+	for _, want := range []string{
+		`ExecStart="/home/a b/100%%/$$x/token-advisor" start`,
+		"StandardOutput=append:/home/100%%/out.log",
+		"StandardError=append:/home/100%%/err.log",
+	} {
+		if !strings.Contains(unit, want) {
+			t.Errorf("unit file missing %q\n---\n%s", want, unit)
+		}
 	}
 }
 

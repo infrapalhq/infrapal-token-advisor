@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -32,12 +31,27 @@ StandardError=append:%s
 
 [Install]
 WantedBy=default.target
-`, p.ExecPath, p.StdoutLog, p.StderrLog))
+`, systemdQuote(p.ExecPath), systemdLogEscape.Replace(p.StdoutLog), systemdLogEscape.Replace(p.StderrLog)))
+}
+
+// systemd reads these characters specially in a unit file: quotes and
+// backslashes split words, % starts a specifier, and $ an environment variable.
+var (
+	systemdExecEscape   = strings.NewReplacer(`\`, `\\`, `"`, `\"`, `%`, `%%`, `$`, `$$`)
+	systemdExecUnescape = strings.NewReplacer(`\\`, `\`, `\"`, `"`, `%%`, `%`, `$$`, `$`)
+	systemdLogEscape    = strings.NewReplacer(`%`, `%%`)
+)
+
+// systemdQuote makes path a single word in ExecStart, so a space in it can't
+// split the command.
+func systemdQuote(path string) string {
+	return `"` + systemdExecEscape.Replace(path) + `"`
 }
 
 type systemdService struct {
 	p        Paths
 	unitPath string
+	run      commandRunner
 }
 
 func (s *systemdService) Install() error {
@@ -50,37 +64,37 @@ func (s *systemdService) Install() error {
 	if err := os.WriteFile(s.unitPath, systemdUnitFile(s.p), 0o644); err != nil {
 		return fmt.Errorf("write unit file: %w", err)
 	}
-	if err := runCommand("systemctl", "--user", "daemon-reload"); err != nil {
+	if err := s.run.Run("systemctl", "--user", "daemon-reload"); err != nil {
 		return err
 	}
-	if err := runCommand("systemctl", "--user", "enable", systemdUnitName); err != nil {
+	if err := s.run.Run("systemctl", "--user", "enable", systemdUnitName); err != nil {
 		return err
 	}
 	// Best-effort: without linger, systemd stops user services at logout and
 	// doesn't start them until the next login. doctor reports it if this fails.
-	_ = runCommand("loginctl", "enable-linger")
+	_ = s.run.Run("loginctl", "enable-linger")
 	// restart, not start, so a repeat init picks up the current binary.
-	return runCommand("systemctl", "--user", "restart", systemdUnitName)
+	return s.run.Run("systemctl", "--user", "restart", systemdUnitName)
 }
 
 func (s *systemdService) Uninstall() error {
 	// Best-effort: disable --now may fail if the unit was already stopped
 	// or systemd --user isn't reachable (e.g. no active session); the file
 	// removal below is what makes uninstall itself succeed.
-	_ = runCommand("systemctl", "--user", "disable", "--now", systemdUnitName)
+	_ = s.run.Run("systemctl", "--user", "disable", "--now", systemdUnitName)
 	if err := os.Remove(s.unitPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove unit file: %w", err)
 	}
-	_ = runCommand("systemctl", "--user", "daemon-reload")
+	_ = s.run.Run("systemctl", "--user", "daemon-reload")
 	return nil
 }
 
 func (s *systemdService) Start() error {
-	return runCommand("systemctl", "--user", "start", systemdUnitName)
+	return s.run.Run("systemctl", "--user", "start", systemdUnitName)
 }
 
 func (s *systemdService) Stop() error {
-	return runCommand("systemctl", "--user", "stop", systemdUnitName)
+	return s.run.Run("systemctl", "--user", "stop", systemdUnitName)
 }
 
 // CheckAutostart looks for what stops systemd starting the unit at login.
@@ -97,7 +111,7 @@ func (s *systemdService) CheckAutostart() error {
 	} else if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("the service runs %s, which no longer exists", path)
 	}
-	out, _ := exec.Command("systemctl", "--user", "is-enabled", systemdUnitName).Output()
+	out, _ := s.run.Output("systemctl", "--user", "is-enabled", systemdUnitName)
 	if state := strings.TrimSpace(string(out)); state != "" && state != "enabled" {
 		return fmt.Errorf("the service is %s in systemd, so it won't start at login", state)
 	}
@@ -108,7 +122,10 @@ func (s *systemdService) CheckAutostart() error {
 func unitExecPath(unit string) string {
 	for _, line := range strings.Split(unit, "\n") {
 		if cmd, ok := strings.CutPrefix(line, "ExecStart="); ok {
-			return strings.TrimSuffix(cmd, " start")
+			if quoted, ok := strings.CutPrefix(cmd, `"`); ok {
+				return systemdExecUnescape.Replace(strings.TrimSuffix(quoted, `" start`))
+			}
+			return strings.TrimSuffix(cmd, " start") // an older, unquoted unit
 		}
 	}
 	return ""
@@ -121,7 +138,7 @@ func LingerEnabled() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	out, err := exec.Command("loginctl", "show-user", u.Username, "--property=Linger").Output()
+	out, err := execRunner{}.Output("loginctl", "show-user", u.Username, "--property=Linger")
 	if err != nil {
 		return false, err
 	}
@@ -140,7 +157,7 @@ func (s *systemdService) Status() (Status, error) {
 		return Status{}, err
 	}
 
-	out, err := exec.Command("systemctl", "--user", "is-active", systemdUnitName).Output()
+	out, err := s.run.Output("systemctl", "--user", "is-active", systemdUnitName)
 	state := strings.TrimSpace(string(out))
 	if state == "" {
 		state = "unknown"

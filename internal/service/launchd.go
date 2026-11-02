@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -61,6 +60,7 @@ func launchdPlistXML(p Paths) []byte {
 type launchdService struct {
 	p         Paths
 	plistPath string
+	run       commandRunner
 }
 
 func (s *launchdService) Install() error {
@@ -75,15 +75,15 @@ func (s *launchdService) Install() error {
 	}
 	// Best-effort unload so a repeat init restarts on the current binary;
 	// load alone leaves an already-loaded job running as it was.
-	_ = runCommand("launchctl", "unload", s.plistPath)
-	return runCommand("launchctl", "load", "-w", s.plistPath)
+	_ = s.run.Run("launchctl", "unload", s.plistPath)
+	return s.run.Run("launchctl", "load", "-w", s.plistPath)
 }
 
 func (s *launchdService) Uninstall() error {
 	// Best-effort unload: if it's already unloaded (e.g. after a crash),
 	// launchctl exits non-zero and that's fine — the file removal below is
 	// what actually matters for uninstall to succeed.
-	_ = runCommand("launchctl", "unload", s.plistPath)
+	_ = s.run.Run("launchctl", "unload", s.plistPath)
 	if err := os.Remove(s.plistPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove plist: %w", err)
 	}
@@ -91,13 +91,13 @@ func (s *launchdService) Uninstall() error {
 }
 
 func (s *launchdService) Start() error {
-	return runCommand("launchctl", "load", "-w", s.plistPath)
+	return s.run.Run("launchctl", "load", "-w", s.plistPath)
 }
 
 // Stop leaves out -w: that would mark the job disabled, and launchd skips
 // disabled jobs at login, so one stop would turn the service off for good.
 func (s *launchdService) Stop() error {
-	return runCommand("launchctl", "unload", s.plistPath)
+	return s.run.Run("launchctl", "unload", s.plistPath)
 }
 
 // CheckAutostart looks for what stops launchd starting the job at login.
@@ -115,7 +115,7 @@ func (s *launchdService) CheckAutostart() error {
 		return fmt.Errorf("the service runs %s, which no longer exists", path)
 	}
 	domain := "gui/" + strconv.Itoa(os.Getuid())
-	out, err := exec.Command("launchctl", "print-disabled", domain).Output()
+	out, err := s.run.Output("launchctl", "print-disabled", domain)
 	if err != nil {
 		return nil //nolint:nilerr // can't tell, and the job may well be fine
 	}
@@ -155,7 +155,7 @@ func (s *launchdService) Status() (Status, error) {
 		return Status{}, err
 	}
 
-	out, err := exec.Command("launchctl", "list", launchdLabel).Output()
+	out, err := s.run.Output("launchctl", "list", launchdLabel)
 	if err != nil {
 		// launchctl exits non-zero when the label isn't loaded.
 		return Status{Installed: true, Running: false, Detail: "installed but not loaded"}, nil //nolint:nilerr // see above
