@@ -1015,6 +1015,36 @@ button, select, input { font: inherit; }
 .receipt-foot { font-family: var(--mono); font-size: 11px; color: var(--ink-3); text-align: center; padding: 16px 0 14px; }
 .receipt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .hint-line { font-size: 12px; color: var(--ink-3); }
+.hint-line code, .first-run code { font-family: var(--mono); color: var(--ink-2); }
+
+/* ---------- First run ---------- */
+
+.first-run-page { display: flex; flex-direction: column; gap: 20px; }
+.first-run {
+  list-style: none;
+  counter-reset: step;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  max-width: 560px;
+}
+.first-run li {
+  counter-increment: step;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 2px 8px;
+  padding: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+}
+.first-run li::before {
+  content: counter(step);
+  grid-row: span 2;
+  font-family: var(--mono);
+  color: var(--ink-3);
+}
+.first-run span { font-size: 14px; color: var(--ink-3); }
 
 /* ---------- Fixes ---------- */
 

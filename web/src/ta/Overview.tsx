@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Overview as OverviewData, type Range } from "./api";
+import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
+import { useFirstRun } from "./status";
 import { AREA_NAME, dayShort, money, pipClass, tokensHuman, waitMs } from "./format";
 
 const PERIODS: { value: Range; label: string }[] = [
@@ -15,17 +17,20 @@ export default function Overview() {
   const range = (params.get("range") as Range) || "7d";
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const firstRun = useFirstRun();
 
   useEffect(() => {
     setData(null);
     api.overview(range).then(setData).catch((e: Error) => setError(e.message));
-  }, [range]);
+  }, [range, firstRun]);
 
   const dayMax = useMemo(() => Math.max(1, ...(data?.by_day.map((d) => d.cost_usd) ?? [1])), [data]);
   const projMax = useMemo(() => Math.max(1, ...(data?.by_project.map((p) => p.cost_usd) ?? [1])), [data]);
   const problemCount = data?.fix_first.length ?? 0;
   const recoveredUsd = (data?.recovered.usd ?? 0) >= 0.005; // would show as $0.00 otherwise
   const recoveredMinutes = Math.round(data?.recovered.minutes ?? 0);
+
+  if (firstRun) return <Shell><FirstRun /></Shell>;
 
   return (
     <Shell fixesToDo={data?.fix_first.length} sessionCount={data?.sessions_count}>
@@ -169,9 +174,11 @@ export default function Overview() {
                   </div>
                 </div>
               ))}
-              <span className="foot">
-                Models: {data.models.slice(0, 3).map((m) => `${m.model} ${Math.round(m.share * 100)}%`).join(" · ")}
-              </span>
+              {data.models.length > 0 && (
+                <span className="foot">
+                  Models: {data.models.slice(0, 3).map((m) => `${m.model} ${Math.round(m.share * 100)}%`).join(" · ")}
+                </span>
+              )}
             </div>
           </section>
 

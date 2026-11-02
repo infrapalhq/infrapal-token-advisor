@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type Range, type SessionCard, type SessionCards } from "./api";
+import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
+import { useFirstRun } from "./status";
 import { AREA_LABEL, SYMPTOM_LABEL, dayShort, durationS, money, pipClass, tokensHuman, waitMs } from "./format";
 
 const TIMES: { value: Range; label: string }[] = [
@@ -45,11 +47,12 @@ export default function Sessions() {
   const [areaFilter, setAreaFilter] = useState<string[]>([]);
   const [symFilter, setSymFilter] = useState<string[]>([]);
   const [popOpen, setPopOpen] = useState(false);
+  const firstRun = useFirstRun();
 
   useEffect(() => {
     setData(null);
     api.sessionCards(range).then(setData).catch((e: Error) => setError(e.message));
-  }, [range]);
+  }, [range, firstRun]);
 
   const visible = useMemo(() => {
     if (!data) return [];
@@ -78,6 +81,8 @@ export default function Sessions() {
 
   const activeFilters = areaFilter.length + symFilter.length;
   const setTime = (value: Range) => setParams({ range: value });
+
+  if (firstRun) return <Shell><FirstRun /></Shell>;
 
   return (
     <Shell sessionCount={data?.count_all}>

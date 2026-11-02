@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
+import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
+import { useFirstRun } from "./status";
 import { AREA_NAME, dayShort, money } from "./format";
 
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -94,6 +96,7 @@ export default function Fixes() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const firstRun = useFirstRun();
 
   const load = useCallback(() => {
     Promise.all([api.fixes("all"), api.progress()])
@@ -106,7 +109,7 @@ export default function Fixes() {
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, firstRun]);
 
   const mark = async (it: Item, state: "fixed" | "reverted") => {
     setBusy(it.key);
@@ -131,6 +134,8 @@ export default function Fixes() {
   const last = weeks[weeks.length - 1];
   const down = first && last && first.avoidable_usd > 0 ? Math.round((1 - last.avoidable_usd / first.avoidable_usd) * 100) : null;
   const maxAvoid = Math.max(1, ...weeks.map((w) => w.avoidable_usd));
+
+  if (firstRun) return <Shell><FirstRun /></Shell>;
 
   return (
     <Shell fixesToDo={data?.to_fix.length} sessionCount={undefined}>
