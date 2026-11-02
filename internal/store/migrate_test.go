@@ -142,6 +142,14 @@ func TestUpgradeKeepsData(t *testing.T) {
 	if promptID != "p1" {
 		t.Errorf("found %q, want p1", promptID)
 	}
+
+	var agent string
+	if err := db.QueryRow(`SELECT agent FROM sessions WHERE session_id = 's1'`).Scan(&agent); err != nil {
+		t.Fatalf("read agent after upgrade: %v", err)
+	}
+	if agent != "claude-code" {
+		t.Errorf("an existing session's agent = %q, want claude-code", agent)
+	}
 }
 
 func TestMigrateBacksUpExistingDatabase(t *testing.T) {
