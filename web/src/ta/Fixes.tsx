@@ -196,8 +196,8 @@ export default function Fixes() {
               <div className="week-head">
                 <h2>Week by week</h2>
                 <div className="week-legend">
-                  <span><span aria-hidden="true" className="hatch" style={{ width: 14, height: 12, border: "1px solid #000" }} />Avoidable $ / week</span>
-                  <span><span aria-hidden="true" style={{ width: 18, borderTop: "2.5px solid #000" }} />Healthy sessions %</span>
+                  <span><span aria-hidden="true" className="hatch" style={{ width: 14, height: 12, border: "1px solid var(--k)" }} />Avoidable $ / week</span>
+                  <span><span aria-hidden="true" style={{ width: 18, borderTop: "2.5px solid var(--k)" }} />Healthy sessions %</span>
                 </div>
               </div>
               <div className="bars" role="img" aria-label="Avoidable spend by week">
