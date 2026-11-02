@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"runtime"
 	"testing"
 )
 
@@ -26,14 +25,5 @@ func TestRunDoctor_AfterInit(t *testing.T) {
 	}
 	if err := runDoctor(nil); err != nil {
 		t.Fatalf("runDoctor after init: %v", err)
-	}
-}
-
-func TestManagedSettingsPath_KnownForDarwinAndLinux(t *testing.T) {
-	switch runtime.GOOS {
-	case "darwin", "linux":
-		if managedSettingsPath() == "" {
-			t.Errorf("managedSettingsPath() empty on GOOS=%s, want a known path", runtime.GOOS)
-		}
 	}
 }

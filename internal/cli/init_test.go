@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/claudecode"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 )
 
@@ -70,7 +71,7 @@ func TestRunInit_NoPreexistingSettings(t *testing.T) {
 	}
 
 	env := readSettingsEnv(t, home)
-	want := wantedEnv(cfg)
+	want := claudecode.TelemetryEnv(cfg.OTLPPort)
 	for k, v := range want {
 		if env[k] != v {
 			t.Errorf("env[%q] = %v, want %q", k, env[k], v)

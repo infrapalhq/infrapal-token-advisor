@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
@@ -44,17 +45,8 @@ func runUninstall(args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
-	switch cfg.SettingsBackupPath {
-	case "":
-		fmt.Println("no settings.json backup recorded, so init never changed an existing file — settings.json left as-is")
-	default:
-		if _, statErr := os.Stat(cfg.SettingsBackupPath); statErr != nil {
-			fmt.Printf("settings.json backup %s is missing — settings.json left as-is\n", cfg.SettingsBackupPath)
-		} else if err := claudesettings.Restore(p.ClaudeSettingsPath, cfg.SettingsBackupPath); err != nil {
-			return fmt.Errorf("restore %s: %w", p.ClaudeSettingsPath, err)
-		} else {
-			fmt.Printf("restored %s from %s\n", p.ClaudeSettingsPath, cfg.SettingsBackupPath)
-		}
+	if err := all.Default(p.Home).Disconnect(os.Stdout, agent.Connection{BackupPath: cfg.SettingsBackupPath}); err != nil {
+		return err
 	}
 
 	if *keepDB {
