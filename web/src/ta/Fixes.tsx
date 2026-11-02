@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { useAgents } from "./agentContext";
+import { SkippedChecks } from "./agents";
 import { api, type AiResult, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
@@ -8,7 +10,7 @@ import { AREA_NAME, dayShort, money } from "./format";
 
 const AI_RANGE = "30d";
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const MCP_SAMPLE_PROMPT = "Use infrapal-token-advisor to find my three biggest sources of avoidable Claude Code spend in the last 30 days, and tell me what to change first.";
+const MCP_SAMPLE_PROMPT = "Use infrapal-token-advisor to find my three biggest sources of avoidable spend in the last 30 days, and tell me what to change first.";
 
 function CopyBlock({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -55,12 +57,12 @@ function EnableMcp() {
   return (
     <section className="card mcp" aria-label="Enable MCP">
       <div className="card-top">
-        <strong>{setup.enabled ? "MCP is enabled" : "Enable MCP to ask Claude about this data"}</strong>
+        <strong>{setup.enabled ? "MCP is enabled" : `Enable MCP to ask ${setup.agent_name} about this data`}</strong>
         <span className={`ok${setup.enabled ? "" : " dashed"}`}>{setup.enabled ? "On" : "Off"}</span>
       </div>
       <span className="body-copy">
-        Claude Code can query your spend, tokens, sessions and findings and work out insights this page doesn't show.
-        When it does, those results go to Anthropic with the conversation. It gets numbers and ids only, not your prompts, responses, file paths or commands.
+        {setup.agent_name} can query your spend, tokens, sessions and findings and work out insights this page doesn't show.
+        When it does, those results go to its model provider with the conversation. It gets numbers and ids only, not your prompts, responses, file paths or commands.
       </span>
       {!setup.enabled && (
         <>
@@ -75,7 +77,7 @@ function EnableMcp() {
         </>
       )}
       <div className="mcp-step">
-        <b>{setup.enabled ? "Start a new Claude Code session and ask" : "3. Start a new Claude Code session and ask"}</b>
+        <b>{setup.enabled ? `Start a new ${setup.agent_name} session and ask` : `3. Start a new ${setup.agent_name} session and ask`}</b>
         <CopyBlock text={MCP_SAMPLE_PROMPT} />
       </div>
       {setup.enabled ? (
@@ -164,15 +166,16 @@ export default function Fixes() {
   const [copied, setCopied] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const firstRun = useFirstRun();
+  const { selected: agent } = useAgents();
 
   const load = useCallback(() => {
-    Promise.all([api.fixes("all"), api.progress()])
+    Promise.all([api.fixes("all", agent), api.progress(agent)])
       .then(([f, p]) => {
         setData(f);
         setProgress(p);
       })
       .catch((e: Error) => setError(e.message));
-  }, []);
+  }, [agent]);
 
   useEffect(() => {
     load();
@@ -218,6 +221,7 @@ export default function Fixes() {
 
       {error && <p className="hint-line">Could not load: {error}</p>}
       {!data && !error && <p className="hint-line">Loading…</p>}
+      <SkippedChecks />
 
       {data && (
         <>

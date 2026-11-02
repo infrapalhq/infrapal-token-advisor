@@ -37,6 +37,7 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	mux.HandleFunc("PUT /api/ai/config", s.handlePutAIConfig)
 	mux.HandleFunc("GET /api/ai/recommendations", s.handleGetAIRecommendations)
 	mux.HandleFunc("POST /api/ai/recommendations", s.handlePostAIRecommendations)
+	mux.HandleFunc("GET /api/agents", s.handleAgents)
 	mux.HandleFunc("GET /api/overview", s.handleOverview)
 	mux.HandleFunc("GET /api/sessions/cards", s.handleSessionCards)
 	mux.HandleFunc("GET /api/sessions/{id}/timeline", s.handleSessionTimeline)
@@ -66,14 +67,15 @@ func Endpoints() []string {
 		"PUT /api/ai/config",
 		"GET /api/ai/recommendations?since=",
 		"POST /api/ai/recommendations",
-		"GET /api/overview?since=",
-		"GET /api/sessions/cards?since=",
+		"GET /api/agents",
+		"GET /api/overview?since=&agent=",
+		"GET /api/sessions/cards?since=&agent=",
 		"GET /api/sessions/{id}/timeline",
 		"GET /api/sessions/{id}/issues",
-		"GET /api/fixes?since=",
+		"GET /api/fixes?since=&agent=",
 		"POST /api/fixes/{id}/state",
 		"POST /api/ui/visit",
-		"GET /api/progress?since=",
+		"GET /api/progress?since=&agent=",
 		"GET /api/status",
 		"GET /api/mcp/setup",
 	}

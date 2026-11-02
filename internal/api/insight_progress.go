@@ -33,7 +33,7 @@ func (s *Server) handleProgress(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	d, occ, err := computeInsights(r.Context(), s.db, cutoff)
+	d, occ, err := computeInsights(r.Context(), s.db, cutoff, agentParam(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

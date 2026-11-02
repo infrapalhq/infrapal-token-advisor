@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
+import { AgentPicker } from "./agents";
 import { api } from "./api";
 import { useStatus } from "./status";
 import { useTheme } from "./theme";
@@ -40,6 +41,7 @@ export function Sidebar({ fixesToDo, sessionCount }: { fixesToDo?: number; sessi
         </NavLink>
         <NavLink to="/settings">Settings</NavLink>
       </nav>
+      <AgentPicker />
       <div className="side-foot">
         <span className="local">
           <span className={`pip ${status?.collector_live ? "full" : ""}`} />
