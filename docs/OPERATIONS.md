@@ -61,7 +61,7 @@ These live in `config.json`. Run `token-advisor restart` after changing one.
 | `api_port` | `4319` | Dashboard port |
 | `retention_months` | `6` | How long to keep data. `0` keeps everything. |
 | `log_level` | `info` | `debug`, `info`, `warn` or `error` |
-| `anthropic_api_key` | none | Your key for AI Mode. Save it in the dashboard's Settings. It's stored in plain text, private to your user. |
+| `ai_keys` | none | Your keys for AI Mode, by provider. Save it in the dashboard's Settings. It's stored in plain text, private to your user. |
 
 `raw_bodies` and `agents` are managed by `init`, so leave them alone.
 

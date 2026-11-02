@@ -2,7 +2,7 @@
 // telemetry, serving the dashboard: insights, session timelines, and fixes.
 //
 // The API only ever talks to this machine, with one exception:
-// POST /api/ai/recommendations calls the Anthropic API, but only in direct
+// POST /api/ai/recommendations calls a model provider, but only in direct
 // response to a user's request, and only once a key has been configured. See
 // internal/ai and the README's network note.
 package api
