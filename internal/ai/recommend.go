@@ -37,7 +37,7 @@ type GenerateResult struct {
 // context, check the cache (unless force), else call req, validate,
 // persist, and return. req is an interface (satisfied by *Client) so
 // callers/tests can inject a fake instead of hitting the real API.
-func Generate(ctx context.Context, db *sql.DB, req Requester, sinceRange string, cutoffMs int64, haveCutoff bool, insights []InsightFact, force bool) (GenerateResult, error) {
+func Generate(ctx context.Context, db *sql.DB, req Requester, model, sinceRange string, cutoffMs int64, haveCutoff bool, insights []InsightFact, force bool) (GenerateResult, error) {
 	bundle, err := BuildContext(ctx, db, sinceRange, cutoffMs, haveCutoff, insights)
 	if err != nil {
 		return GenerateResult{}, fmt.Errorf("build context: %w", err)
@@ -71,7 +71,7 @@ func Generate(ctx context.Context, db *sql.DB, req Requester, sinceRange string,
 		return GenerateResult{}, err
 	}
 	generatedAt := time.Now().UnixMilli()
-	if err := persistBatch(ctx, db, batchID, generatedAt, sinceRange, hash, HaikuModel, kept); err != nil {
+	if err := persistBatch(ctx, db, batchID, generatedAt, sinceRange, hash, model, kept); err != nil {
 		return GenerateResult{}, err
 	}
 
@@ -85,7 +85,7 @@ func Generate(ctx context.Context, db *sql.DB, req Requester, sinceRange string,
 }
 
 // GetCached implements GET /api/ai/recommendations?since= — read-only,
-// never calls Anthropic. Returns a zero-value result (empty
+// never calls a provider. Returns a zero-value result (empty
 // Recommendations) if Generate has never run for sinceRange.
 func GetCached(ctx context.Context, db *sql.DB, sinceRange string) (GenerateResult, error) {
 	var batchID string

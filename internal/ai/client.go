@@ -77,7 +77,7 @@ func NewClient(apiKey string) *Client {
 // systemPrompt is fixed across calls (no per-request interpolation) so it
 // never breaks Context.Hash's meaning and is easy to audit in one place.
 const systemPrompt = `You are analyzing pre-aggregated, already-computed usage
-statistics for one developer's use of Claude Code, a coding assistant. You
+statistics for one developer's use of coding agents. You
 will get a JSON object with capped, sorted rows from several cost/friction
 views, some rule-based insights the app already computed, small rollup
 totals, and a list of data caveats. Your job: propose concrete, actionable

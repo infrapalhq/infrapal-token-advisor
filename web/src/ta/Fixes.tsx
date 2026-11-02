@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAgents } from "./agentContext";
 import { SkippedChecks } from "./agents";
-import { api, type AiResult, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
+import { api, type AiConfig, type AiResult, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
@@ -94,16 +94,17 @@ function EnableMcp() {
   );
 }
 
-// AiInsights is the only control that sends anything to Anthropic. Loading the
+// AiInsights is the only control that sends anything to a model provider. Loading the
 // page reads saved results and never makes a call.
 function AiInsights() {
-  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [ai, setAi] = useState<AiConfig | null>(null);
+  const [aiLoaded, setAiLoaded] = useState(false);
   const [result, setResult] = useState<AiResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.aiConfig().then((c) => setConfigured(c.configured)).catch(() => setConfigured(false));
+    api.aiConfig().then(setAi).catch(() => {}).finally(() => setAiLoaded(true));
     api.aiRecommendations(AI_RANGE).then(setResult).catch(() => {});
   }, []);
 
@@ -119,7 +120,8 @@ function AiInsights() {
     }
   };
 
-  if (configured === null) return null;
+  if (!aiLoaded) return null;
+  const configured = ai?.configured ?? false;
   const hasRun = Boolean(result?.batch_id);
   const recs = result?.recommendations ?? [];
   const dropped = result?.dropped_count ?? 0;
@@ -131,7 +133,7 @@ function AiInsights() {
         <span className={`ok${configured ? "" : " dashed"}`}>{configured ? "Key added" : "Off"}</span>
       </div>
       <span className="body-copy">
-        Optional. Generate sends the last 30 days of aggregated figures and labels to Anthropic with your key, never your prompts, responses, file paths or commands.
+        Optional. Generate sends the last 30 days of aggregated figures and labels to {ai?.provider_name ?? "your model provider"} with your key, never your prompts, responses, file paths or commands.
       </span>
       {recs.map((r, i) => (
         <article className="ai-rec" key={i}>
