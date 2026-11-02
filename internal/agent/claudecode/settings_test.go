@@ -1,4 +1,4 @@
-package claudesettings
+package claudecode
 
 import (
 	"encoding/json"
