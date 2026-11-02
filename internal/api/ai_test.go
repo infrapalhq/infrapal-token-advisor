@@ -24,15 +24,15 @@ func TestAIConfig_GetPutRoundTrip(t *testing.T) {
 		t.Fatalf("GET /api/ai/config: %v", err)
 	}
 	defer resp.Body.Close()
-	var got map[string]bool
+	var got map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got["configured"] {
+	if got["configured"] != false || got["provider_name"] != "Anthropic" {
 		t.Fatalf("expected configured=false before any key is saved")
 	}
 
-	body, _ := json.Marshal(map[string]string{"anthropic_api_key": "sk-ant-test-key"})
+	body, _ := json.Marshal(map[string]string{"api_key": "sk-ant-test-key"})
 	req, _ := http.NewRequest(http.MethodPut, ts.URL+"/api/ai/config", bytes.NewReader(body))
 	putResp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -48,11 +48,11 @@ func TestAIConfig_GetPutRoundTrip(t *testing.T) {
 		t.Fatalf("GET /api/ai/config: %v", err)
 	}
 	defer resp2.Body.Close()
-	var got2 map[string]bool
+	var got2 map[string]any
 	if err := json.NewDecoder(resp2.Body).Decode(&got2); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if !got2["configured"] {
+	if got2["configured"] != true {
 		t.Fatalf("expected configured=true after saving a key")
 	}
 }
@@ -142,7 +142,7 @@ func withFakeRequester(t *testing.T, f *fakeRequester) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("ANTHROPIC_API_KEY", "test-key")
 	old := newAIRequester
-	newAIRequester = func(string) ai.Requester { return f }
+	newAIRequester = func(ai.Provider, string) ai.Requester { return f }
 	t.Cleanup(func() { newAIRequester = old })
 }
 
@@ -213,5 +213,70 @@ func TestPostAIRecommendations_AnthropicErrorIsBadGateway(t *testing.T) {
 	}
 	if msg, _ := out["error"].(string); !strings.Contains(msg, "invalid key") {
 		t.Errorf("error = %q, want the upstream reason", msg)
+	}
+}
+
+func TestPutAIConfig_RefusesAnUnknownProvider(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	ts := newTestServer(t, seedDB(t))
+	req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/ai/config", strings.NewReader(`{"provider":"no-such-provider"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestPutAIConfig_KeepsTheKeyWhenOnlyChoosingAProvider(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	ts := newTestServer(t, seedDB(t))
+	put := func(body string) map[string]any {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/ai/config", strings.NewReader(body))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	put(`{"api_key":"key-1"}`)
+	if got := put(`{"provider":"anthropic"}`); got["configured"] != true {
+		t.Errorf("choosing a provider cleared the key: %v", got)
+	}
+	if got := put(`{"api_key":""}`); got["configured"] != false {
+		t.Errorf("an empty key should clear it: %v", got)
+	}
+}
+
+func TestAIConfig_NeverReturnsTheKey(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ANTHROPIC_API_KEY", "secret-from-env")
+	ts := newTestServer(t, seedDB(t))
+	resp, err := http.Get(ts.URL + "/api/ai/config")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(resp.Body); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "secret-from-env") {
+		t.Errorf("the key leaked: %s", buf.String())
 	}
 }

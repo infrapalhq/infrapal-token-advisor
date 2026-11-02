@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ai"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/api"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/webui"
@@ -42,8 +43,9 @@ func runUI(args []string) error {
 	if *port == 0 && dashboardRunning(cfg.APIPort) {
 		url := fmt.Sprintf("http://127.0.0.1:%d", cfg.APIPort)
 		fmt.Printf("token-advisor dashboard: %s\n", url)
-		if os.Getenv("ANTHROPIC_API_KEY") != "" && cfg.AnthropicAPIKey == "" {
-			fmt.Println("note: the background service can't see ANTHROPIC_API_KEY from this shell — save the key in Settings to use AI Mode")
+		provider := ai.FindProvider(cfg.AIProvider)
+		if os.Getenv(provider.KeyEnv) != "" && cfg.AIKeys[provider.ID] == "" {
+			fmt.Printf("note: the background service can't see %s from this shell — save the key in Settings to use AI Mode\n", provider.KeyEnv)
 		}
 		if !*noBrowser {
 			if err := openBrowser(url); err != nil {

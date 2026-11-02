@@ -23,7 +23,7 @@ func TestGenerate_CacheMissThenHit(t *testing.T) {
 			Evidence: []EvidenceFact{{Label: "cost", Value: "0.1"}}},
 	}}
 
-	result1, err := Generate(context.Background(), db, fake, "", 0, false, nil, false)
+	result1, err := Generate(context.Background(), db, fake, HaikuModel, "", 0, false, nil, false)
 	if err != nil {
 		t.Fatalf("Generate (miss): %v", err)
 	}
@@ -37,7 +37,7 @@ func TestGenerate_CacheMissThenHit(t *testing.T) {
 		t.Fatalf("expected 1 recommendation, got %+v", result1.Recommendations)
 	}
 
-	result2, err := Generate(context.Background(), db, fake, "", 0, false, nil, false)
+	result2, err := Generate(context.Background(), db, fake, HaikuModel, "", 0, false, nil, false)
 	if err != nil {
 		t.Fatalf("Generate (hit): %v", err)
 	}
@@ -59,10 +59,10 @@ func TestGenerate_ForceAlwaysCallsRequester(t *testing.T) {
 			Evidence: []EvidenceFact{{Label: "cost", Value: "0.1"}}},
 	}}
 
-	if _, err := Generate(context.Background(), db, fake, "", 0, false, nil, false); err != nil {
+	if _, err := Generate(context.Background(), db, fake, HaikuModel, "", 0, false, nil, false); err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
-	if _, err := Generate(context.Background(), db, fake, "", 0, false, nil, true); err != nil {
+	if _, err := Generate(context.Background(), db, fake, HaikuModel, "", 0, false, nil, true); err != nil {
 		t.Fatalf("Generate (force): %v", err)
 	}
 	if fake.calls != 2 {
@@ -77,7 +77,7 @@ func TestGenerate_UngroundedRecommendationDroppedNotPersisted(t *testing.T) {
 			Evidence: []EvidenceFact{{Label: "cost", Value: "999999.99"}}},
 	}}
 
-	result, err := Generate(context.Background(), db, fake, "", 0, false, nil, false)
+	result, err := Generate(context.Background(), db, fake, HaikuModel, "", 0, false, nil, false)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)
 	}

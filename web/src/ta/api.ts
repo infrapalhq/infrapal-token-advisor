@@ -160,6 +160,14 @@ export type AiResult = {
   dropped_count: number;
 };
 
+export type AiConfig = {
+  configured: boolean;
+  provider: string;
+  provider_name: string;
+  key_hint: string;
+  providers: { id: string; name: string }[];
+};
+
 export type AgentInfo = { id: string; name: string; sessions: number; cost_known: boolean; skipped: string[] };
 
 export type McpSetup = { server_name: string; agent_name: string; enabled: boolean; command: string; verify: string; remove: string };
@@ -200,8 +208,9 @@ export const api = {
   status: () => get<Status>(`/api/status`),
   mcpSetup: () => get<McpSetup>(`/api/mcp/setup`),
   visit: () => send<{ last_visit_at: number; previous_visit_at: number }>("POST", `/api/ui/visit`),
-  aiConfig: () => get<{ configured: boolean }>(`/api/ai/config`),
+  aiConfig: () => get<AiConfig>(`/api/ai/config`),
   aiRecommendations: (since: string) => get<AiResult>(`/api/ai/recommendations?since=${since}`),
   generateAI: (since: string, force: boolean) => send<AiResult>("POST", `/api/ai/recommendations`, { since, force }),
-  saveAIKey: (key: string) => send<{ configured: boolean }>("PUT", `/api/ai/config`, { anthropic_api_key: key }),
+  saveAIKey: (key: string) => send<AiConfig>("PUT", `/api/ai/config`, { api_key: key }),
+  chooseAIProvider: (provider: string) => send<AiConfig>("PUT", `/api/ai/config`, { provider }),
 };

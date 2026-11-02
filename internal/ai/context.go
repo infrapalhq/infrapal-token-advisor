@@ -173,7 +173,7 @@ type Context struct {
 // data-dependent, so it never perturbs Context.Hash.
 func dataCaveats() []string {
 	return []string{
-		"Cost figures are approximate estimates, not exact Anthropic billing amounts.",
+		"Cost figures are approximate estimates, not exact billing amounts.",
 		"Metric totals (tokens, cost, lines, active time) are sums of delta-temporality points, already aggregated for you — you are not shown a raw event stream.",
 		"Session duration can include idle/orphaned time, not just active work.",
 		"Only prompts/sessions with API-request data have a per-prompt cost figure.",
