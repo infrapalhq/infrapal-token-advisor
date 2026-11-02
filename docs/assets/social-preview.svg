@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="infrapal token advisor: find wasted Claude Code tokens and get the fix">
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16263F"/>
+      <stop offset="1" stop-color="#0F1C30"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.2" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#71A3F4" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#71A3F4" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="10" height="10" fill="#F59E0B" fill-opacity="0.16"/>
+      <rect width="4" height="10" fill="#F59E0B"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="640" fill="#06111F"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+
+  <!-- The logo, on its 32 by 32 grid. -->
+  <g transform="translate(88 88) scale(3.5)">
+    <rect width="32" height="32" rx="7" fill="#04213C"/>
+    <path d="M6.7 13.6 A6.7 6.7 0 0 1 19.6 12.4 A4.6 4.6 0 0 1 21.2 20.9 H18.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M11 17 H17.5" stroke="#8C84F5" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M7.5 20.9 H15.3" stroke="#79C387" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M11 24.5 H19.2" stroke="#71A3F4" stroke-width="1.7" stroke-linecap="round"/>
+  </g>
+  <text x="228" y="148" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="54" font-weight="800" letter-spacing="-1.5" fill="#F4F5F7">infrapal</text>
+  <text x="230" y="188" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="27" fill="#F4F5F7" fill-opacity="0.72">token advisor</text>
+
+  <g font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="800" letter-spacing="-2.5" fill="#F4F5F7" font-size="74">
+    <text x="88" y="338">See where your</text>
+    <text x="88" y="424">tokens go, and</text>
+    <text x="88" y="510">what to change.</text>
+  </g>
+  <text x="90" y="568" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="27" fill="#F4F5F7" fill-opacity="0.72">A local dashboard for Claude Code. Your data stays on your machine.</text>
+
+  <!-- A card like the dashboard's Week by week chart. -->
+  <rect x="768" y="232" width="424" height="272" rx="18" fill="url(#panel)" stroke="#fff" stroke-opacity="0.11"/>
+  <g fill="url(#hatch)">
+    <rect x="800" y="376" width="40" height="88"/>
+    <rect x="852" y="330" width="40" height="134"/>
+    <rect x="904" y="358" width="40" height="106"/>
+    <rect x="956" y="296" width="40" height="168"/>
+    <rect x="1008" y="344" width="40" height="120"/>
+    <rect x="1060" y="392" width="40" height="72"/>
+    <rect x="1112" y="424" width="40" height="40"/>
+  </g>
+  <rect x="800" y="464" width="352" height="2" fill="#fff" fill-opacity="0.2"/>
+  <polyline points="820,386 872,350 924,362 976,308 1028,282 1080,262 1132,250" fill="none" stroke="#71A3F4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
