@@ -254,6 +254,7 @@ Not at the moment. It supports macOS and Linux.
 - [How accurate the numbers are](docs/ACCURACY.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Database schema and migrations](docs/SCHEMA.md)
+- [Adding an agent](docs/ADDING_AN_AGENT.md) and [adding a detector](docs/ADDING_A_DETECTOR.md)
 - [Security](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 
