@@ -13,11 +13,16 @@ import (
 	"github.com/infrapalhq/infrapal-token-advisor/internal/project"
 )
 
-// computeInsights loads the window's data and runs every detector.
-func computeInsights(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightData, []occurrence, error) {
+// computeInsights loads the window's data and runs every detector. A non-empty
+// only keeps one agent's sessions, before the detectors run, because some
+// group calls across sessions.
+func computeInsights(ctx context.Context, db *sql.DB, cutoffMs int64, only agent.ID) (*insightData, []occurrence, error) {
 	d, err := loadInsightData(ctx, db, cutoffMs)
 	if err != nil {
 		return nil, nil, err
+	}
+	if only != "" {
+		d = d.onlyAgent(only)
 	}
 	var occ []occurrence
 	for _, det := range detectors {
@@ -48,6 +53,9 @@ type sessionCard struct {
 	IsNew     bool      `json:"is_new"`
 	Symptoms  []string  `json:"symptoms"`
 	Issues    int       `json:"issues"`
+	// CostUnknown means the agent gives no dollar figures, so CostUSD is
+	// meaningless rather than zero.
+	CostUnknown bool `json:"cost_unknown,omitempty"`
 }
 
 // areaPip is one problem area on a session: its worst severity.
@@ -177,6 +185,8 @@ func buildCards(ctx context.Context, db *sql.DB, d *insightData, occ []occurrenc
 			Model:     topModel(a.modelCost),
 			IsNew:     lastVisit > 0 && s.StartedAt > lastVisit,
 			Issues:    a.issues,
+
+			CostUnknown: d.costUnknown(sid),
 		}
 		if c.Title == "" {
 			c.Title = firstPromptTitle(d, sid)

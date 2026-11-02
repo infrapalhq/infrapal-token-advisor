@@ -318,3 +318,139 @@ func TestProgressWeeksAndStatus(t *testing.T) {
 		t.Errorf("status should report collector_live: %v", st)
 	}
 }
+
+// twoAgentServer holds one session each for Claude Code and an agent with no
+// cost figures or file paths.
+func twoAgentServer(t *testing.T) func(path string) map[string]any {
+	t.Helper()
+	withLimitedAgent(t)
+	db := seedDB(t)
+	for _, stmt := range []string{
+		`INSERT INTO sessions (session_id, started_at, ended_at, agent) VALUES ('other-1', 2000, 3000, 'limited')`,
+		`INSERT INTO interactions (prompt_id, session_id, seq, started_at) VALUES ('op1', 'other-1', 1, 2000)`,
+		`INSERT INTO api_requests (prompt_id, session_id, ts, model, query_source, input_tokens, output_tokens, success)
+			VALUES ('op1', 'other-1', 2000, 'small', 'repl_main_thread', 100, 50, 1)`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	ts := newTestServer(t, db)
+	return func(path string) map[string]any {
+		t.Helper()
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("get %s: %v", path, err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("decode %s: %v", path, err)
+		}
+		return out
+	}
+}
+
+func TestAgents_ListsDefaultFirstWithWhatEachCantReport(t *testing.T) {
+	get := twoAgentServer(t)
+	agents := get("/api/agents")["agents"].([]any)
+	if len(agents) != 2 {
+		t.Fatalf("agents = %v", agents)
+	}
+	first := agents[0].(map[string]any)
+	if first["id"] != "claude-code" || first["cost_known"] != true || len(first["skipped"].([]any)) != 0 {
+		t.Errorf("first = %v", first)
+	}
+	second := agents[1].(map[string]any)
+	if second["id"] != "limited" || second["cost_known"] != false || second["sessions"] != 1.0 {
+		t.Errorf("second = %v", second)
+	}
+	skipped, _ := json.Marshal(second["skipped"])
+	if !strings.Contains(string(skipped), "re-read files") || strings.Contains(string(skipped), "repeated commands") {
+		t.Errorf("skipped = %s: it reports commands, but not file paths", skipped)
+	}
+}
+
+func TestAgents_KeepsTheDefaultWithNoSessions(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "token-advisor.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close() })
+	resp, err := http.Get(newTestServer(t, db).URL + "/api/agents")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var out struct {
+		Agents []agentInfo `json:"agents"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Agents) != 1 || out.Agents[0].Name != "Claude Code" {
+		t.Errorf("agents = %+v: the first-run screen needs a name", out.Agents)
+	}
+}
+
+func TestAgentFilter_KeepsOneAgentsSessions(t *testing.T) {
+	get := twoAgentServer(t)
+	if n := get("/api/sessions/cards?since=all")["count_all"]; n != 2.0 {
+		t.Errorf("unfiltered sessions = %v", n)
+	}
+	only := get("/api/sessions/cards?since=all&agent=limited")
+	if only["count_all"] != 1.0 {
+		t.Fatalf("filtered sessions = %v", only["count_all"])
+	}
+	card := only["sessions"].([]any)[0].(map[string]any)
+	if card["id"] != "other-1" || card["cost_unknown"] != true {
+		t.Errorf("card = %v", card)
+	}
+	if v := get("/api/overview?since=all&agent=claude-code")["tokens"]; v != 0.0 {
+		t.Errorf("Claude's tokens = %v: the other agent's mustn't count", v)
+	}
+	if v := get("/api/overview?since=all&agent=limited")["tokens"]; v != 150.0 {
+		t.Errorf("the other agent's tokens = %v", v)
+	}
+}
+
+func TestOverview_CountsSessionsWithNoCost(t *testing.T) {
+	get := twoAgentServer(t)
+	if v := get("/api/overview?since=all")["cost_unknown_sessions"]; v != 1.0 {
+		t.Errorf("mixed = %v, want 1", v)
+	}
+	if v := get("/api/overview?since=all&agent=claude-code")["cost_unknown_sessions"]; v != 0.0 {
+		t.Errorf("Claude only = %v, want 0", v)
+	}
+}
+
+func TestTimeline_NamesTheAgent(t *testing.T) {
+	get := twoAgentServer(t)
+	other := get("/api/sessions/other-1/timeline")
+	if other["agent_name"] != "Limited Agent" || other["cost_unknown"] != true {
+		t.Errorf("other = %v, %v", other["agent_name"], other["cost_unknown"])
+	}
+	if got := get("/api/sessions/s1/timeline")["agent_name"]; got != "Claude Code" {
+		t.Errorf("claude = %v", got)
+	}
+}
+
+func TestTimeline_PromptDividerHasNoCostWhenUnknown(t *testing.T) {
+	get := twoAgentServer(t)
+	divider := func(sessionID string) string {
+		t.Helper()
+		for _, r := range get("/api/sessions/" + sessionID + "/timeline")["rows"].([]any) {
+			if row := r.(map[string]any); row["kind"] == "div" {
+				return row["meta"].(string)
+			}
+		}
+		t.Fatalf("%s has no divider", sessionID)
+		return ""
+	}
+	if got := divider("other-1"); strings.Contains(got, "$") {
+		t.Errorf("divider = %q, want no dollar figure", got)
+	}
+	if got := divider("s1"); !strings.Contains(got, "$") {
+		t.Errorf("Claude's divider = %q, want its cost", got)
+	}
+}

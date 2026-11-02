@@ -21,7 +21,7 @@ import (
 // The subset used here (initialize, ping, tools) is the same in all of them.
 var protocolVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"}
 
-const instructions = "Token Advisor holds this user's Claude Code usage: spend, tokens, cache, tools, permissions, and sessions. " +
+const instructions = "Token Advisor holds this user's coding agent usage: spend, tokens, cache, tools, permissions, and sessions. " +
 	"Start with get_findings for known problems and get_schema for what can be queried, then use run_sql to quantify and compare. " +
 	"Drill into one prompt or session through v_api_request_detail and v_tool_call_detail. " +
 	"Prompt text, responses, file paths, and commands are not available here."

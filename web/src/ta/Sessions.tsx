@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAgents } from "./agentContext";
 import { api, type Range, type SessionCard, type SessionCards } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
@@ -48,11 +49,12 @@ export default function Sessions() {
   const [symFilter, setSymFilter] = useState<string[]>([]);
   const [popOpen, setPopOpen] = useState(false);
   const firstRun = useFirstRun();
+  const { selected: agent } = useAgents();
 
   useEffect(() => {
     setData(null);
-    api.sessionCards(range).then(setData).catch((e: Error) => setError(e.message));
-  }, [range, firstRun]);
+    api.sessionCards(range, agent).then(setData).catch((e: Error) => setError(e.message));
+  }, [range, agent, firstRun]);
 
   const visible = useMemo(() => {
     if (!data) return [];
@@ -207,7 +209,7 @@ export default function Sessions() {
                     {g.name && (
                       <div className="group-head">
                         <span>{g.name}</span>
-                        <span className="meta-r">{g.rows.length} session{g.rows.length === 1 ? "" : "s"} · {money(g.rows.reduce((n, s) => n + s.cost_usd, 0))}</span>
+                        <span className="meta-r">{g.rows.length} session{g.rows.length === 1 ? "" : "s"} · {g.rows.every((s) => s.cost_unknown) ? "—" : money(g.rows.reduce((n, s) => n + s.cost_usd, 0))}</span>
                       </div>
                     )}
                     {g.rows.map((s) => (
@@ -251,7 +253,7 @@ function SessionRow({ s, showProject }: { s: SessionCard; showProject: boolean }
           <span className="nothing">Nothing to fix</span>
         )}
       </span>
-      <span className="cost-cell">{money(s.cost_usd)}</span>
+      <span className="cost-cell">{s.cost_unknown ? "—" : money(s.cost_usd)}</span>
       <span className="wait-cell">{waitMs(s.wait_ms)}</span>
       <span className="chev" aria-hidden="true">›</span>
     </Link>

@@ -25,6 +25,7 @@ export type SessionCard = {
   is_new: boolean;
   symptoms: ("compacted" | "failed" | "waits" | "repeats")[];
   issues: number;
+  cost_unknown?: boolean;
 };
 
 export type SessionCards = {
@@ -74,6 +75,7 @@ export type Overview = {
   models: { model: string; cost_usd: number; share: number }[];
   review: SessionCard[];
   sessions_count: number;
+  cost_unknown_sessions: number;
 };
 
 export type Fixes = {
@@ -123,6 +125,8 @@ export type Timeline = {
   rows: TimelineRow[];
   peak_context: number;
   compactions: number;
+  agent_name: string;
+  cost_unknown: boolean;
   receipt: {
     cost_usd: number;
     avoidable_usd: number;
@@ -156,7 +160,9 @@ export type AiResult = {
   dropped_count: number;
 };
 
-export type McpSetup = { server_name: string; enabled: boolean; command: string; verify: string; remove: string };
+export type AgentInfo = { id: string; name: string; sessions: number; cost_known: boolean; skipped: string[] };
+
+export type McpSetup = { server_name: string; agent_name: string; enabled: boolean; command: string; verify: string; remove: string };
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: "application/json" } });
@@ -176,16 +182,21 @@ async function send<T>(method: string, path: string, body?: unknown): Promise<T>
   return out as T;
 }
 
+function agentQuery(agent: string): string {
+  return agent ? `&agent=${encodeURIComponent(agent)}` : "";
+}
+
 export const api = {
-  overview: (range: Range) => get<Overview>(`/api/overview?since=${range}`),
-  sessionCards: (range: Range) => get<SessionCards>(`/api/sessions/cards?since=${range}`),
+  agents: () => get<{ agents: AgentInfo[] }>(`/api/agents`),
+  overview: (range: Range, agent = "") => get<Overview>(`/api/overview?since=${range}${agentQuery(agent)}`),
+  sessionCards: (range: Range, agent = "") => get<SessionCards>(`/api/sessions/cards?since=${range}${agentQuery(agent)}`),
   timeline: (id: string) => get<Timeline>(`/api/sessions/${encodeURIComponent(id)}/timeline`),
   issues: (id: string) =>
     get<{ session_id: string; areas: Record<string, Occurrence[]> }>(`/api/sessions/${encodeURIComponent(id)}/issues`),
-  fixes: (range: Range) => get<Fixes>(`/api/fixes?since=${range}`),
+  fixes: (range: Range, agent = "") => get<Fixes>(`/api/fixes?since=${range}${agentQuery(agent)}`),
   setFixState: (key: string, state: "fixed" | "reverted") =>
     send<{ key: string; state: string }>("POST", `/api/fixes/${encodeURIComponent(key)}/state`, { state }),
-  progress: () => get<Progress>(`/api/progress?since=install`),
+  progress: (agent = "") => get<Progress>(`/api/progress?since=install${agentQuery(agent)}`),
   status: () => get<Status>(`/api/status`),
   mcpSetup: () => get<McpSetup>(`/api/mcp/setup`),
   visit: () => send<{ last_visit_at: number; previous_visit_at: number }>("POST", `/api/ui/visit`),

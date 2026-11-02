@@ -329,6 +329,7 @@ func TestToolCategory_UnknownAgentHasNoCategories(t *testing.T) {
 // limitedAgent has commands but no file paths, approval times or dollar figures.
 type limitedAgent struct{ agent.Agent }
 
+func (limitedAgent) Name() string                   { return "Limited Agent" }
 func (limitedAgent) Capabilities() agent.Capability { return agent.CapCommands }
 func (limitedAgent) CostSource() agent.CostSource   { return agent.CostNone }
 func (limitedAgent) PremiumModel(m string) bool     { return m == "big-model" }
