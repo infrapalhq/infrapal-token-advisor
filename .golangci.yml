@@ -1,0 +1,29 @@
+version: "2"
+
+linters:
+  # The default set (errcheck, govet, ineffassign, staticcheck, unused), plus
+  # checks for the mistakes this code is most exposed to: unclosed HTTP bodies,
+  # unchecked SQL row errors, and wrapped errors compared with ==.
+  # sqlclosecheck stays off: with one SQLite connection, rows must be closed
+  # before the next query, so a deferred Close would deadlock.
+  enable:
+    - bodyclose
+    - errorlint
+    - misspell
+    - nilerr
+    - rowserrcheck
+    - unconvert
+    - unparam
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*database/sql.Tx).Rollback # deferred, and a no-op after Commit
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck
+          - errorlint
+          - rowserrcheck

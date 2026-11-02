@@ -70,11 +70,6 @@ func nullInt64Attr(m map[string]any, key string) sql.NullInt64 {
 	return sql.NullInt64{Int64: v, Valid: ok}
 }
 
-func nullFloat64Attr(m map[string]any, key string) sql.NullFloat64 {
-	v, ok := attrFloat64(m, key)
-	return sql.NullFloat64{Float64: v, Valid: ok}
-}
-
 // nullBoolAttr reads a bool attribute into an INTEGER (0/1) column — SQLite
 // has no native boolean type, matching how `success` etc. are declared in
 // the schema.

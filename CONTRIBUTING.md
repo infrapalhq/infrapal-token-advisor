@@ -60,6 +60,7 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
    gofmt -l .            # should print nothing
    go vet ./...
    go test -race ./...
+   golangci-lint run     # needs golangci-lint v2: https://golangci-lint.run/docs/welcome/install/
    ```
 
 4. If you changed anything under `web/`, check that it builds and lints:

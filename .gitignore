@@ -2,6 +2,7 @@
 /internal/webui/dist/*
 !/internal/webui/dist/.gitkeep
 /dist/
+/coverage.out
 web/node_modules/
 web/dist/
 *.db

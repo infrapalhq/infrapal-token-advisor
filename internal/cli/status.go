@@ -2,6 +2,7 @@ package cli
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -82,7 +83,7 @@ func serviceStatusLine(p paths.Paths) string {
 		return fmt.Sprintf("unknown (%v)", err)
 	}
 	svc, err := newService(sp)
-	if err == service.ErrUnsupported {
+	if errors.Is(err, service.ErrUnsupported) {
 		return "no supported service manager on this platform"
 	}
 	if err != nil {

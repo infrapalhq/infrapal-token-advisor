@@ -29,9 +29,10 @@ func launchdPlistPath(home string) string {
 func launchdPlistXML(p Paths) []byte {
 	esc := xml.EscapeText
 	var execPath, stdoutLog, stderrLog strings.Builder
-	esc(&execPath, []byte(p.ExecPath))
-	esc(&stdoutLog, []byte(p.StdoutLog))
-	esc(&stderrLog, []byte(p.StderrLog))
+	// A strings.Builder never fails a write.
+	_ = esc(&execPath, []byte(p.ExecPath))
+	_ = esc(&stdoutLog, []byte(p.StdoutLog))
+	_ = esc(&stderrLog, []byte(p.StderrLog))
 
 	return []byte(fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -116,7 +117,7 @@ func (s *launchdService) CheckAutostart() error {
 	domain := "gui/" + strconv.Itoa(os.Getuid())
 	out, err := exec.Command("launchctl", "print-disabled", domain).Output()
 	if err != nil {
-		return nil // can't tell, and the job may well be fine
+		return nil //nolint:nilerr // can't tell, and the job may well be fine
 	}
 	if launchdDisabled(string(out)) {
 		return errors.New("the service is disabled in launchd, so it won't start at login")
@@ -157,7 +158,7 @@ func (s *launchdService) Status() (Status, error) {
 	out, err := exec.Command("launchctl", "list", launchdLabel).Output()
 	if err != nil {
 		// launchctl exits non-zero when the label isn't loaded.
-		return Status{Installed: true, Running: false, Detail: "installed but not loaded"}, nil
+		return Status{Installed: true, Running: false, Detail: "installed but not loaded"}, nil //nolint:nilerr // see above
 	}
 
 	pid := parseLaunchctlPID(string(out))
