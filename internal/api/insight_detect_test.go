@@ -452,3 +452,39 @@ func TestDetectors_AgentWithNoAdvisorStillGetsFindings(t *testing.T) {
 		t.Errorf("ShellPattern = %q, want the plain prefix", got)
 	}
 }
+
+// An allow rule is permanent, so a command that can write must never be called
+// safe, whatever shape it comes in.
+func FuzzIsSafePattern(f *testing.F) {
+	for _, seed := range []string{"ls -la", "git status", "cat a | grep b", "echo hi > out", "ls 2>&1", "rm -rf /", "ls; rm x", "find . -delete", "cat $(whoami)", "`id`", "sed -i s/a/b/ f"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, cmd string) {
+		if !isSafePattern(toolRow{Name: "x", Category: agent.ToolShell, Command: cmd}) {
+			return
+		}
+		stripped := strings.TrimSpace(cmd)
+		for _, r := range harmlessRedirects {
+			stripped = strings.ReplaceAll(stripped, r, "")
+		}
+		for _, m := range unsafeBashMarkers {
+			if strings.Contains(stripped, m) {
+				t.Errorf("%q was called safe, but contains %q", cmd, m)
+			}
+		}
+		for _, seg := range pipelineSplit.Split(stripped, -1) {
+			if !safeBashPrefixes[bashPattern(strings.TrimSpace(seg))] {
+				t.Errorf("%q was called safe, but %q isn't read-only", cmd, seg)
+			}
+		}
+	})
+}
+
+func FuzzParseToolInput(f *testing.F) {
+	for _, seed := range []string{"", "{}", "null", "[]", `{"file_path":"/a","offset":1,"limit":2}`, `{"offset":"x"}`, `{"offset":1e999}`} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(_ *testing.T, input string) {
+		parseToolInput(input, &toolRow{})
+	})
+}
