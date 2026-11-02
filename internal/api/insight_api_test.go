@@ -231,9 +231,9 @@ func TestVisitRecordsLastVisitAndMarksNew(t *testing.T) {
 	if first["previous_visit_at"].(float64) != 0 {
 		t.Fatalf("first visit has no previous visit")
 	}
-	_, state := call("GET", "/api/ui/state", "")
-	if state["last_visit_at"] == nil {
-		t.Fatalf("state should include last_visit_at: %v", state)
+	_, second := call("POST", "/api/ui/visit", "")
+	if second["previous_visit_at"] != first["last_visit_at"] {
+		t.Fatalf("second visit should see the first: %v, %v", first, second)
 	}
 	_, cards := call("GET", "/api/sessions/cards", "")
 	c := cards["sessions"].([]any)[0].(map[string]any)

@@ -9,10 +9,15 @@ import (
 // newSPAHandler serves the embedded dashboard build out of uiFS. Requests
 // for a path that exists as a real file (e.g. /assets/index-abc123.js) are
 // served as-is; anything else (e.g. /waterfall, a client-side route) falls
-// back to index.html so the React Router app can take over.
+// back to index.html so the React Router app can take over. An unknown /api/
+// path is a 404, not the dashboard's HTML.
 func newSPAHandler(uiFS fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(uiFS))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
 		p := strings.TrimPrefix(r.URL.Path, "/")
 		if p == "" {
 			p = "index.html"

@@ -13,6 +13,9 @@ import (
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
 
+// maxAIFacts caps the findings sent to the model, since every one costs tokens.
+const maxAIFacts = 20
+
 // handleGetAIConfig handles GET /api/ai/config — reports only whether an
 // Anthropic API key is configured; the key itself is never sent to the
 // frontend.
@@ -75,8 +78,7 @@ func (s *Server) handleGetAIRecommendations(w http.ResponseWriter, r *http.Reque
 // handlePostAIRecommendations handles POST /api/ai/recommendations, body
 // {"since": "30d", "force": false}. This is one of infrapal-token-advisor's two deliberate
 // exceptions to read-only/local-only (see the package doc) — it runs only
-// in direct response to a user-triggered request, which the frontend only
-// ever sends from the Trace page's "Explain this trace" action.
+// in direct response to a user-triggered request.
 func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Since string `json:"since"`
@@ -108,27 +110,18 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 	}
 	apiKey := config.ResolveAnthropicAPIKey(cfg)
 	if apiKey == "" {
-		writeError(w, http.StatusPreconditionFailed, "no Anthropic API key configured — add one from the Trace page first")
+		writeError(w, http.StatusPreconditionFailed, "no Anthropic API key configured — add one in Settings first")
 		return
 	}
 
-	rawFindings, err := computeFindings(r.Context(), s.db)
+	findings, err := SafeFindings(r.Context(), s.db, body.Since)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	facts := make([]ai.InsightFact, len(rawFindings))
-	for i, f := range rawFindings {
-		facts[i] = ai.InsightFact{
-			Category: findingCategoryForAI(f.Kind),
-			Severity: findingSeverityForAI(f.Severity),
-			Title:    f.Title,
-			Detail:   f.Evidence,
-		}
-	}
 
 	client := ai.NewClient(apiKey)
-	result, err := ai.Generate(r.Context(), s.db, client, body.Since, cutoffMs, haveCutoff, facts, body.Force)
+	result, err := ai.Generate(r.Context(), s.db, client, body.Since, cutoffMs, haveCutoff, aiFacts(findings), body.Force)
 	if err != nil {
 		var ce *ai.ClientError
 		if errors.As(err, &ce) {
@@ -141,27 +134,40 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, result)
 }
 
-// findingCategoryForAI maps a Finding.Kind (the 4 detector kinds in
-// findings.go, each guaranteed to carry a runnable fix) onto the 4-value
-// category enum ai.InsightFact and the Anthropic tool schema
-// (internal/ai/client.go) already expect.
-func findingCategoryForAI(kind string) string {
-	switch kind {
-	case "dead_mcp":
-		return "tools"
-	case "permission_friction", "rejected_work":
-		return "waste"
-	default: // fat_payload
-		return "efficiency"
+// aiFacts turns findings into what the model sees, highest priority first.
+// They are SafeFindings, so no file path, command, or project name goes out.
+func aiFacts(findings []SafeFinding) []ai.InsightFact {
+	facts := make([]ai.InsightFact, 0, maxAIFacts)
+	for _, f := range findings {
+		if f.MarkedFixed {
+			continue
+		}
+		if len(facts) == maxAIFacts {
+			break
+		}
+		severity := "info"
+		if f.Severity == "full" {
+			severity = "warn"
+		}
+		facts = append(facts, ai.InsightFact{
+			Category: aiCategory(f),
+			Severity: severity,
+			Title:    f.Title,
+			Detail:   f.Detail,
+		})
 	}
+	return facts
 }
 
-// findingSeverityForAI maps a Finding.Severity ("bad"|"warn"|"good"|"info")
-// onto the 2-value severity enum ("info"|"warn") the rest of the AI
-// pipeline expects.
-func findingSeverityForAI(severity string) string {
-	if severity == "bad" || severity == "warn" {
-		return "warn"
+// aiCategory maps a finding onto the category enum in the Anthropic tool
+// schema (internal/ai/client.go).
+func aiCategory(f SafeFinding) string {
+	switch {
+	case strings.Contains(f.Kind, "mcp"):
+		return "tools"
+	case f.Area == "exec" || f.Area == "perm":
+		return "waste"
+	default:
+		return "efficiency"
 	}
-	return "info"
 }
