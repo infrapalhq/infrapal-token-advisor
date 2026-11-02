@@ -9,7 +9,6 @@ import (
 // The views and detectors still read Claude Code's own values for these, so
 // common events are written in that form.
 const (
-	queryMain       = "repl_main_thread"
 	queryBackground = "background"
 	queryTurnCost   = "turn_cost"
 
@@ -136,12 +135,12 @@ func writeResponse(tx *sql.Tx, ev agent.Response) error {
 		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(message_uuid) DO UPDATE SET
 			response_text = COALESCE(excluded.response_text, assistant_responses.response_text)`,
-		ev.MessageID, nullableString(ev.PromptID), ev.SessionID, ev.Ts, queryMain, nullableString(ev.Text))
+		ev.MessageID, nullableString(ev.PromptID), ev.SessionID, ev.Ts, agent.MainQuerySource, nullableString(ev.Text))
 	return err
 }
 
 func writeRequest(tx *sql.Tx, ev agent.Request) error {
-	source := queryMain
+	source := agent.MainQuerySource
 	if ev.Background {
 		source = queryBackground
 	}

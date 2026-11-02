@@ -105,17 +105,87 @@ type insightData struct {
 	blendedRate float64            // USD per token, this install's own rate
 }
 
-// toolCategory asks a session's agent what one of its tools does. A session
-// from an agent this build doesn't know has no categories to give.
-func toolCategory(id agent.ID, name string) agent.ToolCategory {
+// agentFor finds a session's agent. ok is false for an agent this build doesn't
+// know, which is treated as supporting nothing.
+func agentFor(id agent.ID) (agent.Agent, bool) {
 	if id == "" {
 		id = all.Default("").ID()
 	}
-	a, ok := all.Find("", id)
+	return findAgent(id)
+}
+
+// findAgent is all.Find behind a seam, so tests can use an agent with fewer
+// capabilities than any this build supports.
+var findAgent = func(id agent.ID) (agent.Agent, bool) { return all.Find("", id) }
+
+// toolCategory asks a session's agent what one of its tools does.
+func toolCategory(id agent.ID, name string) agent.ToolCategory {
+	a, ok := agentFor(id)
 	if !ok {
 		return agent.ToolOther
 	}
 	return a.ToolCategory(name)
+}
+
+// capable reports whether a session's agent has everything in need.
+func (d *insightData) capable(sessionID string, need agent.Capability) bool {
+	if need == 0 {
+		return true
+	}
+	a, ok := agentFor(d.sessions[sessionID].Agent)
+	return ok && a.Capabilities().Has(need)
+}
+
+// withCapability returns the data a check needing this can use: d itself when
+// every session qualifies, or otherwise a copy holding only those that do.
+func (d *insightData) withCapability(need agent.Capability) *insightData {
+	allCapable := true
+	for id := range d.sessions {
+		if !d.capable(id, need) {
+			allCapable = false
+			break
+		}
+	}
+	if allCapable {
+		return d
+	}
+	view := *d
+	view.tools = nil
+	for _, t := range d.tools {
+		if d.capable(t.SessionID, need) {
+			view.tools = append(view.tools, t)
+		}
+	}
+	view.reqs = nil
+	for _, r := range d.reqs {
+		if d.capable(r.SessionID, need) {
+			view.reqs = append(view.reqs, r)
+		}
+	}
+	view.compactions = nil
+	for _, c := range d.compactions {
+		if d.capable(c.SessionID, need) {
+			view.compactions = append(view.compactions, c)
+		}
+	}
+	return &view
+}
+
+// premiumModel reports whether a request used its agent's most expensive tier.
+func (d *insightData) premiumModel(r reqRow) bool {
+	a, ok := agentFor(d.sessions[r.SessionID].Agent)
+	return ok && a.PremiumModel(r.Model)
+}
+
+// costUnknown reports whether a session's agent gives no dollar figures, so a
+// finding shows none rather than an invented $0.00. A finding with no session
+// isn't tied to one agent.
+func (d *insightData) costUnknown(sessionID string) bool {
+	if sessionID == "" {
+		return false
+	}
+	a, ok := agentFor(d.sessions[sessionID].Agent)
+	return ok && a.CostSource() == agent.CostNone
 }
 
 // loadDeadMCP lists connected MCP servers that never had a tool called.
