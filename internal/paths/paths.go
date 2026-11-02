@@ -28,6 +28,7 @@ type Paths struct {
 	LogPath    string // ~/.infrapal-token-advisor/token-advisor.log
 
 	ClaudeSettingsPath string // ~/.claude/settings.json
+	ClaudeConfigPath   string // ~/.claude.json, where user-scoped MCP servers are registered
 }
 
 // Resolve computes all infrapal-token-advisor paths relative to the current user's home
@@ -46,6 +47,7 @@ func Resolve() (Paths, error) {
 		ConfigPath:         filepath.Join(base, "config.json"),
 		LogPath:            filepath.Join(base, "token-advisor.log"),
 		ClaudeSettingsPath: filepath.Join(home, ".claude", "settings.json"),
+		ClaudeConfigPath:   filepath.Join(home, ".claude.json"),
 	}, nil
 }
 

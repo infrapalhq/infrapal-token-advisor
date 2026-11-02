@@ -140,6 +140,8 @@ export type Progress = {
 
 export type Status = { collector_live: boolean; prompts_logged_7d: boolean; last_event_ms?: number };
 
+export type McpSetup = { server_name: string; enabled: boolean; command: string; verify: string; remove: string };
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: "application/json" } });
   const body = await res.json().catch(() => ({}));
@@ -169,6 +171,7 @@ export const api = {
     send<{ key: string; state: string }>("POST", `/api/fixes/${encodeURIComponent(key)}/state`, { state }),
   progress: () => get<Progress>(`/api/progress?since=install`),
   status: () => get<Status>(`/api/status`),
+  mcpSetup: () => get<McpSetup>(`/api/mcp/setup`),
   visit: () => send<{ last_visit_at: number; previous_visit_at: number }>("POST", `/api/ui/visit`),
   aiConfig: () => get<{ configured: boolean }>(`/api/ai/config`),
   saveAIKey: (key: string) => send<{ configured: boolean }>("PUT", `/api/ai/config`, { anthropic_api_key: key }),

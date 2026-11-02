@@ -1,9 +1,92 @@
 import { useEffect, useState, useCallback } from "react";
-import { api, type Fixes as FixesData, type Item, type Progress } from "./api";
+import { api, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
 import { Shell } from "./Shell";
 import { AREA_NAME, dayShort, money } from "./format";
 
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const MCP_SAMPLE_PROMPT = "Use infrapal-token-advisor to find my three biggest sources of avoidable Claude Code spend in the last 30 days, and tell me what to change first.";
+
+function CopyBlock({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="mcp-copy">
+      <pre className="code">{text}</pre>
+      <button
+        className="btn"
+        type="button"
+        onClick={() => {
+          navigator.clipboard?.writeText(text).catch(() => {});
+          setCopied(true);
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </div>
+  );
+}
+
+function EnableMcp() {
+  const [setup, setSetup] = useState<McpSetup | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  const check = useCallback(() => {
+    setChecking(true);
+    api.mcpSetup()
+      .then((s) => {
+        setSetup(s);
+        setError(null);
+      })
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setChecking(false));
+  }, []);
+
+  useEffect(() => {
+    check();
+  }, [check]);
+
+  if (error && !setup) return <p className="hint-line">Could not load MCP setup: {error}</p>;
+  if (!setup) return null;
+
+  return (
+    <section className="card mcp" aria-label="Enable MCP">
+      <div className="card-top">
+        <strong>{setup.enabled ? "MCP is enabled" : "Enable MCP to ask Claude about this data"}</strong>
+        <span className={`ok${setup.enabled ? "" : " dashed"}`}>{setup.enabled ? "On" : "Off"}</span>
+      </div>
+      <span className="body-copy">
+        Claude Code can query your spend, tokens, sessions and findings and work out insights this page doesn't show.
+        When it does, those results go to Anthropic with the conversation. It gets numbers and ids only, not your prompts, responses, file paths or commands.
+      </span>
+      {!setup.enabled && (
+        <>
+          <div className="mcp-step">
+            <b>1. Paste this in your terminal</b>
+            <CopyBlock text={setup.command} />
+          </div>
+          <div className="mcp-step">
+            <b>2. Check that it shows as connected</b>
+            <CopyBlock text={setup.verify} />
+          </div>
+        </>
+      )}
+      <div className="mcp-step">
+        <b>{setup.enabled ? "Start a new Claude Code session and ask" : "3. Start a new Claude Code session and ask"}</b>
+        <CopyBlock text={MCP_SAMPLE_PROMPT} />
+      </div>
+      {setup.enabled ? (
+        <div className="mcp-step">
+          <b>To turn it off</b>
+          <CopyBlock text={setup.remove} />
+        </div>
+      ) : (
+        <div className="acts">
+          <button className="btn btn-k" type="button" disabled={checking} onClick={check}>{checking ? "Checking…" : "Check again"}</button>
+        </div>
+      )}
+    </section>
+  );
+}
 
 export default function Fixes() {
   const [data, setData] = useState<FixesData | null>(null);
@@ -51,6 +134,8 @@ export default function Fixes() {
 
   return (
     <Shell fixesToDo={data?.to_fix.length} sessionCount={undefined}>
+      <EnableMcp />
+
       <div className="fixes-head">
         <div className="title-block">
           <p className="eb">Fixes · your progress</p>
