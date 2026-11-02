@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { api, type Status } from "./api";
+import { api } from "./api";
+import { useStatus } from "./status";
 import { useTheme } from "./theme";
 
 // Shell is the sidebar layout shared by Overview, Sessions, Fixes and Settings.
@@ -52,19 +53,4 @@ export function Sidebar({ fixesToDo, sessionCount }: { fixesToDo?: number; sessi
       </div>
     </aside>
   );
-}
-
-function useStatus(): Status | null {
-  const [s, setS] = useState<Status | null>(null);
-  useEffect(() => {
-    let live = true;
-    const load = () => api.status().then((v) => live && setS(v)).catch(() => {});
-    load();
-    const t = setInterval(load, 30_000);
-    return () => {
-      live = false;
-      clearInterval(t);
-    };
-  }, []);
-  return s;
 }

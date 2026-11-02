@@ -258,6 +258,40 @@ func containsAny(list []any, want string) bool {
 	return false
 }
 
+// The dashboard shows its setup steps for as long as last_event_ms is missing.
+func TestStatusOmitsLastEventUntilTelemetryArrives(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "token-advisor.db"))
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	ts := newTestServer(t, db)
+
+	status := func() map[string]any {
+		t.Helper()
+		resp, err := http.Get(ts.URL + "/api/status")
+		if err != nil {
+			t.Fatalf("get status: %v", err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("decode status: %v", err)
+		}
+		return out
+	}
+
+	if st := status(); st["last_event_ms"] != nil {
+		t.Errorf("a new database should have no last_event_ms: %v", st)
+	}
+	if _, err := db.Exec(`INSERT INTO events_raw (ts, event_name, body) VALUES (1000, 'user_prompt', '{}')`); err != nil {
+		t.Fatalf("insert event: %v", err)
+	}
+	if st := status(); st["last_event_ms"] == nil {
+		t.Errorf("status should report last_event_ms after an event: %v", st)
+	}
+}
+
 func TestProgressWeeksAndStatus(t *testing.T) {
 	call := insightDB(t)
 	code, body := call("GET", "/api/progress?since=all", "")
