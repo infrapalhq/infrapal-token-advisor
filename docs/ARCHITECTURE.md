@@ -95,6 +95,9 @@ categories such as `agent.ToolRead`, not tool names, so they work for any agent.
 A check also names the capabilities it needs, and only sees sessions from agents
 that have them, so that "no problems" never means "couldn't look".
 
+Fix text comes from the agent's `Advisor`. An agent without one still gets every
+finding, with no fix to paste.
+
 Detectors in `internal/api/insight_detect.go` are pure functions over one
 session's data. Each emits *occurrences*, which are grouped into items by kind and
 subject. Items are ranked by:

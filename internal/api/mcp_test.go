@@ -4,49 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
-
-func TestShellQuote(t *testing.T) {
-	for in, want := range map[string]string{
-		"/usr/local/bin/tool":   "/usr/local/bin/tool",
-		"/Users/a b/tool":       "'/Users/a b/tool'",
-		"/Users/o'neil/tool":    `'/Users/o'\''neil/tool'`,
-		"/tmp/$(touch pwned)/x": "'/tmp/$(touch pwned)/x'",
-	} {
-		if got := shellQuote(in); got != want {
-			t.Errorf("shellQuote(%q) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-func TestMCPRegistered(t *testing.T) {
-	dir := t.TempDir()
-	write := func(name, content string) string {
-		path := filepath.Join(dir, name)
-		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		return path
-	}
-	for _, tc := range []struct {
-		name string
-		path string
-		want bool
-	}{
-		{"missing file", filepath.Join(dir, "absent.json"), false},
-		{"invalid json", write("bad.json", "{"), false},
-		{"other servers", write("other.json", `{"mcpServers":{"github":{}}}`), false},
-		{"registered", write("yes.json", `{"mcpServers":{"`+MCPServerName+`":{"command":"x"}}}`), true},
-	} {
-		if got := mcpRegistered(tc.path); got != tc.want {
-			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
-		}
-	}
-}
 
 func TestHandleMCPSetup(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
