@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
-	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
@@ -16,11 +15,16 @@ import (
 func runInit(args []string) error {
 	fs := newFlagSet("init")
 	rawBodies := fs.Bool("raw-bodies", false, "enable OTEL_LOG_RAW_API_BODIES in file: mode (never inline)")
+	agentName := fs.String("agent", "", "the agent to connect: "+supportedAgents())
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
 	p, err := paths.Resolve()
+	if err != nil {
+		return err
+	}
+	chosen, err := chooseAgent(p.Home, *agentName)
 	if err != nil {
 		return err
 	}
@@ -42,7 +46,7 @@ func runInit(args []string) error {
 
 	opts := agent.ConnectOptions{
 		OTLPPort: cfg.OTLPPort,
-		Previous: agent.Connection{BackupPath: cfg.SettingsBackupPath},
+		Previous: agent.Connection{BackupPath: cfg.Agents[string(chosen.ID())].BackupPath},
 	}
 	if *rawBodies {
 		if err := p.EnsureBodiesDir(); err != nil {
@@ -50,11 +54,14 @@ func runInit(args []string) error {
 		}
 		opts.RawBodiesDir = p.BodiesDir
 	}
-	conn, err := all.Default(p.Home).Connect(os.Stdout, opts)
+	conn, err := chosen.Connect(os.Stdout, opts)
 	if err != nil {
 		return err
 	}
-	cfg.SettingsBackupPath = conn.BackupPath
+	if cfg.Agents == nil {
+		cfg.Agents = map[string]config.AgentState{}
+	}
+	cfg.Agents[string(chosen.ID())] = config.AgentState{BackupPath: conn.BackupPath}
 
 	if err := config.Save(p, cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)

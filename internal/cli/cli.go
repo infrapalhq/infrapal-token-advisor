@@ -7,10 +7,10 @@ import (
 	"fmt"
 )
 
-const usage = `token-advisor — local Claude Code telemetry collector
+const usage = `token-advisor — local coding agent telemetry collector
 
 Usage:
-  token-advisor init            patch ~/.claude/settings.json, create DB, install background service
+  token-advisor init            connect an agent, create DB, install background service
   token-advisor start           run collector and dashboard in foreground (what the service invokes)
   token-advisor stop            stop the background service
   token-advisor restart         restart the background service, e.g. after an upgrade
@@ -22,7 +22,7 @@ Usage:
   token-advisor export          export captured data (--format jsonl|csv --since 7d)
   token-advisor purge           delete captured data (--before 30d | --session <id> | --all)
   token-advisor update          install the latest release (--check only reports it)
-  token-advisor uninstall       revert settings.json from backup, remove service
+  token-advisor uninstall       undo init and remove the service (--agent disconnects just one)
   token-advisor version         print the token-advisor version
 
 Run "token-advisor <command> -h" for flags on a specific command.

@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
-	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
@@ -15,6 +14,7 @@ import (
 func runUninstall(args []string) error {
 	fs := newFlagSet("uninstall")
 	keepDB := fs.Bool("keep-db", false, "keep the SQLite database after uninstalling")
+	agentName := fs.String("agent", "", "only disconnect this agent, keeping everything else: "+supportedAgents())
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -22,6 +22,10 @@ func runUninstall(args []string) error {
 	p, err := paths.Resolve()
 	if err != nil {
 		return err
+	}
+
+	if *agentName != "" {
+		return disconnectAgent(p, *agentName)
 	}
 
 	sp, err := servicePaths(p)
@@ -45,8 +49,11 @@ func runUninstall(args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
-	if err := all.Default(p.Home).Disconnect(os.Stdout, agent.Connection{BackupPath: cfg.SettingsBackupPath}); err != nil {
-		return err
+	for _, a := range connectedAgents(p.Home, cfg) {
+		conn := agent.Connection{BackupPath: cfg.Agents[string(a.ID())].BackupPath}
+		if err := a.Disconnect(os.Stdout, conn); err != nil {
+			return err
+		}
 	}
 
 	if *keepDB {
@@ -59,5 +66,27 @@ func runUninstall(args []string) error {
 	}
 
 	fmt.Println("uninstall complete")
+	return nil
+}
+
+// disconnectAgent removes one agent, leaving the service and data for the rest.
+func disconnectAgent(p paths.Paths, name string) error {
+	a, err := chooseAgent(p.Home, name)
+	if err != nil {
+		return err
+	}
+	cfg, err := config.Load(p)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+	conn := agent.Connection{BackupPath: cfg.Agents[string(a.ID())].BackupPath}
+	if err := a.Disconnect(os.Stdout, conn); err != nil {
+		return err
+	}
+	delete(cfg.Agents, string(a.ID()))
+	if err := config.Save(p, cfg); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+	fmt.Printf("%s disconnected. token-advisor is still running: `token-advisor uninstall` removes it completely\n", a.Name())
 	return nil
 }

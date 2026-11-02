@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
@@ -94,16 +93,22 @@ func runDoctor(args []string) error {
 	}
 
 	// 2. Is the agent set up to report here?
-	checks, err := all.Default(p.Home).Check(cfg.OTLPPort)
-	if err != nil {
-		return err
-	}
-	for _, c := range checks {
-		if c.Skipped {
-			fmt.Printf("[SKIP] %s\n", c.Label)
-			continue
+	agents := connectedAgents(p.Home, cfg)
+	for _, a := range agents {
+		if len(agents) > 1 {
+			fmt.Printf("[INFO] %s:\n", a.Name())
 		}
-		ok(c.Pass, c.Label, c.Fix)
+		checks, err := a.Check(cfg.OTLPPort)
+		if err != nil {
+			return err
+		}
+		for _, c := range checks {
+			if c.Skipped {
+				fmt.Printf("[SKIP] %s\n", c.Label)
+				continue
+			}
+			ok(c.Pass, c.Label, c.Fix)
+		}
 	}
 
 	// 5. Last received metric/event/span timestamps.
