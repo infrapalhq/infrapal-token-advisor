@@ -31,7 +31,7 @@ type EvidenceFact struct {
 }
 
 // Recommendation is one model-proposed callout, prior to grounding
-// validation. Mirrors api.Insight's Category/Severity/Title/Detail so the
+// validation. Mirrors InsightFact's Category/Severity/Title/Detail so the
 // frontend can reuse InsightBanner's visual language.
 type Recommendation struct {
 	Category string         `json:"category"`
