@@ -7,7 +7,7 @@ The adapter interface is experimental. Claude Code is the only real agent so far
 so expect it to change as the next one teaches us something. If your agent doesn't
 fit, tell us in your issue: that's useful, and the interface can move.
 
-Before you start, [open a new agent issue](https://github.com/infrapalhq/infrapal-token-advisor/issues/new/choose),
+Before you start, [open a new agent issue](https://github.com/infrapalhq/infrapal-token-advisor/issues/new?template=new_agent.yml),
 so nobody duplicates your work.
 
 ## 1. Find out what your agent really reports

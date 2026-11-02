@@ -1,0 +1,68 @@
+name: New agent support
+description: Ask for, or offer to add, support for another coding agent.
+labels: [agent-support]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! You can answer as much or as little as you know. [Adding an agent](https://github.com/infrapalhq/infrapal-token-advisor/blob/main/docs/ADDING_AN_AGENT.md) shows how to find out what an agent reports.
+        Please don't paste prompts, file paths or other private data here.
+  - type: input
+    id: agent
+    attributes:
+      label: Which agent?
+      description: Its name and a link to it.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version you looked at
+      description: Telemetry changes between versions, so this helps a lot.
+  - type: dropdown
+    id: reports
+    attributes:
+      label: How does it report usage?
+      options:
+        - OpenTelemetry logs
+        - Local files or a database
+        - Both
+        - Only metrics or traces
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: helping
+    attributes:
+      label: Do you want to build it?
+      options:
+        - Yes, I'd like to write the adapter
+        - I can help test it
+        - I'm asking for someone else to build it
+    validations:
+      required: true
+  - type: checkboxes
+    id: data
+    attributes:
+      label: What can it report?
+      description: Tick what you've seen in real data. This becomes the adapter's capabilities, and anything missing just means a check is skipped.
+      options:
+        - label: Token counts, including cached tokens
+        - label: Dollar cost
+        - label: Tool calls
+        - label: File paths on tool calls
+        - label: Shell commands on tool calls
+        - label: How long you took to approve a tool
+        - label: Context compaction
+        - label: MCP server connections
+  - type: textarea
+    id: sample
+    attributes:
+      label: A sample of what it sends
+      description: One or two records, from a real session if you can. Remove anything private first.
+      render: json
+  - type: textarea
+    id: misfit
+    attributes:
+      label: Anything that doesn't seem to fit?
+      description: The adapter interface is experimental, so this is especially useful. For example, a report the common events can't carry.
