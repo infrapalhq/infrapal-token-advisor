@@ -42,6 +42,7 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
 | --- | --- |
 | `cmd/token-advisor` | CLI entry point |
 | `internal/otlp` | OTLP/HTTP receiver for Claude Code telemetry |
+| `internal/agent` | The common model of a coding agent (experimental) |
 | `internal/ingest` | Turns OTLP logs, metrics and spans into rows |
 | `internal/store` | SQLite store and numbered migrations (`migrations/NNNN_*.sql`) |
 | `internal/api` | Dashboard API, insight checks and fix suggestions |
