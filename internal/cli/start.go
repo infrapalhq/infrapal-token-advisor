@@ -12,12 +12,16 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/otlp"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
+
+// importInterval is how often agents that keep their data locally are read.
+const importInterval = time.Minute
 
 func runStart(args []string) error {
 	fs := newFlagSet("start")
@@ -74,7 +78,8 @@ func runStart(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	writer := ingest.NewWriter(db)
+	agents := all.Agents(p.Home)
+	writer := ingest.NewWriter(db, agents...)
 	writerDone := make(chan error, 1)
 	go func() {
 		defer logging.Recover("logs writer")
@@ -93,6 +98,11 @@ func runStart(args []string) error {
 	go func() {
 		defer logging.Recover("spans writer")
 		spansWriterDone <- spansWriter.Run(ctx)
+	}()
+
+	go func() {
+		defer logging.Recover("imports")
+		ingest.RunImports(ctx, db, agents, importInterval)
 	}()
 
 	go func() {
