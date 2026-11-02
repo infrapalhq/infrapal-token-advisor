@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
 )
 
 // Writer buffers decoded log records (RawEvents) and flushes them to
@@ -15,10 +17,15 @@ type Writer struct {
 	bw *batchWriter[RawEvent]
 }
 
-// NewWriter constructs a Writer over db. Call Run in its own goroutine to
-// start flushing.
-func NewWriter(db *sql.DB) *Writer {
-	return &Writer{bw: newBatchWriter(db, "logs", writeLogsBatch, describeRawEvent)}
+// NewWriter constructs a Writer over db. Records belonging to one of agents
+// are mapped by its adapter, and everything else is projected as Claude
+// Code's. Call Run in its own goroutine to start flushing.
+func NewWriter(db *sql.DB, agents ...agent.Agent) *Writer {
+	sources := logSources(agents)
+	write := func(db *sql.DB, batch []RawEvent) error {
+		return writeRoutedBatch(db, sources, batch)
+	}
+	return &Writer{bw: newBatchWriter(db, "logs", write, describeRawEvent)}
 }
 
 // Enqueue submits e for writing. Non-blocking.
@@ -34,6 +41,10 @@ func describeRawEvent(e RawEvent) string {
 }
 
 func writeLogsBatch(db *sql.DB, batch []RawEvent) error {
+	return writeRoutedBatch(db, nil, batch)
+}
+
+func writeRoutedBatch(db *sql.DB, sources []logSource, batch []RawEvent) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -51,9 +62,6 @@ func writeLogsBatch(db *sql.DB, batch []RawEvent) error {
 
 	touched := map[string]struct{}{}
 	for _, e := range batch {
-		if e.SessionID != "" {
-			touched[e.SessionID] = struct{}{}
-		}
 		if _, err := stmt.Exec(
 			e.Ts,
 			nullableString(e.SessionID),
@@ -63,6 +71,15 @@ func writeLogsBatch(db *sql.DB, batch []RawEvent) error {
 			e.Body,
 		); err != nil {
 			return err
+		}
+		if src := routeLog(sources, e); src != nil {
+			if err := writeMappedLog(tx, *src, e); err != nil {
+				return fmt.Errorf("map %q: %w", e.EventName, err)
+			}
+			continue
+		}
+		if e.SessionID != "" {
+			touched[e.SessionID] = struct{}{}
 		}
 		if err := upsertSession(tx, e.SessionID, e.Ts, e.Attrs, e.ResourceAttrs); err != nil {
 			return fmt.Errorf("upsert session for %q: %w", e.EventName, err)

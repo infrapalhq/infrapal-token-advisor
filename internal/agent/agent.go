@@ -1,6 +1,9 @@
 package agent
 
-import "io"
+import (
+	"context"
+	"io"
+)
 
 // ID names an agent in config, flags and stored data, such as "claude-code".
 type ID string
@@ -50,4 +53,43 @@ type Check struct {
 	Pass    bool
 	Fix     string // what to do if it failed
 	Skipped bool   // the check doesn't apply here, and Pass means nothing
+}
+
+// LogSource is for an agent that exports OTLP logs. Implement it, or Importer,
+// or both, according to how the agent reports.
+type LogSource interface {
+	// OwnsService reports whether a record with this service.name resource
+	// attribute came from this agent. A record no adapter owns is treated as
+	// Claude Code's.
+	OwnsService(service string) bool
+	// MapLog turns one record into events. Return nothing for a record you
+	// don't recognise: it has already been kept raw. Each event must set its
+	// Meta, because agents name their session and prompt ids differently.
+	MapLog(rec LogRecord) []Event
+}
+
+// LogRecord is one OTLP log record.
+type LogRecord struct {
+	Name  string         // the event.name attribute
+	Ts    int64          // Unix milliseconds
+	Attrs map[string]any // resource and record attributes, with the record's winning
+}
+
+// Importer is for an agent that keeps its data locally. It's called every so
+// often and should return promptly with a bounded batch, however large the
+// source is.
+type Importer interface {
+	// Import returns the events after cursor, which is empty the first time
+	// and otherwise a value this method returned. It's opaque to the caller,
+	// so a file offset or a timestamp both work. Leaving Cursor empty in the
+	// result keeps the current position.
+	Import(ctx context.Context, cursor string) (ImportBatch, error)
+}
+
+// ImportBatch is one step of an import. Its events and cursor are saved
+// together, so a crash can't lose or repeat a batch.
+type ImportBatch struct {
+	Events []Event
+	Cursor string
+	More   bool // there's more to read now, so call again straight away
 }
