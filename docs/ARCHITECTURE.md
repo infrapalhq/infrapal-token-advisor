@@ -92,6 +92,8 @@ Most figures come from SQL views, the `v_*` views, which keeps handlers thin.
 
 To add a check, write a function and add a line to `detectors`. Checks read tool
 categories such as `agent.ToolRead`, not tool names, so they work for any agent.
+A check also names the capabilities it needs, and only sees sessions from agents
+that have them, so that "no problems" never means "couldn't look".
 
 Detectors in `internal/api/insight_detect.go` are pure functions over one
 session's data. Each emits *occurrences*, which are grouped into items by kind and
