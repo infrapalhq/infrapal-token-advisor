@@ -1,19 +1,10 @@
-// Package api implements infrapal-token-advisor's HTTP API over the captured telemetry:
-// sessions, interaction waterfalls, full-text search, and the derived views
-// from migration 0006. Business logic lives in SQL (the views); handlers
-// here stay thin — decode params, run one query, encode JSON.
+// Package api implements infrapal-token-advisor's HTTP API over the captured
+// telemetry, serving the dashboard: insights, session timelines, and fixes.
 //
-// Two deliberate exceptions to "read-only, local-only":
-//
-//   - POST /api/ai/recommendations makes an outbound call to the Anthropic
-//     API, but only in direct response to a user-triggered request from
-//     the Trace page's "Explain this trace" action, and only once an API
-//     key has been explicitly configured — see internal/ai and the
-//     README's network-egress note.
-//   - POST /api/findings/{id}/state is this API's first write endpoint: it
-//     records a Dismiss/Snooze/Mark-fixed decision against the local
-//     finding_state table (migration 0009). Nothing here leaves the
-//     machine.
+// The API only ever talks to this machine, with one exception:
+// POST /api/ai/recommendations calls the Anthropic API, but only in direct
+// response to a user's request, and only once a key has been configured. See
+// internal/ai and the README's network note.
 package api
 
 import (
@@ -42,16 +33,6 @@ type Server struct {
 func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	s := &Server{db: db}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/sessions", s.handleListSessions)
-	mux.HandleFunc("GET /api/sessions/{id}", s.handleGetSession)
-	mux.HandleFunc("GET /api/interactions", s.handleListInteractions)
-	mux.HandleFunc("GET /api/interactions/{prompt_id}", s.handleGetInteraction)
-	mux.HandleFunc("GET /api/search", s.handleSearch)
-	mux.HandleFunc("GET /api/views/{name}", s.handleView)
-	mux.HandleFunc("GET /api/timeseries", s.handleTimeseries)
-	mux.HandleFunc("GET /api/findings", s.handleFindings)
-	mux.HandleFunc("POST /api/findings/{id}/state", s.handlePostFindingState)
-	mux.HandleFunc("GET /api/findings/activity", s.handleFindingsActivity)
 	mux.HandleFunc("GET /api/ai/config", s.handleGetAIConfig)
 	mux.HandleFunc("PUT /api/ai/config", s.handlePutAIConfig)
 	mux.HandleFunc("GET /api/ai/recommendations", s.handleGetAIRecommendations)
@@ -62,7 +43,6 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	mux.HandleFunc("GET /api/sessions/{id}/issues", s.handleSessionIssues)
 	mux.HandleFunc("GET /api/fixes", s.handleFixes)
 	mux.HandleFunc("POST /api/fixes/{id}/state", s.handlePostFixState)
-	mux.HandleFunc("GET /api/ui/state", s.handleGetUIState)
 	mux.HandleFunc("POST /api/ui/visit", s.handlePostUIVisit)
 	mux.HandleFunc("GET /api/progress", s.handleProgress)
 	mux.HandleFunc("GET /api/status", s.handleStatus)
@@ -82,16 +62,6 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 // (e.g. from `token-advisor ui`).
 func Endpoints() []string {
 	return []string{
-		"GET /api/sessions",
-		"GET /api/sessions/{id}",
-		"GET /api/interactions?limit=&offset=&since=&sort=",
-		"GET /api/interactions/{prompt_id}",
-		"GET /api/search?q=",
-		"GET /api/views/{name}",
-		"GET /api/timeseries?metric=&bucket=",
-		"GET /api/findings",
-		"POST /api/findings/{id}/state",
-		"GET /api/findings/activity?since=",
 		"GET /api/ai/config",
 		"PUT /api/ai/config",
 		"GET /api/ai/recommendations?since=",
@@ -102,7 +72,6 @@ func Endpoints() []string {
 		"GET /api/sessions/{id}/issues",
 		"GET /api/fixes?since=",
 		"POST /api/fixes/{id}/state",
-		"GET /api/ui/state",
 		"POST /api/ui/visit",
 		"GET /api/progress?since=",
 		"GET /api/status",

@@ -353,30 +353,6 @@ func (s *Server) handlePostFixState(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"key": key, "state": body.State})
 }
 
-// handleGetUIState handles GET /api/ui/state: last_visit_at and install_at.
-func (s *Server) handleGetUIState(w http.ResponseWriter, r *http.Request) {
-	rows, err := s.db.QueryContext(r.Context(), `SELECT key, value FROM ui_state`)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	defer rows.Close()
-	out := map[string]string{}
-	for rows.Next() {
-		var k, v string
-		if err := rows.Scan(&k, &v); err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
-			return
-		}
-		out[k] = v
-	}
-	if err := rows.Err(); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, out)
-}
-
 // handlePostUIVisit handles POST /api/ui/visit: records the time of this
 // visit to the Sessions page. Sessions started after the previous visit are
 // marked NEW on the next load.
