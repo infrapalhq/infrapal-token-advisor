@@ -47,3 +47,12 @@ func TestDefault_MatchesTheDatabaseDefault(t *testing.T) {
 		t.Errorf("sessions.agent defaults to %q, want the default agent %q", got, want)
 	}
 }
+
+func TestFind(t *testing.T) {
+	if a, ok := Find("", "claude-code"); !ok || a.ID() != "claude-code" {
+		t.Errorf("Find(claude-code) = %v, %v", a, ok)
+	}
+	if _, ok := Find("", "no-such-agent"); ok {
+		t.Error("Find should report an unknown agent")
+	}
+}

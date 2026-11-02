@@ -3,6 +3,8 @@ package api
 import (
 	"strings"
 	"testing"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
 )
 
 // fixture builds insightData directly so each rule is tested in isolation.
@@ -20,6 +22,7 @@ func fixture(tools []toolRow, reqs []reqRow, waits map[string]waitRow) *insightD
 			tools[i].Ts = int64(i + 1)
 		}
 		tools[i].Success = -1
+		tools[i].Category = toolCategory("", tools[i].Name)
 		d.tools = append(d.tools, tools[i])
 	}
 	d.reqs = reqs
@@ -196,7 +199,7 @@ func TestSafePatternRejectsWriteMarkers(t *testing.T) {
 		"ls -la modules/db":        true,
 	}
 	for cmd, want := range cases {
-		if got := isSafePattern(toolRow{Name: "Bash", Command: cmd}); got != want {
+		if got := isSafePattern(toolRow{Name: "Bash", Category: agent.ToolShell, Command: cmd}); got != want {
 			t.Errorf("isSafePattern(%q) = %v, want %v", cmd, got, want)
 		}
 	}
@@ -274,5 +277,51 @@ func TestDurationSinceRejectsUnknown(t *testing.T) {
 	}
 	if v, err := durationSince(t.Context(), db, "install"); err != nil || v != 0 {
 		t.Fatalf("install with no ui_state row = no cutoff, got %d %v", v, err)
+	}
+}
+
+func TestDetectors_HaveUniqueKinds(t *testing.T) {
+	seen := map[string]bool{}
+	for _, det := range detectors {
+		if det.kind == "" || det.run == nil {
+			t.Errorf("incomplete detector: %+v", det)
+		}
+		if seen[det.kind] {
+			t.Errorf("two detectors use the kind %q", det.kind)
+		}
+		seen[det.kind] = true
+	}
+}
+
+// Another agent's tools have other names. Only their category should matter.
+func TestDetectors_WorkFromCategoriesNotNames(t *testing.T) {
+	tool := func(id, name string, c agent.ToolCategory, file, cmd string) toolRow {
+		return toolRow{ID: id, SessionID: "s", PromptID: "p1", Ts: 1, Name: name, Category: c, File: file, Command: cmd, ResultBytes: 4000}
+	}
+	d := &insightData{toolByID: map[string]toolRow{}, waits: map[string]waitRow{}, tools: []toolRow{
+		tool("1", "open_file", agent.ToolRead, "/w/a.go", ""),
+		tool("2", "open_file", agent.ToolRead, "/w/a.go", ""),
+		tool("3", "exec_command", agent.ToolShell, "", "go test ./..."),
+		tool("4", "exec_command", agent.ToolShell, "", "go test ./..."),
+	}}
+	if got := detectReRead(d); len(got) != 1 {
+		t.Errorf("re-reads = %d, want 1", len(got))
+	}
+	if got := detectRepeatCommand(d); len(got) != 1 {
+		t.Errorf("repeat commands = %d, want 1", len(got))
+	}
+
+	d.tools = append(d.tools[:1:1], tool("5", "apply_patch", agent.ToolEdit, "/w/a.go", ""), d.tools[1])
+	if got := detectReRead(d); len(got) != 0 {
+		t.Errorf("an edit under another name should still count as a change: %d re-reads", len(got))
+	}
+}
+
+func TestToolCategory_UnknownAgentHasNoCategories(t *testing.T) {
+	if got := toolCategory("no-such-agent", "Read"); got != agent.ToolOther {
+		t.Errorf("category = %q", got)
+	}
+	if got := toolCategory("claude-code", "Read"); got != agent.ToolRead {
+		t.Errorf("category = %q", got)
 	}
 }

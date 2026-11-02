@@ -49,7 +49,6 @@ var toolCategories = map[string]agent.ToolCategory{
 	"Read":         agent.ToolRead,
 	"Grep":         agent.ToolSearch,
 	"Glob":         agent.ToolSearch,
-	"LS":           agent.ToolSearch,
 	"Edit":         agent.ToolEdit,
 	"Write":        agent.ToolEdit,
 	"MultiEdit":    agent.ToolEdit,
