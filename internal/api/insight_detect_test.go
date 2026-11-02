@@ -432,3 +432,22 @@ func TestCostUnknown(t *testing.T) {
 		t.Error("Claude Code reports cost, and a finding with no session isn't tied to an agent")
 	}
 }
+
+// The limited agent has no Advisor: it should get findings, with no fix.
+func TestDetectors_AgentWithNoAdvisorStillGetsFindings(t *testing.T) {
+	withLimitedAgent(t)
+	d := twoAgentData()
+	got := detectRepeatCommand(d)
+	if len(got) != 1 {
+		t.Fatalf("findings = %d, want 1", len(got))
+	}
+	if got[0].Fix != "" || got[0].FixWhere != "" {
+		t.Errorf("fix = %+v, want none", got[0])
+	}
+	if text := d.advisor("other").CompactionDetail(); strings.Contains(text, "Claude") {
+		t.Errorf("another agent shouldn't be told about Claude: %q", text)
+	}
+	if got := d.advisor("other").ShellPattern("ls"); got != "ls" {
+		t.Errorf("ShellPattern = %q, want the plain prefix", got)
+	}
+}

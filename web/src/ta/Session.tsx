@@ -181,7 +181,7 @@ export default function SessionPage() {
                       ))}
                     </div>
                     <div className="fix-stack">
-                      <p className="lbl">{o.Fix ? `Fix · ${o.FixLang === "settings-json" ? "add to settings.json" : "paste into CLAUDE.md"}` : "Habit"}</p>
+                      <p className="lbl">{o.Fix ? `Fix · ${o.FixWhere}` : "Habit"}</p>
                       {o.Fix ? <pre className="code">{o.Fix}</pre> : <span className="body-copy">{o.Note || o.Detail}</span>}
                       {o.Fix && o.Note && <span className="body-copy">{o.Note}</span>}
                     </div>

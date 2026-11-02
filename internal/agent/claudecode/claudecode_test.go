@@ -10,7 +10,11 @@ import (
 	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
 )
 
-var _ agent.Agent = (*Agent)(nil)
+var (
+	_ agent.Agent   = (*Agent)(nil)
+	_ agent.Advisor = (*Agent)(nil)
+	_ agent.MCPHost = (*Agent)(nil)
+)
 
 func TestToolCategory(t *testing.T) {
 	a := New(t.TempDir())
@@ -158,5 +162,73 @@ func TestPremiumModel(t *testing.T) {
 	}
 	if a.PremiumModel("claude-sonnet-5-5") {
 		t.Error("Sonnet shouldn't be premium")
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	for in, want := range map[string]string{
+		"/usr/local/bin/tool":   "/usr/local/bin/tool",
+		"/Users/a b/tool":       "'/Users/a b/tool'",
+		"/Users/o'neil/tool":    `'/Users/o'\''neil/tool'`,
+		"/tmp/$(touch pwned)/x": "'/tmp/$(touch pwned)/x'",
+	} {
+		if got := shellQuote(in); got != want {
+			t.Errorf("shellQuote(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestMCPRegistered(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) string {
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	for _, tc := range []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"missing file", filepath.Join(dir, "absent.json"), false},
+		{"invalid json", write("bad.json", "{"), false},
+		{"other servers", write("other.json", `{"mcpServers":{"github":{}}}`), false},
+		{"registered", write("yes.json", `{"mcpServers":{"token-advisor":{"command":"x"}}}`), true},
+	} {
+		if got := mcpRegistered(tc.path, "token-advisor"); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestAdvice_MatchesClaudeCodesFormats(t *testing.T) {
+	a := New(t.TempDir())
+	if got := a.ShellPattern("git status"); got != "Bash(git status:*)" {
+		t.Errorf("ShellPattern = %q", got)
+	}
+	if f := a.AllowFix("Bash(ls:*)"); !strings.Contains(f.Text, `"Bash(ls:*)"`) || f.Where != whereSettings {
+		t.Errorf("AllowFix = %+v", f)
+	}
+	if f := a.RepeatCommandFix("go test", "go"); !strings.Contains(f.Text, "after editing .go files") {
+		t.Errorf("RepeatCommandFix = %+v", f)
+	}
+	if f := a.RepeatCommandFix("go test", ""); !strings.Contains(f.Text, "unless something it depends on") {
+		t.Errorf("RepeatCommandFix with no edits = %+v", f)
+	}
+	if f := a.RemoveMCPFix("gh"); f.Text != `claude mcp remove "gh"` || f.Where != whereTerminal {
+		t.Errorf("RemoveMCPFix = %+v", f)
+	}
+}
+
+func TestMCPSetup(t *testing.T) {
+	a := New(t.TempDir())
+	s := a.MCPSetup("token-advisor", "/my tools/ta")
+	if s.Enabled {
+		t.Error("nothing is registered yet")
+	}
+	if want := "claude mcp add --scope user token-advisor -- '/my tools/ta' mcp"; s.Command != want {
+		t.Errorf("Command = %q, want %q", s.Command, want)
 	}
 }

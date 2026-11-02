@@ -22,11 +22,15 @@ const ID agent.ID = "claude-code"
 // Agent is the Claude Code adapter.
 type Agent struct {
 	settingsPath string
+	configPath   string // where user-scoped MCP servers are registered
 }
 
 // New returns the adapter for the user with this home directory.
 func New(home string) *Agent {
-	return &Agent{settingsPath: filepath.Join(home, ".claude", "settings.json")}
+	return &Agent{
+		settingsPath: filepath.Join(home, ".claude", "settings.json"),
+		configPath:   filepath.Join(home, ".claude.json"),
+	}
 }
 
 // ID implements agent.Agent.

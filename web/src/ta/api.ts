@@ -113,6 +113,7 @@ export type Occurrence = {
   Detail: string;
   Fix?: string;
   FixLang?: string;
+  FixWhere?: string;
   Note?: string;
 };
 
