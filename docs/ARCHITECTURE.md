@@ -97,7 +97,8 @@ confidence label, and document it in [ACCURACY.md](ACCURACY.md).
 `internal/ai` sends only aggregated figures and labels. It never sends prompts,
 responses, tool content, file paths or commands, and a test fails if a sensitive
 fixture string reaches the payload. Each recommendation must cite facts found in
-what was sent, or it's dropped. Results are cached in `ai_recommendations`.
+what was sent, or it's dropped. Results are cached in `ai_recommendations`, so
+the Fixes page loads them without calling Anthropic.
 
 The model id is one constant, `HaikuModel` in `internal/ai/client.go`.
 

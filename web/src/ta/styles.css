@@ -1196,6 +1196,8 @@ button, select, input { font: inherit; }
 .card .acts .btn-q { padding: 0 8px; }
 .card .acts .btn svg { width: 15px; height: 15px; }
 .mcp { margin-bottom: 32px; }
+.ai-rec { display: flex; flex-direction: column; gap: 4px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.ai-rec strong { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .mcp-step { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
 .mcp-copy { display: flex; gap: 8px; align-items: flex-start; }
 .mcp-copy pre { flex: 1; min-width: 0; overflow-wrap: anywhere; }

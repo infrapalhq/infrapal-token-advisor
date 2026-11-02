@@ -2,9 +2,13 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/ai"
 )
 
 func TestAIConfig_GetPutRoundTrip(t *testing.T) {
@@ -118,5 +122,96 @@ func TestAIFacts_SkipsFixedAndCaps(t *testing.T) {
 	many := make([]SafeFinding, maxAIFacts+5)
 	if got := len(aiFacts(many)); got != maxAIFacts {
 		t.Errorf("got %d facts, want the cap of %d", got, maxAIFacts)
+	}
+}
+
+// fakeRequester stands in for Anthropic and records what it was asked.
+type fakeRequester struct {
+	bundle ai.Context
+	recs   []ai.Recommendation
+	err    error
+}
+
+func (f *fakeRequester) RequestRecommendations(_ context.Context, bundle ai.Context) ([]ai.Recommendation, bool, error) {
+	f.bundle = bundle
+	return f.recs, false, f.err
+}
+
+func withFakeRequester(t *testing.T, f *fakeRequester) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ANTHROPIC_API_KEY", "test-key")
+	old := newAIRequester
+	newAIRequester = func(string) ai.Requester { return f }
+	t.Cleanup(func() { newAIRequester = old })
+}
+
+func postAI(t *testing.T, url string) (int, map[string]any) {
+	t.Helper()
+	resp, err := http.Post(url+"/api/ai/recommendations", "application/json", strings.NewReader(`{"since":"30d"}`))
+	if err != nil {
+		t.Fatalf("POST /api/ai/recommendations: %v", err)
+	}
+	defer resp.Body.Close()
+	var out map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return resp.StatusCode, out
+}
+
+func TestPostAIRecommendations_GeneratesThenServesSavedResult(t *testing.T) {
+	fake := &fakeRequester{recs: []ai.Recommendation{{
+		Category: "waste",
+		Severity: "warn",
+		Title:    "Grounded",
+		Detail:   "cites a known model",
+		Evidence: []ai.EvidenceFact{{Label: "model", Value: "claude-3-opus"}},
+	}, {
+		Category: "waste",
+		Severity: "warn",
+		Title:    "Made up",
+		Detail:   "cites nothing we sent",
+		Evidence: []ai.EvidenceFact{{Label: "cost", Value: "$123456.78"}},
+	}}}
+	withFakeRequester(t, fake)
+	ts := newTestServer(t, seedDB(t))
+
+	code, out := postAI(t, ts.URL)
+	if code != http.StatusOK {
+		t.Fatalf("status %d: %v", code, out)
+	}
+	recs := out["recommendations"].([]any)
+	if len(recs) != 1 || recs[0].(map[string]any)["title"] != "Grounded" {
+		t.Errorf("recommendations = %v, want only the grounded one", recs)
+	}
+	if out["dropped_count"] != 1.0 {
+		t.Errorf("dropped_count = %v, want 1", out["dropped_count"])
+	}
+
+	resp, err := http.Get(ts.URL + "/api/ai/recommendations?since=30d")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+	var saved map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&saved); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if saved["batch_id"] != out["batch_id"] || len(saved["recommendations"].([]any)) != 1 {
+		t.Errorf("saved result = %v, want batch %v", saved, out["batch_id"])
+	}
+}
+
+func TestPostAIRecommendations_AnthropicErrorIsBadGateway(t *testing.T) {
+	withFakeRequester(t, &fakeRequester{err: &ai.ClientError{StatusCode: 401, Body: "invalid key"}})
+	ts := newTestServer(t, seedDB(t))
+
+	code, out := postAI(t, ts.URL)
+	if code != http.StatusBadGateway {
+		t.Fatalf("status %d, want 502: %v", code, out)
+	}
+	if msg, _ := out["error"].(string); !strings.Contains(msg, "invalid key") {
+		t.Errorf("error = %q, want the upstream reason", msg)
 	}
 }

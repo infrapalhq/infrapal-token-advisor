@@ -74,7 +74,7 @@ html[data-theme="dark"] .nav a.on .v { color: var(--blue); }
 html[data-theme="dark"] .side-foot { color: var(--mut); }
 html[data-theme="dark"] .side-foot a { color: var(--blue); }
 html[data-theme="dark"] .local { border: 1px solid var(--line-2); background: var(--slab); box-shadow: var(--hi); color: var(--ink-2); }
-html[data-theme="dark"] .local .pip { background: var(--green); border-color: var(--green); box-shadow: 0 0 8px rgba(121, 195, 135, .8); }
+html[data-theme="dark"] .local .pip.full { background: var(--green); border-color: var(--green); box-shadow: 0 0 8px rgba(121, 195, 135, .8); }
 
 /* ---------- Buttons & controls ---------- */
 html[data-theme="dark"] .btn {
