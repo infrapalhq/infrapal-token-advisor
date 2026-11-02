@@ -68,6 +68,10 @@ An agent's adapter can bring data in two ways, and implements whichever fit:
 - `Importer` reads local files or databases in bounded batches. Each batch's events
   and cursor are saved in one transaction, so a crash can't lose or repeat one.
 
+`internal/agent/agenttest` is the contract every adapter must meet, and every agent
+in `internal/agent/all` runs through it automatically. `internal/agent/example` is a
+complete adapter to copy, and it runs end to end in `internal/api`.
+
 `internal/ingest/agent_events.go` writes common events to the same tables, and an
 adapter never writes SQL. Records no adapter claims take Claude Code's own path,
 because it fills far more columns than common events carry, and merges spans into

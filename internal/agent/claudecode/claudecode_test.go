@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/agenttest"
 )
 
 var (
@@ -231,4 +232,18 @@ func TestMCPSetup(t *testing.T) {
 	if want := "claude mcp add --scope user token-advisor -- '/my tools/ta' mcp"; s.Command != want {
 		t.Errorf("Command = %q, want %q", s.Command, want)
 	}
+}
+
+func TestContract(t *testing.T) {
+	agenttest.Run(t, agenttest.Suite{
+		New:          func(home string) agent.Agent { return New(home) },
+		NativeIngest: true,
+		Tools: map[string]agent.ToolCategory{
+			"Read":                  agent.ToolRead,
+			"Grep":                  agent.ToolSearch,
+			"Edit":                  agent.ToolEdit,
+			"Bash":                  agent.ToolShell,
+			"mcp__github__get_repo": agent.ToolMCP,
+		},
+	})
 }
