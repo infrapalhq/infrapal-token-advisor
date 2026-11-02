@@ -63,8 +63,8 @@ func TestRunInit_NoPreexistingSettings(t *testing.T) {
 	}
 
 	cfg := readConfig(t, home)
-	if cfg.SettingsBackupPath != "" {
-		t.Errorf("SettingsBackupPath = %q, want empty when settings.json didn't preexist", cfg.SettingsBackupPath)
+	if cfg.Agents["claude-code"].BackupPath != "" {
+		t.Errorf("SettingsBackupPath = %q, want empty when settings.json didn't preexist", cfg.Agents["claude-code"].BackupPath)
 	}
 	if cfg.RawBodies {
 		t.Error("RawBodies = true, want false without --raw-bodies")
@@ -101,10 +101,10 @@ func TestRunInit_BacksUpAndPreservesExistingSettings(t *testing.T) {
 	}
 
 	cfg := readConfig(t, home)
-	if cfg.SettingsBackupPath == "" {
+	if cfg.Agents["claude-code"].BackupPath == "" {
 		t.Fatal("SettingsBackupPath is empty, want a backup path since settings.json preexisted")
 	}
-	backupData, err := os.ReadFile(cfg.SettingsBackupPath)
+	backupData, err := os.ReadFile(cfg.Agents["claude-code"].BackupPath)
 	if err != nil {
 		t.Fatalf("read backup: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestRunInit_KeepsFirstBackupOnRepeatRuns(t *testing.T) {
 		t.Fatalf("runInit: %v", err)
 	}
 
-	if got := readConfig(t, home).SettingsBackupPath; got != "/original/backup" {
+	if got := readConfig(t, home).Agents["claude-code"].BackupPath; got != "/original/backup" {
 		t.Errorf("SettingsBackupPath = %q, want the first backup kept", got)
 	}
 }
@@ -200,7 +200,7 @@ func TestRunInit_LeavesSettingsAloneWhenNothingChanges(t *testing.T) {
 	if len(backups) != 0 {
 		t.Errorf("backups = %v, want none", backups)
 	}
-	if path := readConfig(t, home).SettingsBackupPath; path != "" {
+	if path := readConfig(t, home).Agents["claude-code"].BackupPath; path != "" {
 		t.Errorf("SettingsBackupPath = %q, want empty", path)
 	}
 }

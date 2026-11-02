@@ -62,6 +62,11 @@ func runStatus(args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
+	line, err := agentsStatus(db, p.Home, cfg)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("agents:      %s\n", line)
 	fmt.Printf("retention:   %s\n", retentionStatus(db, cfg.RetentionMonths))
 
 	fmt.Printf("log:         %s\n", p.LogPath)
