@@ -34,7 +34,7 @@ type timelineRow struct {
 // thread in order, each step's context size, and compaction markers.
 func (s *Server) handleSessionTimeline(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	d, occ, err := computeInsights(r.Context(), s.db, 0)
+	d, occ, err := computeInsights(r.Context(), s.db, 0, "")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -67,6 +67,8 @@ func (s *Server) handleSessionTimeline(w http.ResponseWriter, r *http.Request) {
 		"peak_context": peak,
 		"compactions":  compactions,
 		"receipt":      buildReceipt(d, occ, id),
+		"agent_name":   describeAgent(sess.Agent, 0).Name,
+		"cost_unknown": d.costUnknown(id),
 	})
 }
 
@@ -126,10 +128,14 @@ func buildTimeline(ctx context.Context, db *sql.DB, d *insightData, occ []occurr
 			continue
 		}
 		n++
+		meta := time.UnixMilli(p.StartedAt).Format("15:04")
+		if !d.costUnknown(sid) {
+			meta += fmt.Sprintf(" · $%.2f", promptCost[p.PromptID])
+		}
 		rows = append(rows, timelineRow{
 			ID: "d:" + p.PromptID, Kind: "div", Ts: p.StartedAt,
 			Text: fmt.Sprintf("PROMPT %d", n), PromptID: p.PromptID,
-			Meta: fmt.Sprintf("%s · $%.2f", time.UnixMilli(p.StartedAt).Format("15:04"), promptCost[p.PromptID]),
+			Meta: meta,
 		})
 		rows = append(rows, timelineRow{
 			ID: "u:" + p.PromptID, Kind: "you", Ts: p.StartedAt, Text: p.Text, PromptID: p.PromptID,

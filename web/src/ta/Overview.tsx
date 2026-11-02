@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useAgents } from "./agentContext";
+import { SkippedChecks } from "./agents";
 import { api, type Overview as OverviewData, type Range } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
@@ -18,17 +20,21 @@ export default function Overview() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const firstRun = useFirstRun();
+  const { selected: agent } = useAgents();
 
   useEffect(() => {
     setData(null);
-    api.overview(range).then(setData).catch((e: Error) => setError(e.message));
-  }, [range, firstRun]);
+    api.overview(range, agent).then(setData).catch((e: Error) => setError(e.message));
+  }, [range, agent, firstRun]);
 
   const dayMax = useMemo(() => Math.max(1, ...(data?.by_day.map((d) => d.cost_usd) ?? [1])), [data]);
   const projMax = useMemo(() => Math.max(1, ...(data?.by_project.map((p) => p.cost_usd) ?? [1])), [data]);
   const problemCount = data?.fix_first.length ?? 0;
   const recoveredUsd = (data?.recovered.usd ?? 0) >= 0.005; // would show as $0.00 otherwise
   const recoveredMinutes = Math.round(data?.recovered.minutes ?? 0);
+  const unknownCost = data?.cost_unknown_sessions ?? 0;
+  const noCost = unknownCost > 0 && unknownCost === data?.sessions_count;
+  const periodLabel = PERIODS.find((p) => p.value === range)?.label.toLowerCase() ?? "in range";
 
   if (firstRun) return <Shell><FirstRun /></Shell>;
 
@@ -52,7 +58,7 @@ export default function Overview() {
       {data && (
         <>
           <section className="hero">
-            <h1>{money(data.spend_usd)} spent {PERIODS.find((p) => p.value === range)?.label.toLowerCase() ?? "in range"}.</h1>
+            <h1>{noCost ? `${tokensHuman(data.tokens)} tokens used` : `${money(data.spend_usd)} spent`} {periodLabel}.</h1>
             <p className="lead">
               {problemCount} {problemCount === 1 ? "thing" : "things"} worth fixing
               {(recoveredUsd || recoveredMinutes > 0) ? ". Fixing the top three " : "."}
@@ -61,12 +67,14 @@ export default function Overview() {
               {recoveredMinutes > 0 && <>saves about <strong>{recoveredMinutes} {recoveredMinutes === 1 ? "minute" : "minutes"}</strong> of waiting</>}
               {(recoveredUsd || recoveredMinutes > 0) && "."}
             </p>
+            {unknownCost > 0 && !noCost && <p className="hint-line">Spend leaves out {unknownCost} {unknownCost === 1 ? "session" : "sessions"} with no cost data.</p>}
+            <SkippedChecks />
           </section>
 
           <section className="kpis" aria-label="Key numbers">
             <div className="kpi">
               <p className="eb">Spend</p>
-              <div className="num">{money(data.spend_usd)}</div>
+              <div className="num">{noCost ? "—" : money(data.spend_usd)}</div>
             </div>
             <div className="kpi">
               <p className="eb">Tokens</p>
@@ -75,7 +83,7 @@ export default function Overview() {
             </div>
             <div className="kpi">
               <p className="eb">Avoidable</p>
-              <div className="num">≈ {money(data.avoidable_usd)}</div>
+              <div className="num">{noCost ? "—" : `≈ ${money(data.avoidable_usd)}`}</div>
               <div className="meter hatch" />
             </div>
             <div className="kpi">
@@ -136,7 +144,7 @@ export default function Overview() {
             </div>
           </section>
 
-          <section className="charts">
+          {!noCost && <section className="charts">
             <div className="panel day">
               <div className="panel-head">
                 <h2>Spend by day</h2>
@@ -180,7 +188,7 @@ export default function Overview() {
                 </span>
               )}
             </div>
-          </section>
+          </section>}
 
           {data.review.length > 0 && (
             <section className="section">

@@ -20,19 +20,20 @@ import (
 // it needs, so that "no problems" never means "couldn't look".
 type detector struct {
 	kind  string
+	label string // what's checked, for saying a check doesn't apply
 	needs agent.Capability
 	run   func(d *insightData) []occurrence
 }
 
 // detectors lists every check. To add one, write its function and add a line.
 var detectors = []detector{
-	{"re_read", agent.CapFilePaths, detectReRead},
-	{"compaction", agent.CapCompaction, detectCompaction},
-	{"repeat_cmd", agent.CapCommands, detectRepeatCommand},
-	{"repeat_approval", agent.CapApprovalWait, detectRepeatApproval},
-	{"failing_mcp", 0, detectFailingMCP},
-	{"oversized_model", 0, detectOversizedModel},
-	{"dead_mcp", agent.CapMCPConnections, detectDeadMCP},
+	{"re_read", "re-read files", agent.CapFilePaths, detectReRead},
+	{"compaction", "compactions", agent.CapCompaction, detectCompaction},
+	{"repeat_cmd", "repeated commands", agent.CapCommands, detectRepeatCommand},
+	{"repeat_approval", "repeated approvals", agent.CapApprovalWait, detectRepeatApproval},
+	{"failing_mcp", "failing MCP servers", 0, detectFailingMCP},
+	{"oversized_model", "oversized models", 0, detectOversizedModel},
+	{"dead_mcp", "unused MCP servers", agent.CapMCPConnections, detectDeadMCP},
 }
 
 // occurrence is one instance of a detected problem in one session.

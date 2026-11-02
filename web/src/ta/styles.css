@@ -1015,6 +1015,7 @@ button, select, input { font: inherit; }
 .receipt-foot { font-family: var(--mono); font-size: 11px; color: var(--ink-3); text-align: center; padding: 16px 0 14px; }
 .receipt-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .hint-line { font-size: 12px; color: var(--ink-3); }
+.agent-picker { margin: 0 12px; }
 .hint-line code, .first-run code { font-family: var(--mono); color: var(--ink-2); }
 
 /* ---------- First run ---------- */
