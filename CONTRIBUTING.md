@@ -37,6 +37,9 @@ go build ./cmd/token-advisor        # writes ./token-advisor (git-ignored)
 ## Where things live
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the pieces fit together.
+To add support for another coding agent, see
+[docs/ADDING_AN_AGENT.md](docs/ADDING_AN_AGENT.md). To add a new check, see
+[docs/ADDING_A_DETECTOR.md](docs/ADDING_A_DETECTOR.md).
 
 | Path | What it is |
 | --- | --- |
