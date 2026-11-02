@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/agenttest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/claudecode"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
 
@@ -54,5 +56,28 @@ func TestFind(t *testing.T) {
 	}
 	if _, ok := Find("", "no-such-agent"); ok {
 		t.Error("Find should report an unknown agent")
+	}
+}
+
+// Every listed agent meets the contract, with no effort from its author. For
+// anything an agent does beyond this, see agenttest.Run in its own tests.
+func TestAgents_MeetTheContract(t *testing.T) {
+	ids := map[agent.ID]bool{}
+	for _, a := range Agents("") {
+		ids[a.ID()] = true
+	}
+	for id := range ids {
+		t.Run(string(id), func(t *testing.T) {
+			agenttest.Run(t, agenttest.Suite{
+				New: func(home string) agent.Agent {
+					a, ok := Find(home, id)
+					if !ok {
+						t.Fatalf("Find(%q) failed", id)
+					}
+					return a
+				},
+				NativeIngest: id == claudecode.ID,
+			})
+		})
 	}
 }
