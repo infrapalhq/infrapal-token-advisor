@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -179,7 +180,7 @@ func installService(p paths.Paths, cfg config.Config) error {
 		return err
 	}
 	svc, err := newService(sp)
-	if err == service.ErrUnsupported {
+	if errors.Is(err, service.ErrUnsupported) {
 		fmt.Println("no supported service manager on this platform — run `token-advisor start` yourself (e.g. via cron @reboot or your own supervisor) to keep the collector running")
 		return nil
 	}

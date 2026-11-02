@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
@@ -22,7 +23,7 @@ func runStop(args []string) error {
 		return err
 	}
 	svc, err := newService(sp)
-	if err == service.ErrUnsupported {
+	if errors.Is(err, service.ErrUnsupported) {
 		fmt.Println("no supported service manager on this platform — kill the `token-advisor start` process yourself")
 		return nil
 	}

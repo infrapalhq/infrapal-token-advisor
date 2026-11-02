@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"database/sql"
+	"errors"
 	"strings"
 )
 
@@ -105,7 +106,7 @@ func claimPendingInteractionSpan(tx *sql.Tx, promptID, traceID, spanID string) e
 	err := tx.QueryRow(`
 		SELECT duration_ms FROM pending_interaction_spans WHERE trace_id = ? AND span_id = ?
 	`, traceID, spanID).Scan(&durationMs)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 )
 
@@ -206,7 +207,7 @@ func claimPendingBlockedOnUserSpan(tx *sql.Tx, spanID, toolUseID string) error {
 		SELECT duration_ms, decision, decision_source
 		FROM pending_blocked_on_user_spans WHERE parent_span_id = ?
 	`, spanID).Scan(&durationMs, &decision, &decisionSource)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
@@ -260,7 +261,7 @@ func projectToolBlockedOnUserSpan(tx *sql.Tx, s Span) error {
 
 	var parentAttrsJSON string
 	err := tx.QueryRow(`SELECT attrs FROM spans WHERE span_id = ?`, s.ParentSpanID).Scan(&parentAttrsJSON)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		_, err := tx.Exec(`
 			INSERT INTO pending_blocked_on_user_spans (parent_span_id, duration_ms, decision, decision_source)
 			VALUES (?, ?, ?, ?)
@@ -276,7 +277,7 @@ func projectToolBlockedOnUserSpan(tx *sql.Tx, s Span) error {
 	}
 	var parentAttrs map[string]any
 	if err := json.Unmarshal([]byte(parentAttrsJSON), &parentAttrs); err != nil {
-		return nil
+		return nil //nolint:nilerr // without readable attrs there is nothing to link
 	}
 
 	toolUseID := toolUseIDFromSpan(parentAttrs)
