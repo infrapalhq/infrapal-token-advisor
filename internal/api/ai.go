@@ -16,11 +16,27 @@ import (
 // maxAIFacts caps the findings sent to the model, since every one costs tokens.
 const maxAIFacts = 20
 
-// newAIRequester is ai.NewClient behind a seam, so tests never call Anthropic.
-var newAIRequester = func(apiKey string) ai.Requester { return ai.NewClient(apiKey) }
+// newAIRequester is behind a seam so tests never call a real provider.
+var newAIRequester = func(p ai.Provider, apiKey string) ai.Requester { return p.New(apiKey) }
 
-// handleGetAIConfig handles GET /api/ai/config — reports only whether an
-// Anthropic API key is configured; the key itself is never sent to the
+// aiStatus is what the Settings page shows. It never includes a key.
+func aiStatus(cfg config.Config) map[string]any {
+	p := ai.FindProvider(cfg.AIProvider)
+	names := []map[string]string{}
+	for _, each := range ai.Providers() {
+		names = append(names, map[string]string{"id": each.ID, "name": each.Name})
+	}
+	return map[string]any{
+		"configured":    config.ResolveAIKey(cfg, p.ID, p.KeyEnv) != "",
+		"provider":      p.ID,
+		"provider_name": p.Name,
+		"key_hint":      p.KeyHint,
+		"providers":     names,
+	}
+}
+
+// handleGetAIConfig handles GET /api/ai/config — reports which provider is
+// chosen and whether it has a key; the key itself is never sent to the
 // frontend.
 func (s *Server) handleGetAIConfig(w http.ResponseWriter, r *http.Request) {
 	p, err := paths.Resolve()
@@ -33,15 +49,16 @@ func (s *Server) handleGetAIConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"configured": config.ResolveAnthropicAPIKey(cfg) != ""})
+	writeJSON(w, http.StatusOK, aiStatus(cfg))
 }
 
-// handlePutAIConfig handles PUT /api/ai/config, body
-// {"anthropic_api_key": "sk-ant-..."}. Sending an empty string clears the
-// stored key.
+// handlePutAIConfig handles PUT /api/ai/config, body {"provider": "...",
+// "api_key": "..."}. A provider sets the choice, and api_key sets that
+// provider's key if it's present. An empty string clears the stored key.
 func (s *Server) handlePutAIConfig(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		AnthropicAPIKey string `json:"anthropic_api_key"`
+		Provider string  `json:"provider"`
+		APIKey   *string `json:"api_key"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid body")
@@ -58,16 +75,28 @@ func (s *Server) handlePutAIConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	cfg.AnthropicAPIKey = strings.TrimSpace(body.AnthropicAPIKey)
+	if body.Provider != "" {
+		if ai.FindProvider(body.Provider).ID != body.Provider {
+			writeError(w, http.StatusBadRequest, "unknown provider")
+			return
+		}
+		cfg.AIProvider = body.Provider
+	}
+	if body.APIKey != nil {
+		if cfg.AIKeys == nil {
+			cfg.AIKeys = map[string]string{}
+		}
+		cfg.AIKeys[ai.FindProvider(cfg.AIProvider).ID] = strings.TrimSpace(*body.APIKey)
+	}
 	if err := config.Save(p, cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"configured": cfg.AnthropicAPIKey != ""})
+	writeJSON(w, http.StatusOK, aiStatus(cfg))
 }
 
 // handleGetAIRecommendations handles GET /api/ai/recommendations?since= —
-// cached rows only, never calls Anthropic. Safe on every page load.
+// cached rows only, never calls a provider. Safe on every page load.
 func (s *Server) handleGetAIRecommendations(w http.ResponseWriter, r *http.Request) {
 	since := r.URL.Query().Get("since")
 	result, err := ai.GetCached(r.Context(), s.db, since)
@@ -111,9 +140,10 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	apiKey := config.ResolveAnthropicAPIKey(cfg)
+	provider := ai.FindProvider(cfg.AIProvider)
+	apiKey := config.ResolveAIKey(cfg, provider.ID, provider.KeyEnv)
 	if apiKey == "" {
-		writeError(w, http.StatusPreconditionFailed, "no Anthropic API key configured — add one in Settings first")
+		writeError(w, http.StatusPreconditionFailed, "no "+provider.Name+" API key configured — add one in Settings first")
 		return
 	}
 
@@ -123,11 +153,11 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	result, err := ai.Generate(r.Context(), s.db, newAIRequester(apiKey), body.Since, cutoffMs, haveCutoff, aiFacts(findings), body.Force)
+	result, err := ai.Generate(r.Context(), s.db, newAIRequester(provider, apiKey), provider.Model, body.Since, cutoffMs, haveCutoff, aiFacts(findings), body.Force)
 	if err != nil {
 		var ce *ai.ClientError
 		if errors.As(err, &ce) {
-			writeError(w, http.StatusBadGateway, "Anthropic API error: "+ce.Error())
+			writeError(w, http.StatusBadGateway, provider.Name+" API error: "+ce.Error())
 			return
 		}
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -161,8 +191,8 @@ func aiFacts(findings []SafeFinding) []ai.InsightFact {
 	return facts
 }
 
-// aiCategory maps a finding onto the category enum in the Anthropic tool
-// schema (internal/ai/client.go).
+// aiCategory maps a finding onto the category enum the model answers with
+// (see the tool schema in internal/ai/client.go).
 func aiCategory(f SafeFinding) string {
 	switch {
 	case strings.Contains(f.Kind, "mcp"):

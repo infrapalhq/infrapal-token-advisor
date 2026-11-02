@@ -10,7 +10,7 @@ flowchart LR
     C --> D[(SQLite<br>internal/store)]
     D --> E[internal/api]
     E --> F[React dashboard<br>web/]
-    G[internal/ai] -. only on Generate .-> H[Anthropic API]
+    G[internal/ai] -. only on Generate .-> H[Model provider API]
     E --> G
 ```
 
@@ -127,7 +127,9 @@ fixture string reaches the payload. Each recommendation must cite facts found in
 what was sent, or it's dropped. Results are cached in `ai_recommendations`, so
 the Fixes page loads them without calling Anthropic.
 
-The model id is one constant, `HaikuModel` in `internal/ai/client.go`.
+`internal/ai/provider.go` lists the model services. To add one, write a `Requester`
+for its API and add an entry. Anthropic is the only one today, and its model id is
+one constant, `HaikuModel` in `internal/ai/client.go`.
 
 ## Security boundaries
 
