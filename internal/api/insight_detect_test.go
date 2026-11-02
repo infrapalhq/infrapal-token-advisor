@@ -325,3 +325,110 @@ func TestToolCategory_UnknownAgentHasNoCategories(t *testing.T) {
 		t.Errorf("category = %q", got)
 	}
 }
+
+// limitedAgent has commands but no file paths, approval times or dollar figures.
+type limitedAgent struct{ agent.Agent }
+
+func (limitedAgent) Capabilities() agent.Capability { return agent.CapCommands }
+func (limitedAgent) CostSource() agent.CostSource   { return agent.CostNone }
+func (limitedAgent) PremiumModel(m string) bool     { return m == "big-model" }
+
+func withLimitedAgent(t *testing.T) {
+	t.Helper()
+	old := findAgent
+	findAgent = func(id agent.ID) (agent.Agent, bool) {
+		if id == "limited" {
+			return limitedAgent{}, true
+		}
+		return old(id)
+	}
+	t.Cleanup(func() { findAgent = old })
+}
+
+func twoAgentData() *insightData {
+	shell := func(id, sid string) toolRow {
+		return toolRow{ID: id, SessionID: sid, PromptID: "p-" + sid, Ts: 1, Name: "x", Category: agent.ToolShell, Command: "go test", ResultBytes: 400}
+	}
+	read := func(id, sid string) toolRow {
+		return toolRow{ID: id, SessionID: sid, PromptID: "p-" + sid, Ts: 1, Name: "x", Category: agent.ToolRead, File: "/a.go", ResultBytes: 400}
+	}
+	return &insightData{
+		sessions: map[string]sessionRow{"claude": {ID: "claude", Agent: "claude-code"}, "other": {ID: "other", Agent: "limited"}},
+		toolByID: map[string]toolRow{},
+		waits:    map[string]waitRow{},
+		tools: []toolRow{
+			read("r1", "claude"), read("r2", "claude"), read("r3", "other"), read("r4", "other"),
+			shell("c1", "other"), shell("c2", "other"),
+		},
+		reqs: []reqRow{
+			{PromptID: "p-claude", SessionID: "claude", QuerySource: agent.MainQuerySource, Model: "claude-opus-5-5", Output: 10},
+			{PromptID: "p-other", SessionID: "other", QuerySource: agent.MainQuerySource, Model: "big-model", Output: 10},
+		},
+		compactions: []compactRow{{SessionID: "claude"}, {SessionID: "other"}},
+	}
+}
+
+func TestWithCapability_KeepsOnlySessionsThatQualify(t *testing.T) {
+	withLimitedAgent(t)
+	d := twoAgentData()
+	view := d.withCapability(agent.CapFilePaths)
+	if len(view.tools) != 2 {
+		t.Fatalf("tools = %d: only the Claude session has file paths", len(view.tools))
+	}
+	if got := detectReRead(view); len(got) != 1 || got[0].SessionID != "claude" {
+		t.Errorf("re-reads = %+v, want only Claude's", got)
+	}
+	if len(view.compactions) != 1 || view.compactions[0].SessionID != "claude" {
+		t.Errorf("compactions = %+v", view.compactions)
+	}
+	if len(view.reqs) != 1 {
+		t.Errorf("reqs = %+v", view.reqs)
+	}
+	if got := detectRepeatCommand(d.withCapability(agent.CapCommands)); len(got) != 1 {
+		t.Errorf("a check the agent can support should still run: %d", len(got))
+	}
+	if len(d.tools) != 6 {
+		t.Errorf("the original data changed: %d tools", len(d.tools))
+	}
+}
+
+// With every session able to supply it, a check gets the very same data, so
+// Claude Code's findings can't change.
+func TestWithCapability_ChangesNothingForClaudeCode(t *testing.T) {
+	d := &insightData{sessions: map[string]sessionRow{"a": {Agent: "claude-code"}, "b": {}}}
+	a, _ := agentFor("claude-code")
+	if got := d.withCapability(a.Capabilities()); got != d {
+		t.Error("should return d itself")
+	}
+}
+
+func TestWithCapability_UnknownAgentSupportsNothing(t *testing.T) {
+	d := &insightData{sessions: map[string]sessionRow{"a": {Agent: "no-such-agent"}}}
+	if d.capable("a", agent.CapCommands) {
+		t.Error("an unknown agent shouldn't qualify")
+	}
+	if !d.capable("a", 0) {
+		t.Error("a check needing nothing applies to everyone")
+	}
+}
+
+func TestOversizedModel_AsksTheSessionsAgent(t *testing.T) {
+	withLimitedAgent(t)
+	d := twoAgentData()
+	d.tools = nil // a turn with many tools isn't a small one
+	got := detectOversizedModel(d)
+	if len(got) != 2 {
+		t.Fatalf("occurrences = %d, want one per agent's premium model", len(got))
+	}
+}
+
+func TestCostUnknown(t *testing.T) {
+	withLimitedAgent(t)
+	d := twoAgentData()
+	if !d.costUnknown("other") {
+		t.Error("an agent with no cost source has unknown costs")
+	}
+	if d.costUnknown("claude") || d.costUnknown("") {
+		t.Error("Claude Code reports cost, and a finding with no session isn't tied to an agent")
+	}
+}

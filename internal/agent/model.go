@@ -83,6 +83,10 @@ func InputWithoutCached(input, cached int64) int64 {
 	return max(input-cached, 0)
 }
 
+// MainQuerySource is how a request that isn't Background is stored. It's Claude
+// Code's own value, which its telemetry writes directly.
+const MainQuerySource = "repl_main_thread"
+
 // Approval says how a tool call was allowed to run.
 type Approval string
 

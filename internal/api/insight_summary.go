@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/project"
 )
 
@@ -20,7 +21,12 @@ func computeInsights(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 	}
 	var occ []occurrence
 	for _, det := range detectors {
-		occ = append(occ, det.run(d)...)
+		occ = append(occ, det.run(d.withCapability(det.needs))...)
+	}
+	for i := range occ {
+		if d.costUnknown(occ[i].SessionID) {
+			occ[i].USD = nil
+		}
 	}
 	sortOccurrences(occ)
 	return d, occ, nil
@@ -121,7 +127,7 @@ func buildCards(ctx context.Context, db *sql.DB, d *insightData, occ []occurrenc
 		a := get(r.SessionID)
 		a.tokens += r.Tokens()
 		a.costF += r.CostUSD
-		if r.QuerySource == "repl_main_thread" || r.QuerySource == "" {
+		if r.QuerySource == agent.MainQuerySource || r.QuerySource == "" {
 			a.modelCost[r.Model] += r.CostUSD
 		}
 	}
