@@ -171,6 +171,17 @@ func (d *insightData) withCapability(need agent.Capability) *insightData {
 	return &view
 }
 
+// advisor returns the fix advice for a session's agent. A finding with no
+// session gets the default agent's.
+func (d *insightData) advisor(sessionID string) agent.Advisor {
+	if a, ok := agentFor(d.sessions[sessionID].Agent); ok {
+		if adv, ok := a.(agent.Advisor); ok {
+			return adv
+		}
+	}
+	return agent.NoAdvice{}
+}
+
 // premiumModel reports whether a request used its agent's most expensive tier.
 func (d *insightData) premiumModel(r reqRow) bool {
 	a, ok := agentFor(d.sessions[r.SessionID].Agent)
