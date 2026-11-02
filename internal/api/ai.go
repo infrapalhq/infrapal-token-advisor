@@ -16,6 +16,9 @@ import (
 // maxAIFacts caps the findings sent to the model, since every one costs tokens.
 const maxAIFacts = 20
 
+// newAIRequester is ai.NewClient behind a seam, so tests never call Anthropic.
+var newAIRequester = func(apiKey string) ai.Requester { return ai.NewClient(apiKey) }
+
 // handleGetAIConfig handles GET /api/ai/config — reports only whether an
 // Anthropic API key is configured; the key itself is never sent to the
 // frontend.
@@ -120,8 +123,7 @@ func (s *Server) handlePostAIRecommendations(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	client := ai.NewClient(apiKey)
-	result, err := ai.Generate(r.Context(), s.db, client, body.Since, cutoffMs, haveCutoff, aiFacts(findings), body.Force)
+	result, err := ai.Generate(r.Context(), s.db, newAIRequester(apiKey), body.Since, cutoffMs, haveCutoff, aiFacts(findings), body.Force)
 	if err != nil {
 		var ce *ai.ClientError
 		if errors.As(err, &ce) {

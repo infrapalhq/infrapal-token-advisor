@@ -59,7 +59,7 @@ See context grow step by step, with each issue marked where it happened.<br><br>
 <td width="50%" valign="top">
 <b>Fixes</b><br>
 Paste a fix in, mark it done, and see week by week whether it helped.<br><br>
-<img src="docs/assets/fixes.png" alt="The Fixes page, showing avoidable spend over time and the fixes to do">
+<img src="docs/assets/fixes.png" alt="The Fixes page, showing avoidable spend over time and AI recommendations">
 </td>
 <td width="50%" valign="top">
 <b>Numbers you can check</b><br>
@@ -67,7 +67,8 @@ Everything is labelled <b>Measured</b>, <b>Likely</b> or <b>Estimated</b>, and
 <a href="docs/ACCURACY.md">the rules are documented</a>.<br><br>
 <b>Optional AI Mode</b><br>
 Add your own Anthropic API key for extra recommendations. It's off by default,
-runs only when you press <b>Generate</b>, and never sends prompt text.
+runs only when you press <b>Generate</b> on the Fixes page, and never sends prompt
+text.
 </td>
 </tr>
 </table>
