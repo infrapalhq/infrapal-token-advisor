@@ -74,7 +74,7 @@ export default function SessionPage() {
             <Link key={c.id} className={`sl${c.id === id ? " on" : ""}${c.priority === "fine" ? " quiet" : ""}`} to={`/sessions/${encodeURIComponent(c.id)}`}>
               <span className={`pip ${c.priority === "now" ? "wfull" : c.priority === "look" ? "whalf" : "woff"}`} />
               <span className="name">{c.title}</span>
-              <span className="cost">{money(c.cost_usd)}</span>
+              <span className="cost">{c.cost_unknown ? "—" : money(c.cost_usd)}</span>
             </Link>
           ))}
         </div>
@@ -91,7 +91,7 @@ export default function SessionPage() {
             <div className="meta-row">
               <span className="pill">{dayShort(timeline.started_at)}</span>
               <span className="pill">{durationS(current?.duration_s ?? 0)}</span>
-              <span className="pill strong">{money(timeline.receipt.cost_usd)}</span>
+              <span className="pill strong">{timeline.cost_unknown ? "—" : money(timeline.receipt.cost_usd)}</span>
               <span className="pill">{tokensHuman(timeline.receipt.tokens.fresh_input + timeline.receipt.tokens.output + timeline.receipt.tokens.cache_read + timeline.receipt.tokens.cache_write)} tok</span>
               {current?.model && <span className="pill">{current.model}</span>}
             </div>
@@ -131,7 +131,7 @@ export default function SessionPage() {
 
         <div className="thread-list" id="thread-list">
           {timeline.rows.map((r) => (
-            <ThreadRow key={r.id} row={r} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
+            <ThreadRow key={r.id} row={r} agentName={timeline.agent_name} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
           ))}
         </div>
       </section>
@@ -215,7 +215,7 @@ export default function SessionPage() {
   );
 }
 
-function ThreadRow({ row, flagged, highlighted, onFlag }: { row: TimelineRow; flagged?: Occurrence; highlighted: boolean; onFlag: () => void }) {
+function ThreadRow({ row, agentName, flagged, highlighted, onFlag }: { row: TimelineRow; agentName: string; flagged?: Occurrence; highlighted: boolean; onFlag: () => void }) {
   return (
     <div className={`trow${flagged ? " fl" : ""}${highlighted ? " hl" : ""}`} id={`row-${row.id}`}>
       <div>
@@ -228,7 +228,7 @@ function ThreadRow({ row, flagged, highlighted, onFlag }: { row: TimelineRow; fl
           <div className="divider"><span className="mono">{row.text}</span><span className="rule" /><span className="mono meta-d">{row.meta}</span></div>
         )}
         {row.kind === "you" && <div className="you"><span className="lbl">You</span><p>{row.text || "(prompt not logged)"}</p></div>}
-        {row.kind === "claude" && <div className="claude"><span className="lbl">Claude</span><p>{row.text}</p></div>}
+        {row.kind === "claude" && <div className="claude"><span className="lbl">{agentName}</span><p>{row.text}</p></div>}
         {row.kind === "tool" && (
           <div className="tool-row">
             <span>▸ <b>{row.name}</b> {row.text}{flagged && <span className="tag">{flagged.Title}</span>}{row.wait_ms ? <span className="tag">waited {Math.round(row.wait_ms / 1000)}s</span> : null}</span>
@@ -255,7 +255,7 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
           <div className="rc-sub">{r.calls} model calls</div>
         </div>
         <div>
-          <div className="rc-total">{money(r.cost_usd)}</div>
+          <div className="rc-total">{t.cost_unknown ? "—" : money(r.cost_usd)}</div>
           <div className="rc-tokens">{tokensHuman(total)} tokens</div>
         </div>
       </div>

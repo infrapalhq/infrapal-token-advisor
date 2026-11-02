@@ -95,6 +95,10 @@ categories such as `agent.ToolRead`, not tool names, so they work for any agent.
 A check also names the capabilities it needs, and only sees sessions from agents
 that have them, so that "no problems" never means "couldn't look".
 
+The dashboard reads `/api/agents` for what each agent can report. It shows `—`, never
+`$0.00`, for a session with no cost, and lists the checks that were skipped. The
+agent picker only appears with two or more agents.
+
 Fix text comes from the agent's `Advisor`. An agent without one still gets every
 finding, with no fix to paste.
 

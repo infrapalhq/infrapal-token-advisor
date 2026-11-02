@@ -5,6 +5,8 @@ import (
 	"sort"
 	"time"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/project"
 )
 
@@ -15,6 +17,74 @@ func rangeCutoff(s *Server, r *http.Request) (int64, string, error) {
 	return cutoff, token, err
 }
 
+// agentParam reads ?agent=, which keeps one agent's sessions. Empty means all.
+func agentParam(r *http.Request) agent.ID {
+	return agent.ID(r.URL.Query().Get("agent"))
+}
+
+// handleAgents handles GET /api/agents: the default agent, then every other
+// agent with sessions, with what each can't report.
+func (s *Server) handleAgents(w http.ResponseWriter, r *http.Request) {
+	rows, err := s.db.QueryContext(r.Context(), `SELECT agent, COUNT(*) FROM sessions GROUP BY agent`)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	defer rows.Close()
+	counts := map[agent.ID]int{}
+	for rows.Next() {
+		var id agent.ID
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		counts[id] = n
+	}
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	first := all.Default("").ID()
+	ids := []agent.ID{first}
+	for id := range counts {
+		if id != first {
+			ids = append(ids, id)
+		}
+	}
+	sort.Slice(ids[1:], func(i, j int) bool { return ids[i+1] < ids[j+1] })
+	out := make([]agentInfo, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, describeAgent(id, counts[id]))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"agents": out})
+}
+
+// agentInfo is what the dashboard knows about one agent.
+type agentInfo struct {
+	ID        agent.ID `json:"id"`
+	Name      string   `json:"name"`
+	Sessions  int      `json:"sessions"`
+	CostKnown bool     `json:"cost_known"`
+	Skipped   []string `json:"skipped"` // checks this agent can't supply data for
+}
+
+func describeAgent(id agent.ID, sessions int) agentInfo {
+	info := agentInfo{ID: id, Name: string(id), Sessions: sessions, Skipped: []string{}}
+	a, ok := agentFor(id)
+	if ok {
+		info.Name = a.Name()
+		info.CostKnown = a.CostSource() != agent.CostNone
+	}
+	for _, det := range detectors {
+		if det.needs != 0 && (!ok || !a.Capabilities().Has(det.needs)) {
+			info.Skipped = append(info.Skipped, det.label)
+		}
+	}
+	return info
+}
+
 // handleSessionCards handles GET /api/sessions/cards?since=. One card per
 // session, plus the priority counts the Sessions page's tabs show.
 func (s *Server) handleSessionCards(w http.ResponseWriter, r *http.Request) {
@@ -23,7 +93,7 @@ func (s *Server) handleSessionCards(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	d, occ, err := computeInsights(r.Context(), s.db, cutoff)
+	d, occ, err := computeInsights(r.Context(), s.db, cutoff, agentParam(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -60,7 +130,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	d, occ, err := computeInsights(r.Context(), s.db, cutoff)
+	d, occ, err := computeInsights(r.Context(), s.db, cutoff, agentParam(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -180,7 +250,11 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(modelRows, func(i, j int) bool { return modelRows[i]["cost_usd"].(float64) > modelRows[j]["cost_usd"].(float64) })
 
 	review := []sessionCard{}
+	costUnknown := 0
 	for _, c := range cards {
+		if c.CostUnknown {
+			costUnknown++
+		}
 		if c.Priority == "now" && len(review) < 2 {
 			review = append(review, c)
 		}
@@ -206,6 +280,8 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		"models":         modelRows,
 		"review":         review,
 		"sessions_count": len(cards),
+
+		"cost_unknown_sessions": costUnknown,
 	})
 }
 
@@ -275,7 +351,7 @@ func (s *Server) handleFixes(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	d, occ, err := computeInsights(r.Context(), s.db, cutoff)
+	d, occ, err := computeInsights(r.Context(), s.db, cutoff, agentParam(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -330,7 +406,7 @@ func (s *Server) handlePostFixState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Find the item across all time so its baseline covers its full history.
-	d, occ, err := computeInsights(r.Context(), s.db, 0)
+	d, occ, err := computeInsights(r.Context(), s.db, 0, "")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -372,7 +448,7 @@ func (s *Server) handlePostUIVisit(w http.ResponseWriter, r *http.Request) {
 // occurrences grouped by area, for the Issues tabs and the Fix cards.
 func (s *Server) handleSessionIssues(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	d, occ, err := computeInsights(r.Context(), s.db, 0)
+	d, occ, err := computeInsights(r.Context(), s.db, 0, "")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

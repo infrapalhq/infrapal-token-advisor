@@ -149,26 +149,57 @@ func (d *insightData) withCapability(need agent.Capability) *insightData {
 	if allCapable {
 		return d
 	}
+	return d.filtered(func(sid string) bool { return d.capable(sid, need) })
+}
+
+// filtered returns a copy of d with only the rows of sessions that match.
+func (d *insightData) filtered(match func(sessionID string) bool) *insightData {
 	view := *d
 	view.tools = nil
 	for _, t := range d.tools {
-		if d.capable(t.SessionID, need) {
+		if match(t.SessionID) {
 			view.tools = append(view.tools, t)
 		}
 	}
 	view.reqs = nil
 	for _, r := range d.reqs {
-		if d.capable(r.SessionID, need) {
+		if match(r.SessionID) {
 			view.reqs = append(view.reqs, r)
 		}
 	}
 	view.compactions = nil
 	for _, c := range d.compactions {
-		if d.capable(c.SessionID, need) {
+		if match(c.SessionID) {
 			view.compactions = append(view.compactions, c)
 		}
 	}
 	return &view
+}
+
+// onlyAgent keeps one agent's sessions. Unlike withCapability, this also
+// removes sessions from what's reported.
+func (d *insightData) onlyAgent(id agent.ID) *insightData {
+	match := func(sid string) bool { return d.sessions[sid].Agent == id }
+	view := d.filtered(match)
+	view.sessions = map[string]sessionRow{}
+	for sid, s := range d.sessions {
+		if s.Agent == id {
+			view.sessions[sid] = s
+		}
+	}
+	view.prompts = nil
+	for _, p := range d.prompts {
+		if match(p.SessionID) {
+			view.prompts = append(view.prompts, p)
+		}
+	}
+	view.waits = map[string]waitRow{}
+	for tool, w := range d.waits {
+		if match(w.SessionID) {
+			view.waits[tool] = w
+		}
+	}
+	return view
 }
 
 // advisor returns the fix advice for a session's agent. A finding with no

@@ -24,7 +24,8 @@ func (s *Server) handleMCPSetup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	host, ok := all.Default(p.Home).(agent.MCPHost)
+	a := all.Default(p.Home)
+	host, ok := a.(agent.MCPHost)
 	if !ok {
 		writeError(w, http.StatusNotFound, "this agent doesn't use MCP servers")
 		return
@@ -36,6 +37,7 @@ func (s *Server) handleMCPSetup(w http.ResponseWriter, r *http.Request) {
 	setup := host.MCPSetup(MCPServerName, binary)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"server_name": MCPServerName,
+		"agent_name":  a.Name(),
 		"enabled":     setup.Enabled,
 		"command":     setup.Command,
 		"verify":      setup.Verify,
@@ -92,7 +94,7 @@ func SafeFindings(ctx context.Context, db *sql.DB, since string) ([]SafeFinding,
 	if err != nil {
 		return nil, err
 	}
-	d, occ, err := computeInsights(ctx, db, cutoff)
+	d, occ, err := computeInsights(ctx, db, cutoff, "")
 	if err != nil {
 		return nil, err
 	}

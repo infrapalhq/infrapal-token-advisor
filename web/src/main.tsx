@@ -7,6 +7,7 @@ import Sessions from "./ta/Sessions";
 import SessionPage from "./ta/Session";
 import Fixes from "./ta/Fixes";
 import Settings from "./ta/Settings";
+import { AgentProvider } from "./ta/agents";
 import { api } from "./ta/api";
 
 // The old Fix, Spend and Trace routes are replaced by the mock's pages. Their
@@ -39,6 +40,7 @@ function SessionRoute() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
+    <AgentProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Overview />} />
@@ -58,5 +60,6 @@ createRoot(document.getElementById("root")!).render(
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </AgentProvider>
   </StrictMode>,
 );
