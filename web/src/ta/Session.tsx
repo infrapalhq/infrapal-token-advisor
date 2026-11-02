@@ -125,7 +125,7 @@ export default function SessionPage() {
                 </div>
               </div>
             </div>
-            <span className="hint">Black bars are flagged steps. Click any bar to jump to it in the thread.</span>
+            <span className="hint">Highlighted bars are flagged steps. Click any bar to jump to it in the thread.</span>
           </div>
         </header>
 
