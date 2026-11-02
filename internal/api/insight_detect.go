@@ -54,6 +54,7 @@ type occurrence struct {
 	Detail    string
 	Fix       string
 	FixLang   string
+	FixWhere  string // where the fix goes, for the dashboard
 	Note      string
 }
 
@@ -163,6 +164,7 @@ func detectReRead(d *insightData) []occurrence {
 		if g.rereads >= minRereadsForFullSeverity {
 			sev = "full"
 		}
+		fix := d.advisor(g.session).ReReadFix()
 		out = append(out, occurrence{
 			Kind:      "re_read",
 			Area:      "context",
@@ -177,8 +179,9 @@ func detectReRead(d *insightData) []occurrence {
 			Tokens:    &tokens,
 			Title:     fmt.Sprintf("%s read %d× in one prompt", filepath.Base(g.file), total),
 			Detail:    fmt.Sprintf("%d re-read(s) with no edit to the file between them.", g.rereads),
-			Fix:       "## Working with files\n- Grep before reading large files.\n- Don't re-read a file already in context.",
-			FixLang:   "claude-md",
+			Fix:       fix.Text,
+			FixLang:   fix.Lang,
+			FixWhere:  fix.Where,
 		})
 	}
 	return out
@@ -201,7 +204,7 @@ func detectCompaction(d *insightData) []occurrence {
 			Severity:  sev,
 			Conf:      "Measured",
 			Title:     fmt.Sprintf("Context compacted: ~%dK → ~%dK", c.Pre/1000, c.Post/1000),
-			Detail:    "Claude had to summarise the conversation to keep going. A fresh session per task avoids this.",
+			Detail:    d.advisor(c.SessionID).CompactionDetail(),
 		})
 	}
 	return out
@@ -285,10 +288,7 @@ func detectRepeatCommand(d *insightData) []occurrence {
 		if g.repeats >= minRepeatsForFullSeverity {
 			sev = "full"
 		}
-		fix := fmt.Sprintf("Add to CLAUDE.md:\n\n- Don't re-run `%s` unless something it depends on has changed.", k.cmd)
-		if ext := extBySession[g.session]; ext != "" {
-			fix = fmt.Sprintf("Add to CLAUDE.md:\n\n- Only re-run `%s` after editing .%s files.", k.cmd, ext)
-		}
+		fix := d.advisor(g.session).RepeatCommandFix(k.cmd, extBySession[g.session])
 		out = append(out, occurrence{
 			Kind:      "repeat_cmd",
 			Area:      "exec",
@@ -303,8 +303,9 @@ func detectRepeatCommand(d *insightData) []occurrence {
 			Tokens:    &tokens,
 			Title:     fmt.Sprintf("`%s` ran again with nothing changed", truncate(k.cmd, 60)),
 			Detail:    fmt.Sprintf("%d extra run(s) in one prompt with no file change between.", g.repeats),
-			Fix:       fix,
-			FixLang:   "claude-md",
+			Fix:       fix.Text,
+			FixLang:   fix.Lang,
+			FixWhere:  fix.Where,
 		})
 	}
 	return out
@@ -378,10 +379,10 @@ func isSafePattern(t toolRow) bool {
 	return len(segments) > 0
 }
 
-// approvalPattern is the settings.json-style pattern an approval would allow.
-func approvalPattern(t toolRow) string {
+// approvalPattern is the pattern an approval would allow, in the agent's terms.
+func (d *insightData) approvalPattern(t toolRow) string {
 	if t.Category == agent.ToolShell {
-		return fmt.Sprintf("Bash(%s:*)", bashPattern(t.Command))
+		return d.advisor(t.SessionID).ShellPattern(bashPattern(t.Command))
 	}
 	if t.MCPServer != "" {
 		return fmt.Sprintf("%s · %s", t.MCPServer, t.Name)
@@ -391,7 +392,7 @@ func approvalPattern(t toolRow) string {
 
 // detectRepeatApproval groups hand-approved calls by the pattern they would
 // allow. Two or more approvals of one pattern is a pattern. Safe patterns get
-// a settings.json allow diff; unsafe ones are reported with no fix.
+// an allow rule from the agent; unsafe ones are reported with no fix.
 func detectRepeatApproval(d *insightData) []occurrence {
 	type group struct {
 		pattern  string
@@ -409,7 +410,7 @@ func detectRepeatApproval(d *insightData) []occurrence {
 		if !ok || t.Name == "" {
 			continue
 		}
-		pat := approvalPattern(t)
+		pat := d.approvalPattern(t)
 		g, ok := groups[pat]
 		if !ok {
 			g = &group{pattern: pat, safe: isSafePattern(t), session: t.SessionID, ts: t.Ts}
@@ -428,12 +429,11 @@ func detectRepeatApproval(d *insightData) []occurrence {
 			continue
 		}
 		minutes := float64(g.waitMs) / 60000
-		fix, lang := "", ""
+		var fix agent.Fix
 		note := "Approved by hand more than once. Not suggested for permanent allow: it is not a read-only command."
 		if g.safe {
 			note = ""
-			fix = allowRuleJSON(g.pattern)
-			lang = "settings-json"
+			fix = d.advisor(g.session).AllowFix(g.pattern)
 		}
 		sev := "half"
 		if minutes >= 1 {
@@ -452,17 +452,13 @@ func detectRepeatApproval(d *insightData) []occurrence {
 			Minutes:   &minutes,
 			Title:     fmt.Sprintf("%s approved by hand %d×", g.pattern, g.count),
 			Detail:    fmt.Sprintf("%.1f min waiting on your approval.", minutes),
-			Fix:       fix,
-			FixLang:   lang,
+			Fix:       fix.Text,
+			FixLang:   fix.Lang,
+			FixWhere:  fix.Where,
 			Note:      note,
 		})
 	}
 	return out
-}
-
-// allowRuleJSON renders one settings.json permissions.allow entry.
-func allowRuleJSON(pattern string) string {
-	return fmt.Sprintf("{\n  \"permissions\": {\n    \"allow\": [\n      %q\n    ]\n  }\n}", pattern)
 }
 
 // detectFailingMCP flags an MCP server whose calls fail often. A habit: the
@@ -573,7 +569,7 @@ func detectOversizedModel(d *insightData) []occurrence {
 			USD:       &usd,
 			Title:     fmt.Sprintf("Small turn on %s", a.model),
 			Detail:    fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn.", a.output, a.tools, a.cost),
-			Note:      "Habit: switch to a smaller model with /model for turns like this. Spend shown is what this turn cost, not a saving.",
+			Note:      d.advisor(a.session).SmallerModelNote(),
 		})
 	}
 	return out
@@ -584,6 +580,7 @@ func detectOversizedModel(d *insightData) []occurrence {
 func detectDeadMCP(d *insightData) []occurrence {
 	var out []occurrence
 	for _, name := range d.deadMCP {
+		fix := d.advisor("").RemoveMCPFix(name)
 		out = append(out, occurrence{
 			Kind:     "dead_mcp",
 			Area:     "context",
@@ -593,8 +590,9 @@ func detectDeadMCP(d *insightData) []occurrence {
 			Conf:     "Measured",
 			Title:    name + " connected but never used",
 			Detail:   "Its tool definitions ride along on every request.",
-			Fix:      fmt.Sprintf("claude mcp remove %q", name),
-			FixLang:  "bash",
+			Fix:      fix.Text,
+			FixLang:  fix.Lang,
+			FixWhere: fix.Where,
 		})
 	}
 	return out

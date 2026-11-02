@@ -5,12 +5,11 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"net/http"
 	"os"
-	"regexp"
-	"strings"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 )
 
@@ -25,44 +24,23 @@ func (s *Server) handleMCPSetup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	host, ok := all.Default(p.Home).(agent.MCPHost)
+	if !ok {
+		writeError(w, http.StatusNotFound, "this agent doesn't use MCP servers")
+		return
+	}
 	binary, err := os.Executable()
 	if err != nil {
 		binary = MCPServerName
 	}
+	setup := host.MCPSetup(MCPServerName, binary)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"server_name": MCPServerName,
-		"enabled":     mcpRegistered(p.ClaudeConfigPath),
-		"command":     "claude mcp add --scope user " + MCPServerName + " -- " + shellQuote(binary) + " mcp",
-		"verify":      "claude mcp list",
-		"remove":      "claude mcp remove --scope user " + MCPServerName,
+		"enabled":     setup.Enabled,
+		"command":     setup.Command,
+		"verify":      setup.Verify,
+		"remove":      setup.Remove,
 	})
-}
-
-// mcpRegistered reports whether Claude Code's user config lists the server. A
-// missing or unreadable file just means "not registered".
-func mcpRegistered(configPath string) bool {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return false
-	}
-	var cfg struct {
-		MCPServers map[string]json.RawMessage `json:"mcpServers"`
-	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return false
-	}
-	_, ok := cfg.MCPServers[MCPServerName]
-	return ok
-}
-
-var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
-
-// shellQuote makes s a single POSIX shell word.
-func shellQuote(s string) string {
-	if shellSafe.MatchString(s) {
-		return s
-	}
-	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // safeFindingTitles lists every kind whose text may go to the model. An empty
