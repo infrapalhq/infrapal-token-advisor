@@ -68,18 +68,30 @@ func New(p Paths) (Service, error) {
 func newForGOOS(goos string, p Paths) (Service, error) {
 	switch goos {
 	case "darwin":
-		return &launchdService{p: p, plistPath: launchdPlistPath(p.Home)}, nil
+		return &launchdService{p: p, plistPath: launchdPlistPath(p.Home), run: execRunner{}}, nil
 	case "linux":
-		return &systemdService{p: p, unitPath: systemdUnitPath(p.Home)}, nil
+		return &systemdService{p: p, unitPath: systemdUnitPath(p.Home), run: execRunner{}}, nil
 	default:
 		return nil, ErrUnsupported
 	}
 }
 
-// runCommand runs an external command and folds its combined output into
-// the error, since launchctl/systemctl failures are otherwise opaque exit
-// codes.
-func runCommand(name string, args ...string) error {
+// commandRunner runs the service manager's commands, so tests can check what
+// would run without touching launchd or systemd.
+type commandRunner interface {
+	// Run runs a command for its effect, with its output in any error.
+	Run(name string, args ...string) error
+	// Output returns a command's stdout, including when it exits non-zero:
+	// systemctl and launchctl report state both ways.
+	Output(name string, args ...string) ([]byte, error)
+}
+
+// execRunner runs commands for real.
+type execRunner struct{}
+
+// Run folds the command's combined output into the error, since
+// launchctl/systemctl failures are otherwise opaque exit codes.
+func (execRunner) Run(name string, args ...string) error {
 	out, err := exec.Command(name, args...).CombinedOutput()
 	if err != nil {
 		detail := strings.TrimSpace(string(out))
@@ -89,4 +101,8 @@ func runCommand(name string, args ...string) error {
 		return fmt.Errorf("%s %s: %w: %s", name, strings.Join(args, " "), err, detail)
 	}
 	return nil
+}
+
+func (execRunner) Output(name string, args ...string) ([]byte, error) {
+	return exec.Command(name, args...).Output()
 }
