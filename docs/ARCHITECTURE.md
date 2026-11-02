@@ -41,7 +41,8 @@ flowchart LR
 | `internal/webui` | Embeds the built dashboard, or a placeholder without one |
 | `internal/ai` | AI Mode: builds the aggregate-only context, calls the API, checks the answer |
 | `internal/project` | Works out which project a session belongs to |
-| `internal/claudesettings` | Reads, backs up and patches `~/.claude/settings.json` |
+| `internal/agent/claudecode` | The Claude Code adapter: patches `~/.claude/settings.json` and checks the setup |
+| `internal/agent/all` | The list of supported agents |
 | `internal/service` | Installs the launchd or systemd user service |
 | `internal/logging` | The rotating log and crash capture |
 | `internal/update` | Finds and installs a release |

@@ -1,8 +1,4 @@
-// Package claudesettings reads, backs up, and patches the Claude Code
-// settings.json file that infrapal-token-advisor's env vars must live in for the `claude`
-// process to pick them up: exported shell vars silently lose to whatever's
-// already in settings.json.
-package claudesettings
+package claudecode
 
 import (
 	"encoding/json"
@@ -53,7 +49,8 @@ func Backup(path string, now time.Time) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}
-	backupPath := fmt.Sprintf("%s.infrapal-token-advisor-backup-%d", path, now.Unix())
+	// Nanoseconds, so that a second run can't overwrite this backup.
+	backupPath := fmt.Sprintf("%s.infrapal-token-advisor-backup-%d", path, now.UnixNano())
 	if err := os.WriteFile(backupPath, data, 0o600); err != nil {
 		return "", fmt.Errorf("write backup %s: %w", backupPath, err)
 	}

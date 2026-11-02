@@ -7,29 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
-	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
-
-// managedSettingsPath returns the platform's enterprise managed-settings.json
-// location, or "" on a platform with no known path (e.g. Windows, whose
-// managed settings can also arrive via registry rather than a file — not
-// checkable here). Confirmed against https://code.claude.com/docs/en/settings.
-func managedSettingsPath() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return "/Library/Application Support/ClaudeCode/managed-settings.json"
-	case "linux":
-		return "/etc/claude-code/managed-settings.json"
-	default:
-		return ""
-	}
-}
 
 func runDoctor(args []string) error {
 	fs := newFlagSet("doctor")
@@ -109,63 +93,17 @@ func runDoctor(args []string) error {
 			fmt.Sprintf("see %s — it holds startup failures and Go runtime crashes", errLog))
 	}
 
-	// 2. Does settings.json contain our env block, endpoint matching our port?
-	doc, existed, err := claudesettings.Load(p.ClaudeSettingsPath)
+	// 2. Is the agent set up to report here?
+	checks, err := all.Default(p.Home).Check(cfg.OTLPPort)
 	if err != nil {
 		return err
 	}
-	wantEndpoint := fmt.Sprintf("http://localhost:%d", cfg.OTLPPort)
-	settingsOK := false
-	var settingsDetail string
-	if !existed {
-		settingsDetail = fmt.Sprintf("%s does not exist", p.ClaudeSettingsPath)
-	} else if env, envErr := doc.EnvBlock(); envErr != nil {
-		settingsDetail = envErr.Error()
-	} else {
-		endpoint, _ := env["OTEL_EXPORTER_OTLP_ENDPOINT"].(string)
-		var missing []string
-		for _, key := range []string{
-			"CLAUDE_CODE_ENABLE_TELEMETRY", "OTEL_LOGS_EXPORTER", "OTEL_TRACES_EXPORTER",
-			"OTEL_METRICS_EXPORTER", "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA",
-		} {
-			if _, present := env[key]; !present {
-				missing = append(missing, key)
-			}
+	for _, c := range checks {
+		if c.Skipped {
+			fmt.Printf("[SKIP] %s\n", c.Label)
+			continue
 		}
-		if endpoint != wantEndpoint {
-			settingsDetail = fmt.Sprintf("OTEL_EXPORTER_OTLP_ENDPOINT is %q, want %q", endpoint, wantEndpoint)
-		} else if len(missing) > 0 {
-			settingsDetail = fmt.Sprintf("missing keys: %s", strings.Join(missing, ", "))
-		} else {
-			settingsOK = true
-		}
-	}
-	ok(settingsOK, fmt.Sprintf("%s has token-advisor's env block", p.ClaudeSettingsPath),
-		fmt.Sprintf("%s — run `token-advisor init` to fix", settingsDetail))
-
-	// 3. Conflicting OTEL_*/CLAUDE_CODE_* vars in doctor's own shell env.
-	var conflicting []string
-	for _, kv := range os.Environ() {
-		key, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(key, "OTEL_") || strings.HasPrefix(key, "CLAUDE_CODE_") {
-			conflicting = append(conflicting, key)
-		}
-	}
-	if len(conflicting) == 0 {
-		ok(true, "no OTEL_*/CLAUDE_CODE_* vars exported in this shell", "")
-	} else {
-		ok(false, "no OTEL_*/CLAUDE_CODE_* vars exported in this shell",
-			fmt.Sprintf("this shell exports: %s — these can override settings.json for any `claude` launched from here; unset them or reconcile with `token-advisor init`'s values. Note: this only reflects the shell doctor was invoked from, not every shell you might launch `claude` from.", strings.Join(conflicting, ", ")))
-	}
-
-	// 4. Managed settings file present (strips developer-set OTLP endpoints)?
-	if mp := managedSettingsPath(); mp == "" {
-		fmt.Printf("[SKIP] managed settings check — no known path for GOOS=%s\n", runtime.GOOS)
-	} else if _, statErr := os.Stat(mp); statErr == nil {
-		ok(false, fmt.Sprintf("no managed settings file at %s", mp),
-			"a managed-settings.json is present and can strip developer-set OTLP endpoint/protocol at startup — check it with `claude --debug` and coordinate with whoever manages it if telemetry isn't reaching token-advisor")
-	} else {
-		ok(true, fmt.Sprintf("no managed settings file at %s", mp), "")
+		ok(c.Pass, c.Label, c.Fix)
 	}
 
 	// 5. Last received metric/event/span timestamps.

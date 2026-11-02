@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/infrapalhq/infrapal-token-advisor/internal/claudesettings"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
@@ -40,56 +40,21 @@ func runInit(args []string) error {
 	}
 	cfg.RawBodies = *rawBodies
 
-	doc, _, err := claudesettings.Load(p.ClaudeSettingsPath)
-	if err != nil {
-		return err
+	opts := agent.ConnectOptions{
+		OTLPPort: cfg.OTLPPort,
+		Previous: agent.Connection{BackupPath: cfg.SettingsBackupPath},
 	}
-
-	wanted := wantedEnv(cfg)
 	if *rawBodies {
 		if err := p.EnsureBodiesDir(); err != nil {
 			return fmt.Errorf("create %s: %w", p.BodiesDir, err)
 		}
-		wanted["OTEL_LOG_RAW_API_BODIES"] = "file:" + p.BodiesDir
-		fmt.Println("warning: --raw-bodies captures the entire conversation history and system prompt on every API request, written unredacted to disk under", p.BodiesDir)
+		opts.RawBodiesDir = p.BodiesDir
 	}
-
-	changes, err := claudesettings.MergeEnv(doc, wanted)
+	conn, err := all.Default(p.Home).Connect(os.Stdout, opts)
 	if err != nil {
-		return fmt.Errorf("merge settings.json env block: %w", err)
+		return err
 	}
-
-	// Leave the file alone when there's nothing to change: rewriting it would
-	// reorder the user's keys, and a backup would only be another copy of it.
-	if len(changes) == 0 {
-		fmt.Println("settings.json already had everything token-advisor wants — nothing changed")
-	} else {
-		backupPath, err := claudesettings.Backup(p.ClaudeSettingsPath, time.Now())
-		if err != nil {
-			return fmt.Errorf("back up %s: %w", p.ClaudeSettingsPath, err)
-		}
-		if backupPath != "" {
-			fmt.Printf("backed up %s to %s\n", p.ClaudeSettingsPath, backupPath)
-			// Keep the first backup across repeat inits: a later one already
-			// holds our changes, so uninstall couldn't restore from it.
-			if cfg.SettingsBackupPath == "" {
-				cfg.SettingsBackupPath = backupPath
-			}
-		}
-		if err := claudesettings.Save(p.ClaudeSettingsPath, doc); err != nil {
-			return fmt.Errorf("write %s: %w", p.ClaudeSettingsPath, err)
-		}
-
-		fmt.Println("changed in", p.ClaudeSettingsPath+":")
-		for _, c := range changes {
-			if !c.Existed {
-				fmt.Printf("  %s: added (%q)\n", c.Key, c.NewValue)
-			} else {
-				fmt.Printf("  %s: %v -> %q\n", c.Key, c.OldValue, c.NewValue)
-			}
-		}
-	}
-	fmt.Println("reminder: already-running Claude Code sessions won't pick up the new env — restart them.")
+	cfg.SettingsBackupPath = conn.BackupPath
 
 	if err := config.Save(p, cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
@@ -106,29 +71,6 @@ func runInit(args []string) error {
 	}
 
 	return nil
-}
-
-// wantedEnv builds the fixed set of settings.json env keys infrapal-token-advisor's init
-// wants present. Values are all strings, as settings.json expects.
-func wantedEnv(cfg config.Config) map[string]string {
-	return map[string]string{
-		"CLAUDE_CODE_ENABLE_TELEMETRY":        "1",
-		"OTEL_METRICS_EXPORTER":               "otlp",
-		"OTEL_LOGS_EXPORTER":                  "otlp",
-		"OTEL_TRACES_EXPORTER":                "otlp",
-		"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA": "1",
-		"OTEL_EXPORTER_OTLP_PROTOCOL":         "http/protobuf",
-		"OTEL_EXPORTER_OTLP_ENDPOINT":         fmt.Sprintf("http://localhost:%d", cfg.OTLPPort),
-		"OTEL_METRIC_EXPORT_INTERVAL":         "10000",
-		"OTEL_LOGS_EXPORT_INTERVAL":           "2000",
-		"OTEL_TRACES_EXPORT_INTERVAL":         "2000",
-		"OTEL_METRICS_INCLUDE_VERSION":        "true",
-		"OTEL_METRICS_INCLUDE_ENTRYPOINT":     "true",
-		"OTEL_LOG_USER_PROMPTS":               "1",
-		"OTEL_LOG_ASSISTANT_RESPONSES":        "1",
-		"OTEL_LOG_TOOL_DETAILS":               "1",
-		"OTEL_LOG_TOOL_CONTENT":               "1",
-	}
 }
 
 // servicePaths builds the service.Paths infrapal-token-advisor's own commands need to
