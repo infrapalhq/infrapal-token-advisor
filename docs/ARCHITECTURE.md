@@ -61,6 +61,19 @@ it into typed tables such as `interactions`, `api_requests` and `tool_calls`.
 buffered writer that flushes in batches. If the database falls far behind, items
 are dropped and logged. A failed batch is recorded in `ingest_errors`.
 
+An agent's adapter can bring data in two ways, and implements whichever fit:
+
+- `LogSource` claims OTLP log records by their `service.name`, and maps each one
+  to common events.
+- `Importer` reads local files or databases in bounded batches. Each batch's events
+  and cursor are saved in one transaction, so a crash can't lose or repeat one.
+
+`internal/ingest/agent_events.go` writes common events to the same tables, and an
+adapter never writes SQL. Records no adapter claims take Claude Code's own path,
+because it fills far more columns than common events carry, and merges spans into
+them. Common events use Claude Code's values for fields like `query_source`, because
+the views and detectors still read those.
+
 Telemetry has no working directory, so `internal/project` reads it from Claude
 Code's transcript, or works it out from the files a session touched. The result is
 saved on the session, because Claude Code deletes transcripts after 30 days.
