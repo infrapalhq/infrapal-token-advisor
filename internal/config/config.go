@@ -29,11 +29,9 @@ type Config struct {
 	// inline mode: inline truncates at the content limit and bloats the DB.
 	RawBodies bool `json:"raw_bodies"`
 
-	// SettingsBackupPath is the ~/.claude/settings.json backup init made
-	// before patching it, e.g. "settings.json.infrapal-token-advisor-backup-1234567890".
-	// Empty if init never ran, or settings.json didn't exist yet at init
-	// time. uninstall uses this to restore settings.json byte-for-byte.
-	SettingsBackupPath string `json:"settings_backup_path"`
+	// Agents holds each connected coding agent, by ID. uninstall uses it to
+	// know what to disconnect and restore.
+	Agents map[string]AgentState `json:"agents,omitempty"`
 
 	// AnthropicAPIKey is the user's own key, pasted into the AI Mode
 	// settings panel. Used only in direct response to the "Generate"
@@ -48,6 +46,13 @@ type Config struct {
 	// LogLevel is the collector's log level: debug, info (the default),
 	// warn or error.
 	LogLevel string `json:"log_level,omitempty"`
+}
+
+// AgentState is what's remembered about one connected agent.
+type AgentState struct {
+	// BackupPath is the agent's settings from before init first changed them.
+	// Empty if init changed nothing that already existed.
+	BackupPath string `json:"backup_path,omitempty"`
 }
 
 // ResolveAnthropicAPIKey returns the key AI Mode should use: the
@@ -82,6 +87,17 @@ func Load(p paths.Paths) (Config, error) {
 	cfg := Default()
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, err
+	}
+	// Installs from before multi-agent support kept one backup path. Carry it
+	// over, or uninstall would forget what to restore.
+	var old struct {
+		SettingsBackupPath string `json:"settings_backup_path"`
+	}
+	if err := json.Unmarshal(data, &old); err != nil {
+		return Config{}, err
+	}
+	if cfg.Agents == nil && old.SettingsBackupPath != "" {
+		cfg.Agents = map[string]AgentState{"claude-code": {BackupPath: old.SettingsBackupPath}}
 	}
 	return cfg, nil
 }
