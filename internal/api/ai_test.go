@@ -93,3 +93,30 @@ func TestGetAIRecommendations_EmptyWhenNeverGenerated(t *testing.T) {
 		t.Errorf("expected no cached recommendations, got %+v", body.Recommendations)
 	}
 }
+
+func TestAIFacts_SkipsFixedAndCaps(t *testing.T) {
+	findings := []SafeFinding{
+		{Kind: "failing_mcp", Area: "exec", Title: "fixed already", MarkedFixed: true, Severity: "full"},
+		{Kind: "failing_mcp", Area: "exec", Title: "mcp", Severity: "full"},
+		{Kind: "repeat_cmd", Area: "exec", Title: "cmd", Severity: "half"},
+		{Kind: "re_read", Area: "context", Title: "read", Severity: "half"},
+	}
+	facts := aiFacts(findings)
+	if len(facts) != 3 {
+		t.Fatalf("facts = %+v, want the 3 unfixed findings", facts)
+	}
+	if f := facts[0]; f.Title != "mcp" || f.Category != "tools" || f.Severity != "warn" {
+		t.Errorf("mcp fact = %+v", f)
+	}
+	if f := facts[1]; f.Category != "waste" || f.Severity != "info" {
+		t.Errorf("exec fact = %+v", f)
+	}
+	if f := facts[2]; f.Category != "efficiency" {
+		t.Errorf("context fact = %+v", f)
+	}
+
+	many := make([]SafeFinding, maxAIFacts+5)
+	if got := len(aiFacts(many)); got != maxAIFacts {
+		t.Errorf("got %d facts, want the cap of %d", got, maxAIFacts)
+	}
+}

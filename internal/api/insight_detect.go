@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // Per-session detectors. Every detector is a pure function over
@@ -580,4 +581,39 @@ func sortOccurrences(occ []occurrence) {
 		}
 		return occ[i].Kind < occ[j].Kind
 	})
+}
+
+// normalizeBashPrefix reduces a full Bash command to its first two
+// whitespace-separated tokens (e.g. "npm run build --watch" -> "npm run"),
+// a heuristic stand-in for a stable command "shape" — not a validated
+// Claude Code permission-rule pattern. The second token is only kept when it
+// looks like a stable subcommand name (isSubcommandLike) — otherwise (e.g.
+// "cd /Users/me/My Project", where the second token is an
+// unbounded, possibly space-escaped path) it's dropped, since including a
+// one-off path in the suggested rule would make it neither a sensible
+// generalization nor a valid copy-pasteable pattern.
+func normalizeBashPrefix(cmd string) string {
+	fields := strings.Fields(cmd)
+	if len(fields) == 0 {
+		return ""
+	}
+	if len(fields) > 1 && isSubcommandLike(fields[1]) {
+		return fields[0] + " " + fields[1]
+	}
+	return fields[0]
+}
+
+// isSubcommandLike reports whether tok looks like a stable subcommand name
+// (letters, digits, '-', '_' only) rather than a path, flag, or other
+// unbounded argument.
+func isSubcommandLike(tok string) bool {
+	if tok == "" {
+		return false
+	}
+	for _, r := range tok {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' {
+			return false
+		}
+	}
+	return true
 }

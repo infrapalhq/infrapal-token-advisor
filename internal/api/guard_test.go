@@ -2,8 +2,10 @@ package api
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 func TestGuardRejectsForeignHost(t *testing.T) {
@@ -59,5 +61,22 @@ func TestGuardRejectsCrossOriginWrite(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Errorf("status = %d, want 403", resp.StatusCode)
+	}
+}
+
+func TestUnknownAPIPathIsNotFound(t *testing.T) {
+	srv := NewServer("127.0.0.1:0", seedDB(t), fstest.MapFS{"index.html": {Data: []byte("<html>")}})
+	ts := httptest.NewServer(srv.http.Handler)
+	defer ts.Close()
+
+	for path, want := range map[string]int{"/api/nope": http.StatusNotFound, "/some/page": http.StatusOK} {
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("get %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("%s: status %d, want %d", path, resp.StatusCode, want)
+		}
 	}
 }

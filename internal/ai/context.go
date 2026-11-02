@@ -30,11 +30,9 @@ const (
 	maxRetryRows   = 15
 )
 
-// InsightFact mirrors the fields of api.Insight the model is allowed to
-// see. Deliberately excludes Link (a frontend route, not a fact) and ID (an
-// internal key). Defined here rather than imported from internal/api to
-// avoid an import cycle — internal/api/ai.go builds these by hand from the
-// []api.Insight it already has via computeInsights.
+// InsightFact is the part of a finding the model is allowed to see. Defined
+// here rather than imported from internal/api to avoid an import cycle —
+// internal/api/ai.go builds these from api.SafeFindings.
 type InsightFact struct {
 	Category string `json:"category"`
 	Severity string `json:"severity"`
@@ -193,8 +191,8 @@ func sinceFilter(col string, cutoffMs int64, haveCutoff bool) (string, []any) {
 }
 
 // BuildContext assembles the compact JSON bundle for one Generate call.
-// insights is the already-computed, already-vetted fact list (converted
-// from api.computeInsights's []Insight by the caller) — reused, never
+// insights is the already-computed, already-vetted fact list, built by
+// the caller from api.SafeFindings — reused, never
 // recomputed here, so this package inherits the same deterministic
 // "don't fabricate" checks the rest of infrapal-token-advisor relies on. cutoffMs/haveCutoff
 // mirror the ?since= cutoff every other view/insight query already uses.
