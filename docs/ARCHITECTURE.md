@@ -34,6 +34,7 @@ flowchart LR
 | `cmd/token-advisor` | Entry point |
 | `internal/cli` | Commands: `init`, `start`, `doctor`, `purge` and the rest. Retention lives here too. |
 | `internal/otlp` | Receives OTLP over HTTP on `127.0.0.1:4318` and decodes it |
+| `internal/agent` | The common model of a coding agent: events, tokens, tool categories and capabilities. Experimental until a second agent uses it |
 | `internal/ingest` | Batches writes and projects events into typed tables |
 | `internal/store` | Opens SQLite and runs migrations. See [SCHEMA.md](SCHEMA.md). |
 | `internal/api` | HTTP API on `127.0.0.1:4319`, the detectors, and serving the dashboard |
