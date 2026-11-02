@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"database/sql"
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -30,7 +31,7 @@ func resolveSessionProject(tx *sql.Tx, sessionID string) error {
 	}
 	var current sql.NullString
 	err := tx.QueryRow(`SELECT project_dir FROM sessions WHERE session_id = ?`, sessionID).Scan(&current)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {

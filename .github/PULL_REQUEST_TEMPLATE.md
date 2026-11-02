@@ -8,6 +8,6 @@
 
 ## Checklist
 
-- [ ] `gofmt -l .` prints nothing, and `go vet ./...` and `go test -race ./...` pass
+- [ ] `gofmt -l .` prints nothing, and `go vet ./...`, `go test -race ./...` and `golangci-lint run` pass
 - [ ] If the schema changed: added a new migration, didn't edit an existing one
 - [ ] Commits are signed off (`git commit -s`)

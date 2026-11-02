@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -28,7 +29,7 @@ func runUninstall(args []string) error {
 	}
 	svc, err := newService(sp)
 	switch {
-	case err == service.ErrUnsupported:
+	case errors.Is(err, service.ErrUnsupported):
 		fmt.Println("no supported service manager on this platform — stop and remove the `token-advisor start` process yourself")
 	case err != nil:
 		return err
@@ -43,8 +44,8 @@ func runUninstall(args []string) error {
 	if err != nil {
 		return fmt.Errorf("load config: %w", err)
 	}
-	switch {
-	case cfg.SettingsBackupPath == "":
+	switch cfg.SettingsBackupPath {
+	case "":
 		fmt.Println("no settings.json backup recorded (init never ran, or ran before this field existed) — settings.json left as-is")
 	default:
 		if _, statErr := os.Stat(cfg.SettingsBackupPath); statErr != nil {

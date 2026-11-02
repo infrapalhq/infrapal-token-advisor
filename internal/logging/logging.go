@@ -116,7 +116,7 @@ func RecoverHTTP(where string, next http.Handler) http.Handler {
 			if rec == nil {
 				return
 			}
-			if rec == http.ErrAbortHandler {
+			if rec == http.ErrAbortHandler { //nolint:errorlint // a recovered panic value, not a returned error
 				panic(rec)
 			}
 			logPanic(where, rec)

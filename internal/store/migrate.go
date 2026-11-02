@@ -145,7 +145,7 @@ func applyMigration(db *sql.DB, m migration) error {
 	if _, err := conn.ExecContext(ctx, `BEGIN IMMEDIATE`); err != nil {
 		return err
 	}
-	defer conn.ExecContext(ctx, `ROLLBACK`) // a no-op once committed
+	defer func() { _, _ = conn.ExecContext(ctx, `ROLLBACK`) }() // a no-op once committed
 
 	var applied int
 	if err := conn.QueryRowContext(ctx,

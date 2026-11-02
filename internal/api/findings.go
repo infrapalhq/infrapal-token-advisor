@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -554,9 +555,7 @@ func buildAllowRuleFix(ctx context.Context, db *sql.DB) (fixJSON string, ruleCou
 	}
 
 	var patch permissionsPatch
-	for _, pattern := range order {
-		patch.Permissions.Allow = append(patch.Permissions.Allow, pattern)
-	}
+	patch.Permissions.Allow = append(patch.Permissions.Allow, order...)
 	encoded, err := json.MarshalIndent(patch, "", "  ")
 	if err != nil {
 		return "", 0, fmt.Errorf("build allow rule fix encode: %w", err)
@@ -580,7 +579,7 @@ func rejectedWorkFinding(ctx context.Context, db *sql.DB) (*Finding, error) {
 		GROUP BY tool_name
 		ORDER BY n DESC LIMIT 1`,
 	).Scan(&topTool, &topCount)
-	if err == sql.ErrNoRows || topCount < minRejectedToolCount {
+	if errors.Is(err, sql.ErrNoRows) || topCount < minRejectedToolCount {
 		return nil, nil
 	}
 	if err != nil {
@@ -601,7 +600,7 @@ func rejectedWorkFinding(ctx context.Context, db *sql.DB) (*Finding, error) {
 		SELECT session_id FROM tool_calls WHERE decision = 'reject' AND tool_name = ?
 		ORDER BY ts DESC LIMIT 1`, topTool,
 	).Scan(&sessionID)
-	if err != nil && err != sql.ErrNoRows {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("rejected work finding session lookup: %w", err)
 	}
 
@@ -778,7 +777,7 @@ func isSubcommandLike(tok string) bool {
 		return false
 	}
 	for _, r := range tok {
-		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || r == '-' || r == '_') {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' {
 			return false
 		}
 	}

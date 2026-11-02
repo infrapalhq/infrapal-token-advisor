@@ -370,6 +370,10 @@ func (s *Server) handleGetUIState(w http.ResponseWriter, r *http.Request) {
 		}
 		out[k] = v
 	}
+	if err := rows.Err(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
