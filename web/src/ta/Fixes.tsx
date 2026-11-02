@@ -1,10 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
-import { api, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
+import { Link } from "react-router-dom";
+import { api, type AiResult, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
 import { AREA_NAME, dayShort, money } from "./format";
 
+const AI_RANGE = "30d";
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const MCP_SAMPLE_PROMPT = "Use infrapal-token-advisor to find my three biggest sources of avoidable Claude Code spend in the last 30 days, and tell me what to change first.";
 
@@ -86,6 +88,71 @@ function EnableMcp() {
           <button className="btn btn-k" type="button" disabled={checking} onClick={check}>{checking ? "Checking…" : "Check again"}</button>
         </div>
       )}
+    </section>
+  );
+}
+
+// AiInsights is the only control that sends anything to Anthropic. Loading the
+// page reads saved results and never makes a call.
+function AiInsights() {
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [result, setResult] = useState<AiResult | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.aiConfig().then((c) => setConfigured(c.configured)).catch(() => setConfigured(false));
+    api.aiRecommendations(AI_RANGE).then(setResult).catch(() => {});
+  }, []);
+
+  const generate = async (force: boolean) => {
+    setGenerating(true);
+    setError(null);
+    try {
+      setResult(await api.generateAI(AI_RANGE, force));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (configured === null) return null;
+  const hasRun = Boolean(result?.batch_id);
+  const recs = result?.recommendations ?? [];
+  const dropped = result?.dropped_count ?? 0;
+
+  return (
+    <section className="card ai" aria-label="AI recommendations">
+      <div className="card-top">
+        <strong>AI recommendations</strong>
+        <span className={`ok${configured ? "" : " dashed"}`}>{configured ? "Key added" : "Off"}</span>
+      </div>
+      <span className="body-copy">
+        Optional. Generate sends the last 30 days of aggregated figures and labels to Anthropic with your key, never your prompts, responses, file paths or commands.
+      </span>
+      {recs.map((r, i) => (
+        <article className="ai-rec" key={i}>
+          <strong><span className={`pip ${r.severity === "warn" ? "full" : "half"}`} />{r.title}</strong>
+          <span className="body-copy">{r.detail}</span>
+          {r.evidence.length > 0 && (
+            <span className="sub">{r.evidence.map((e) => `${e.label}: ${e.value}`).join(" · ")}</span>
+          )}
+        </article>
+      ))}
+      {hasRun && recs.length === 0 && <span className="note">Nothing to recommend yet. Try again after a few more sessions.</span>}
+      {dropped > 0 && <span className="note">Left out {dropped} {dropped === 1 ? "recommendation" : "recommendations"} that didn't match your data.</span>}
+      {error && <span className="note" role="alert">Could not generate: {error}</span>}
+      <div className="acts">
+        {configured ? (
+          <button className="btn btn-k" type="button" disabled={generating} onClick={() => generate(hasRun)}>
+            {generating ? "Generating…" : hasRun ? "Generate again" : "Generate"}
+          </button>
+        ) : (
+          <Link className="btn btn-k" to="/settings">Add a key in Settings</Link>
+        )}
+      </div>
+      {hasRun && <span className="note" role="status">Last generated {dayShort(result?.generated_at ?? 0)}</span>}
     </section>
   );
 }
@@ -224,6 +291,8 @@ export default function Fixes() {
               </div>
             </div>
           </section>
+
+          <AiInsights />
 
           <div className="cols">
             <div className="col">

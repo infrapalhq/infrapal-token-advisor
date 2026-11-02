@@ -140,6 +140,21 @@ export type Progress = {
 
 export type Status = { collector_live: boolean; prompts_logged_7d: boolean; last_event_ms?: number };
 
+export type AiRecommendation = {
+  category: string;
+  severity: "info" | "warn";
+  title: string;
+  detail: string;
+  evidence: { label: string; value: string }[];
+};
+
+export type AiResult = {
+  batch_id: string;
+  generated_at: number;
+  recommendations: AiRecommendation[];
+  dropped_count: number;
+};
+
 export type McpSetup = { server_name: string; enabled: boolean; command: string; verify: string; remove: string };
 
 async function get<T>(path: string): Promise<T> {
@@ -174,5 +189,7 @@ export const api = {
   mcpSetup: () => get<McpSetup>(`/api/mcp/setup`),
   visit: () => send<{ last_visit_at: number; previous_visit_at: number }>("POST", `/api/ui/visit`),
   aiConfig: () => get<{ configured: boolean }>(`/api/ai/config`),
+  aiRecommendations: (since: string) => get<AiResult>(`/api/ai/recommendations?since=${since}`),
+  generateAI: (since: string, force: boolean) => send<AiResult>("POST", `/api/ai/recommendations`, { since, force }),
   saveAIKey: (key: string) => send<{ configured: boolean }>("PUT", `/api/ai/config`, { anthropic_api_key: key }),
 };

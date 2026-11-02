@@ -1,17 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" role="img" aria-label="infrapal token advisor">
-  <rect width="960" height="240" rx="16" fill="#000"/>
-  <rect x="64" y="84" width="72" height="72" rx="16" fill="#fff"/>
-  <text x="164" y="118" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1.5" fill="#fff">infrapal</text>
-  <text x="166" y="154" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24" fill="#bdbdbd">token advisor</text>
-  <g fill="#fff">
-    <rect x="600" y="132" width="26" height="44"/>
-    <rect x="636" y="112" width="26" height="64"/>
-    <rect x="672" y="124" width="26" height="52"/>
-    <rect x="708" y="84" width="26" height="92"/>
-    <rect x="744" y="100" width="26" height="76" fill="#6b6b6b"/>
-    <rect x="780" y="68" width="26" height="108"/>
-    <rect x="816" y="92" width="26" height="84" fill="#6b6b6b"/>
-    <rect x="852" y="120" width="26" height="56" fill="#6b6b6b"/>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16263F"/>
+      <stop offset="1" stop-color="#0F1C30"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.14" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#71A3F4" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#71A3F4" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#F59E0B" fill-opacity="0.16"/>
+      <rect width="3" height="8" fill="#F59E0B"/>
+    </pattern>
+  </defs>
+
+  <rect width="960" height="240" rx="16" fill="#06111F"/>
+  <rect width="960" height="240" rx="16" fill="url(#glow)"/>
+
+  <!-- The logo, redrawn on its 32 by 32 grid. -->
+  <g transform="translate(56 72) scale(3)">
+    <rect width="32" height="32" rx="7" fill="#04213C"/>
+    <path d="M6.7 13.6 A6.7 6.7 0 0 1 19.6 12.4 A4.6 4.6 0 0 1 21.2 20.9 H18.3" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M11 17 H17.5" stroke="#8C84F5" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M7.5 20.9 H15.3" stroke="#79C387" stroke-width="1.7" stroke-linecap="round"/>
+    <path d="M11 24.5 H19.2" stroke="#71A3F4" stroke-width="1.7" stroke-linecap="round"/>
   </g>
-  <rect x="600" y="180" width="278" height="2" fill="#fff"/>
+
+  <text x="176" y="118" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="46" font-weight="800" letter-spacing="-1.5" fill="#F4F5F7">infrapal</text>
+  <text x="178" y="154" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24" fill="#F4F5F7" fill-opacity="0.72">token advisor</text>
+
+  <!-- A card like the dashboard's Week by week chart. -->
+  <rect x="568" y="36" width="336" height="168" rx="14" fill="url(#panel)" stroke="#fff" stroke-opacity="0.11"/>
+  <g fill="url(#hatch)">
+    <rect x="592" y="132" width="32" height="48"/>
+    <rect x="634" y="104" width="32" height="76"/>
+    <rect x="676" y="120" width="32" height="60"/>
+    <rect x="718" y="84" width="32" height="96"/>
+    <rect x="760" y="112" width="32" height="68"/>
+    <rect x="802" y="136" width="32" height="44"/>
+    <rect x="844" y="154" width="32" height="26"/>
+  </g>
+  <rect x="592" y="180" width="284" height="1.5" fill="#fff" fill-opacity="0.2"/>
+  <polyline points="608,138 650,118 692,124 734,92 776,76 818,64 860,56" fill="none" stroke="#71A3F4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
