@@ -46,7 +46,7 @@ func runUninstall(args []string) error {
 	}
 	switch cfg.SettingsBackupPath {
 	case "":
-		fmt.Println("no settings.json backup recorded (init never ran, or ran before this field existed) — settings.json left as-is")
+		fmt.Println("no settings.json backup recorded, so init never changed an existing file — settings.json left as-is")
 	default:
 		if _, statErr := os.Stat(cfg.SettingsBackupPath); statErr != nil {
 			fmt.Printf("settings.json backup %s is missing — settings.json left as-is\n", cfg.SettingsBackupPath)

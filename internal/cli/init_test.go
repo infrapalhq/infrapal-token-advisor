@@ -161,6 +161,49 @@ func TestRunInit_KeepsFirstBackupOnRepeatRuns(t *testing.T) {
 	}
 }
 
+// A settings.json that needs no changes must stay byte for byte as it was, with
+// no backup: uninstall would otherwise "restore" a copy holding our own keys.
+func TestRunInit_LeavesSettingsAloneWhenNothingChanges(t *testing.T) {
+	home := withFakeHome(t)
+	withFakeService(t)
+
+	if err := runInit(nil); err != nil {
+		t.Fatalf("first runInit: %v", err)
+	}
+
+	// Compact, so a rewrite in init's own indented style would show up.
+	settings := filepath.Join(home, ".claude", "settings.json")
+	compact, err := json.Marshal(map[string]any{"env": readSettingsEnv(t, home)})
+	if err != nil {
+		t.Fatalf("marshal settings: %v", err)
+	}
+	if err := os.WriteFile(settings, compact, 0o600); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+
+	if err := runInit(nil); err != nil {
+		t.Fatalf("second runInit: %v", err)
+	}
+
+	got, err := os.ReadFile(settings)
+	if err != nil {
+		t.Fatalf("read settings.json: %v", err)
+	}
+	if string(got) != string(compact) {
+		t.Errorf("settings.json was rewritten:\n%s", got)
+	}
+	backups, err := filepath.Glob(settings + ".infrapal-token-advisor-backup-*")
+	if err != nil {
+		t.Fatalf("glob backups: %v", err)
+	}
+	if len(backups) != 0 {
+		t.Errorf("backups = %v, want none", backups)
+	}
+	if path := readConfig(t, home).SettingsBackupPath; path != "" {
+		t.Errorf("SettingsBackupPath = %q, want empty", path)
+	}
+}
+
 func TestRunInit_RawBodies(t *testing.T) {
 	home := withFakeHome(t)
 	withFakeService(t)
