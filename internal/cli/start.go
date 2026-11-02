@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/infrapalhq/infrapal-token-advisor/internal/agent/all"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
@@ -78,7 +77,7 @@ func runStart(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	agents := all.Agents(p.Home)
+	agents := agentList(p.Home)
 	writer := ingest.NewWriter(db, agents...)
 	writerDone := make(chan error, 1)
 	go func() {

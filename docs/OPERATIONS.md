@@ -63,7 +63,7 @@ These live in `config.json`. Run `token-advisor restart` after changing one.
 | `log_level` | `info` | `debug`, `info`, `warn` or `error` |
 | `anthropic_api_key` | none | Your key for AI Mode. Save it in the dashboard's Settings. It's stored in plain text, private to your user. |
 
-`raw_bodies` and `settings_backup_path` are managed by `init`, so leave them alone.
+`raw_bodies` and `agents` are managed by `init`, so leave them alone.
 
 The service can't see your shell's environment, so `ANTHROPIC_API_KEY` from your
 shell only reaches a dashboard you run with `token-advisor start` or
