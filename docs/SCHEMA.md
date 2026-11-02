@@ -18,6 +18,9 @@ source of truth for every column.
 | Dashboard | `fix_marks`, `ai_recommendations`, `ui_state` | Your decisions on findings, AI Mode output and UI state |
 | Internal | `ingest_errors`, `schema_migrations` | Failed writes and the applied migrations |
 
+`sessions.agent` records which coding agent a session came from, such as
+`claude-code`. Other tables reach it through `session_id`.
+
 The `v_*` views hold the derived figures the dashboard shows. Business logic
 lives in those views, not in the API handlers.
 
