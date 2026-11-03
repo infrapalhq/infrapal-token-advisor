@@ -110,3 +110,20 @@ func TestGetCached_EmptyWhenNeverGenerated(t *testing.T) {
 		t.Errorf("FromCache = true for a never-generated range, want false")
 	}
 }
+
+// A stored batch that can't be read back is an error, not an empty answer that
+// looks like "nothing to recommend".
+func TestGetCached_ReportsACorruptBatch(t *testing.T) {
+	db := seedDB(t)
+	if _, err := Generate(context.Background(), db, &fakeRequester{recs: []Recommendation{
+		{Category: "waste", Severity: "info", Title: "t", Detail: "d", Evidence: []EvidenceFact{{Label: "cost", Value: "0.1"}}},
+	}}, HaikuModel, "30d", 0, false, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`UPDATE ai_recommendations SET evidence_json = '{broken'`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetCached(context.Background(), db, "30d"); err == nil {
+		t.Error("want an error for unreadable evidence")
+	}
+}

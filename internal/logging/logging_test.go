@@ -236,3 +236,60 @@ func TestTrimFileLeavesSmallAndMissingFiles(t *testing.T) {
 		t.Errorf("file changed: %q", data)
 	}
 }
+
+// A foreground run shows its log on the terminal as well as in the file.
+func TestSetupWritesToConsoleToo(t *testing.T) {
+	old := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(old) })
+	path := filepath.Join(t.TempDir(), "token-advisor.log")
+	var console bytes.Buffer
+	closer, err := Setup(path, slog.LevelInfo, &console)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slog.Info("hello both")
+	if err := closer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(file), "hello both") || !strings.Contains(console.String(), "hello both") {
+		t.Errorf("file %q, console %q", file, console.String())
+	}
+}
+
+func TestSetupFailsWhenTheLogCantBeCreated(t *testing.T) {
+	if _, err := Setup(filepath.Join(t.TempDir(), "missing", "dir", "x.log"), slog.LevelInfo, nil); err == nil {
+		t.Error("want an error for a log in a folder that doesn't exist")
+	}
+}
+
+// net/http uses ErrAbortHandler to drop a connection on purpose. It must pass
+// through untouched, not be logged as a crash.
+func TestRecoverHTTPLetsAbortThrough(t *testing.T) {
+	h := RecoverHTTP("test", http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) }))
+	defer func() {
+		if r := recover(); r != http.ErrAbortHandler { //nolint:errorlint // comparing the recovered value
+			t.Errorf("recovered %v, want http.ErrAbortHandler", r)
+		}
+	}()
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	t.Error("the abort should have propagated")
+}
+
+func TestSummarizeIgnoresLinesWithoutATime(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "token-advisor.log")
+	content := "not a log line\ntime=garbage level=ERROR msg=x\ntime=" + time.Now().Format(time.RFC3339) + " level=ERROR msg=y\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s, err := Summarize(path, time.Now().Add(-time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Errors != 1 {
+		t.Errorf("errors = %d, want only the line with a real time", s.Errors)
+	}
+}

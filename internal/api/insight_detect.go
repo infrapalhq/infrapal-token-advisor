@@ -642,8 +642,8 @@ func normalizeBashPrefix(cmd string) string {
 // (letters, digits, '-', '_' only) rather than a path, flag, or other
 // unbounded argument.
 func isSubcommandLike(tok string) bool {
-	if tok == "" {
-		return false
+	if tok == "" || tok[0] == '-' {
+		return false // a flag, such as -rf, says nothing about which subcommand ran
 	}
 	for _, r := range tok {
 		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' {
