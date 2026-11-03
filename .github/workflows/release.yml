@@ -2,6 +2,10 @@ name: release
 
 # Publishes a release when a v* tag is pushed. HOMEBREW_TAP_TOKEN must be a
 # token that can push to infrapalhq/homebrew-tap.
+#
+# Each release is signed and carries build provenance, both tied to this
+# workflow's identity through GitHub's OIDC token, so there's no key to manage.
+# docs/OPERATIONS.md explains how to check them.
 on:
   push:
     tags: ["v*"]
@@ -14,7 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: write # create the release and upload files to it
+      id-token: write # prove this workflow's identity for signing
+      attestations: write # record build provenance
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,6 +35,9 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: v3.1.4
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           version: v2.19.0
@@ -36,3 +45,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      # SLSA build provenance for every archive: which commit and workflow built
+      # it. It's stored with GitHub, and attached to the release as well, where
+      # tools such as OpenSSF Scorecard look for it.
+      - id: provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: dist/checksums.txt
+      - name: Attach the provenance to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          name="infrapal-token-advisor_${GITHUB_REF_NAME#v}.intoto.jsonl"
+          cp "$BUNDLE" "$name"
+          gh release upload "$GITHUB_REF_NAME" "$name" --repo "$GITHUB_REPOSITORY"
