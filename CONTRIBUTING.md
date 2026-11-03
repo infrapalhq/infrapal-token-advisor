@@ -58,7 +58,9 @@ To add support for another coding agent, see
 ## Making a change
 
 1. Branch from `main`.
-2. Write a test for the change where one makes sense.
+2. Add tests. New features and bug fixes must come with tests, and a bug fix
+   needs a test that fails without it. Changes to docs, or to code that's purely
+   visual, are the exception. A maintainer will ask for tests before merging.
 3. Run the same checks CI runs:
 
    ```sh
@@ -81,6 +83,33 @@ To add support for another coding agent, see
 5. Schema changes go in a **new** migration file with the next number.
    Never edit a migration that has already been released. See
    [docs/SCHEMA.md](docs/SCHEMA.md#adding-a-migration).
+
+## Coding standards
+
+CI checks formatting, linting and types on every pull request, and a pull request
+that fails them can't be merged. Reviewers check the rest.
+
+**Go**
+- Formatted with `gofmt`, and following [Effective Go](https://go.dev/doc/effective_go)
+  and the [Go Code Review Comments](https://go.dev/wiki/CodeReviewComments).
+- Passing `go vet` and `golangci-lint`, with the rules in [.golangci.yml](.golangci.yml).
+  If a finding is deliberate, add `//nolint:<linter>` with the reason.
+- Wrap errors with context, as in `fmt.Errorf("open database: %w", err)`, and
+  never panic on bad input from outside the program.
+- Every query is parameterised. Join SQL from fixed strings only.
+
+**TypeScript**
+- TypeScript in strict mode, passing `tsc` and [oxlint](https://oxc.rs/docs/guide/usage/linter).
+- Show text from data as text. Never use `dangerouslySetInnerHTML`.
+
+**Everywhere**
+- Match the code around you: its naming, comments and structure.
+- Files follow [.editorconfig](.editorconfig).
+- Ask in an issue before adding a dependency. Each one is something we have to
+  keep up to date and trust.
+- Keep anything specific to one coding agent in its adapter. A test fails if
+  Claude Code's tool or file names appear in `internal/api`.
+- Write messages and docs in plain English, with short sentences.
 
 ## Changelog
 
