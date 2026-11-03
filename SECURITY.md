@@ -13,23 +13,51 @@ reporting.
 
 **Do not open a public issue.** Report it privately through
 [GitHub private vulnerability reporting](https://github.com/infrapalhq/infrapal-token-advisor/security/advisories/new).
+Only the maintainers can see it.
 
-Include the version (`token-advisor version`), your OS, and steps
-to reproduce. We aim to:
+Include the version (`token-advisor version`), your OS, and steps to reproduce.
 
-- acknowledge the report within 3 business days
-- fix or mitigate a confirmed critical issue within 30 days, and publish an
-  advisory once a fixed release is out
+### What counts
 
-These are targets for a small team, not a guarantee.
+Examples of what we treat as security issues:
 
-Examples of what we treat as security issues: another user or a website
-reading your telemetry, the API or receiver accepting connections from
-other machines, the database or config being readable by other users, or
-AI Mode sending more than described below.
+- a website, or another machine, reading or sending data to the collector or the
+  dashboard
+- the database or config being readable by other user accounts
+- AI Mode or the MCP server sending more than described below
+- a suggested fix that would let your agent do something harmful without asking
+- a download or update that isn't verified
 
-[docs/ASSURANCE.md](docs/ASSURANCE.md) explains why we believe token-advisor is secure: what it
-protects, from whom, and what it doesn't protect yet.
+Some limits are already known, and listed in
+[docs/ASSURANCE.md](docs/ASSURANCE.md#known-gaps), such as another account on the
+same machine reaching the dashboard while it runs. A new way past those limits, or
+a reason they matter more than we think, is still worth reporting.
+
+### How we handle a report
+
+1. **Acknowledge** it within 3 business days.
+2. **Assess** it within 7 days: confirm it, judge how severe it is, and tell you
+   what we found.
+3. **Fix it privately**, in a GitHub security advisory, and invite you to check
+   the fix. We aim to release a fix for a critical issue within 30 days, and for
+   others within 90.
+4. **Release and disclose** together: a fixed release, a published advisory with a
+   CVE where one applies, and an entry under **Security** in the
+   [changelog](CHANGELOG.md).
+5. **Credit you** in the advisory and the changelog, unless you'd rather not be
+   named.
+
+We keep you updated at each step. Please give us the time above before disclosing
+it yourself. If we miss it, tell us, and we'll agree on a date together.
+
+These are targets for a small team, not a guarantee. Who handles reports is set
+out in [GOVERNANCE.md](GOVERNANCE.md).
+
+## What you can expect
+
+[docs/ASSURANCE.md](docs/ASSURANCE.md) explains why we believe token-advisor is
+secure: what it protects, from whom, how, and what it doesn't protect yet. The
+sections below summarize what leaves your machine and what's stored on it.
 
 ## What leaves your machine
 
