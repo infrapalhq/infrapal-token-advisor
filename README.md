@@ -8,6 +8,7 @@
 Your data stays on your machine. No account, no cloud, no proxy.
 
 [![CI](https://github.com/infrapalhq/infrapal-token-advisor/actions/workflows/ci.yml/badge.svg)](https://github.com/infrapalhq/infrapal-token-advisor/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/infrapalhq/infrapal-token-advisor/graph/badge.svg)](https://codecov.io/gh/infrapalhq/infrapal-token-advisor)
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/infrapalhq/infrapal-token-advisor/badge)](https://securityscorecards.dev/viewer/?uri=github.com/infrapalhq/infrapal-token-advisor)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16290/badge)](https://www.bestpractices.dev/projects/16290)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

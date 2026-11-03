@@ -168,3 +168,37 @@ func TestInstallMissingPlatform(t *testing.T) {
 		t.Fatalf("Install = %v", err)
 	}
 }
+
+// failingRelease serves one fixed answer for every path.
+func failingRelease(t *testing.T, status int, body string) *Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		fmt.Fprint(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return &Client{HTTP: srv.Client(), APIBase: srv.URL + "/api", ReleaseBase: srv.URL + "/dl"}
+}
+
+func TestLatest_RefusesABadAnswer(t *testing.T) {
+	for name, c := range map[string]*Client{
+		"server error": failingRelease(t, http.StatusInternalServerError, ""),
+		"no tag":       failingRelease(t, http.StatusOK, `{"tag_name":""}`),
+		"not json":     failingRelease(t, http.StatusOK, `<html>`),
+	} {
+		if tag, err := c.Latest(context.Background()); err == nil {
+			t.Errorf("%s: got %q, want an error", name, tag)
+		}
+	}
+}
+
+func TestInstall_FailsWhenTheReleaseCantBeFetched(t *testing.T) {
+	path := oldBinary(t)
+	c := failingRelease(t, http.StatusNotFound, "")
+	if err := c.Install(context.Background(), "v1.2.3", "linux", "amd64", path); err == nil {
+		t.Fatal("want an error")
+	}
+	if got, err := os.ReadFile(path); err != nil || string(got) != "old" {
+		t.Errorf("the old binary should be untouched: %q, %v", got, err)
+	}
+}
