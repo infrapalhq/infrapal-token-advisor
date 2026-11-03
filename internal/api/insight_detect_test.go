@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -487,4 +488,119 @@ func FuzzParseToolInput(f *testing.F) {
 	f.Fuzz(func(_ *testing.T, input string) {
 		parseToolInput(input, &toolRow{})
 	})
+}
+
+func TestTimelineLabels(t *testing.T) {
+	for n, want := range map[int64]string{512: "512", 31_500: "31K", 1_250_000: "1.2M"} {
+		if got := humanTokens(n); got != want {
+			t.Errorf("humanTokens(%d) = %q, want %q", n, got, want)
+		}
+	}
+	cases := []struct {
+		row  toolRow
+		want string
+	}{
+		{toolRow{Name: "Read", File: "/repo/main.go"}, "main.go"},
+		{toolRow{Name: "Bash", Category: agent.ToolShell, Command: "go   test  ./..."}, "go test ./..."},
+		{toolRow{Name: "mcp__gh__list", MCPServer: "gh"}, "gh"},
+		{toolRow{Name: "Task"}, "Task"},
+	}
+	for _, c := range cases {
+		if got := toolLabel(c.row); got != c.want {
+			t.Errorf("toolLabel(%+v) = %q, want %q", c.row, got, c.want)
+		}
+	}
+}
+
+func mcpCall(id, server string, ok bool) toolRow {
+	success := int64(1)
+	if !ok {
+		success = 0
+	}
+	return toolRow{ID: id, SessionID: "s", PromptID: "p1", Ts: 1, Name: "mcp__" + server + "__x", Category: agent.ToolMCP, MCPServer: server, Success: success}
+}
+
+// The rule: at least minCallsForFailingMCP calls, with failingMCPRate or more
+// failing. Below either, a server is fine.
+func TestFailingMCP_FiresOnlyPastBothThresholds(t *testing.T) {
+	var tools []toolRow
+	for i := range 5 {
+		tools = append(tools, mcpCall(fmt.Sprintf("a%d", i), "flaky", i < 2))   // 3 of 5 fail
+		tools = append(tools, mcpCall(fmt.Sprintf("b%d", i), "steady", i != 0)) // 1 of 5 fails: 20%
+	}
+	tools = append(tools, mcpCall("c1", "rare", false), mcpCall("c2", "rare", false)) // too few calls
+	d := &insightData{tools: tools}
+
+	byServer := map[string]occurrence{}
+	for _, o := range detectFailingMCP(d) {
+		byServer[o.Subject] = o
+	}
+	flaky, ok := byServer["flaky"]
+	if !ok {
+		t.Fatalf("flaky should be flagged: %v", byServer)
+	}
+	if flaky.Count != 3 || len(flaky.Evidence) != 3 || !strings.Contains(flaky.Title, "failed 3 of 5") {
+		t.Errorf("flaky = %+v", flaky)
+	}
+	if _, ok := byServer["steady"]; !ok {
+		t.Error("exactly 20% failing should be flagged")
+	}
+	if _, ok := byServer["rare"]; ok {
+		t.Error("two calls are too few to judge")
+	}
+}
+
+func TestApprovalPattern_ForEachKindOfTool(t *testing.T) {
+	d := &insightData{sessions: map[string]sessionRow{"s": {Agent: "claude-code"}}}
+	cases := []struct {
+		row  toolRow
+		want string
+	}{
+		{toolRow{SessionID: "s", Name: "Bash", Category: agent.ToolShell, Command: "git status"}, "Bash(git status:*)"},
+		{toolRow{SessionID: "s", Name: "query", Category: agent.ToolMCP, MCPServer: "db"}, "db · query"},
+		{toolRow{SessionID: "s", Name: "Read", Category: agent.ToolRead}, "Read"},
+	}
+	for _, c := range cases {
+		if got := d.approvalPattern(c.row); got != c.want {
+			t.Errorf("approvalPattern(%+v) = %q, want %q", c.row, got, c.want)
+		}
+	}
+}
+
+func TestIsSafePattern_NonShellTools(t *testing.T) {
+	for cat, want := range map[agent.ToolCategory]bool{
+		agent.ToolRead: true, agent.ToolSearch: true,
+		agent.ToolEdit: false, agent.ToolMCP: false, agent.ToolOther: false,
+	} {
+		if got := isSafePattern(toolRow{Name: "x", Category: cat}); got != want {
+			t.Errorf("isSafePattern(%s) = %v, want %v", cat, got, want)
+		}
+	}
+}
+
+func TestCommandShapes(t *testing.T) {
+	if got := bashPattern(""); got != "" {
+		t.Errorf("bashPattern(empty) = %q", got)
+	}
+	for cmd, want := range map[string]string{
+		"":                        "",
+		"npm run build --watch":   "npm run",
+		"cd /Users/me/My Project": "cd",
+		"go test":                 "go test",
+	} {
+		if got := normalizeBashPrefix(cmd); got != want {
+			t.Errorf("normalizeBashPrefix(%q) = %q, want %q", cmd, got, want)
+		}
+	}
+	for tok, want := range map[string]bool{"": false, "build": true, "run-all": true, "./x": false, "--flag": false} {
+		if got := isSubcommandLike(tok); got != want {
+			t.Errorf("isSubcommandLike(%q) = %v, want %v", tok, got, want)
+		}
+	}
+	if got := truncate("abcdef", 4); got != "abc…" {
+		t.Errorf("truncate = %q", got)
+	}
+	if got := truncate("abc", 4); got != "abc" {
+		t.Errorf("truncate of a short string = %q", got)
+	}
 }

@@ -10,7 +10,8 @@ import (
 // only ships service-install support for darwin/linux (see
 // internal/service), so that's the scope here too — failure is non-fatal,
 // the caller just prints the URL for the user to open by hand.
-func openBrowser(url string) error {
+// openBrowser is a variable so tests don't open real browser windows.
+var openBrowser = func(url string) error {
 	switch runtime.GOOS {
 	case "darwin":
 		return exec.Command("open", url).Start()
