@@ -113,7 +113,7 @@ These follow Saltzer and Schroeder's principles.
 | Untrusted model output | A recommendation must cite facts that were sent, or it's dropped, and it's shown as plain text | `internal/ai/validate.go` |
 | Over-broad permissions | An allow rule is only suggested for read-only commands, with no redirects, substitution or chained writes | `isSafePattern`, `FuzzIsSafePattern` |
 | A crash taking the collector down | Panics are caught and logged. The service manager restarts it from a known state | `internal/logging` |
-| Tampered downloads (CWE-494) | Every download is checked against the release's SHA-256 checksums, over HTTPS | `scripts/install.sh`, `internal/update` |
+| Tampered downloads (CWE-494) | Every download is checked against the release's SHA-256 checksums, over HTTPS. The checksums are signed with Sigstore, and each archive has SLSA build provenance | `scripts/install.sh`, `internal/update`, `.goreleaser.yaml`, `.github/workflows/release.yml` |
 | Vulnerable dependencies (CWE-1395) | Dependabot, `govulncheck` and `npm audit` in CI, and Actions pinned to commit SHAs | `.github/dependabot.yml`, `.github/workflows` |
 
 Static analysis (golangci-lint, CodeQL and oxlint) and the race detector run on
@@ -132,9 +132,10 @@ We'd rather you knew these than discovered them.
 - **Prompt logging is on by default** for Claude Code, so the dashboard can show
   your prompts. It stays on your machine, and data is deleted after 6 months by
   default.
-- **Release signing isn't in place yet.** Downloads are checked against
-  checksums, but the checksums aren't signed. It's planned before the first
-  release.
+- **The installer doesn't check signatures.** Releases are signed and carry
+  provenance, but `install.sh` and `update` only check the SHA-256 checksums, so
+  they trust the checksums file they download over HTTPS. You can check the
+  signature yourself, as [OPERATIONS.md](OPERATIONS.md#checking-a-release) shows.
 - **The dashboard sends no security headers yet,** such as a content security
   policy. The other protections don't depend on them.
 - **The adapter interface is new.** An adapter that maps data carelessly could
