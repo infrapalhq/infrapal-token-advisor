@@ -256,7 +256,7 @@ Not at the moment. It supports macOS and Linux.
 - [Database schema and migrations](docs/SCHEMA.md)
 - [Adding an agent](docs/ADDING_AN_AGENT.md) and [adding a detector](docs/ADDING_A_DETECTOR.md)
 - [Security](SECURITY.md) and the [security assurance case](docs/ASSURANCE.md)
-- [Contributing](CONTRIBUTING.md)
+- [Contributing](CONTRIBUTING.md) and [governance](GOVERNANCE.md)
 
 ## Build from source
 
