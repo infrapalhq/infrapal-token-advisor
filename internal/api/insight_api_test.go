@@ -46,6 +46,8 @@ func insightDB(t *testing.T) func(method, path, body string) (int, map[string]an
 			VALUES ('p1', 's1', 1500, 'claude-opus-5-5', 'repl_main_thread', 1000, 300, 50000, 2000, 800000)`,
 		`INSERT INTO api_requests (prompt_id, session_id, ts, model, query_source, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, cost_usd_micros)
 			VALUES ('p1', 's1', 4600, 'claude-opus-5-5', 'repl_main_thread', 2000, 500, 90000, 0, 1200000)`,
+		// A session that was opened and closed with nothing in it.
+		`INSERT INTO sessions (session_id, started_at, ended_at, project_dir) VALUES ('empty1', 950000, 958000, '')`,
 	}
 	for _, stmt := range stmts {
 		if _, err := db.Exec(stmt); err != nil {
@@ -499,5 +501,26 @@ func TestProgressAndOverview_RejectAnUnknownRange(t *testing.T) {
 		if code, _ := call("GET", path, ""); code != 400 {
 			t.Errorf("%s: status %d, want 400", path, code)
 		}
+	}
+}
+
+func TestEmptySessionIsHiddenFromCardsButItsTimelineIsAnEmptyList(t *testing.T) {
+	call := insightDB(t)
+	_, body := call("GET", "/api/sessions/cards?since=all", "")
+	for _, c := range body["sessions"].([]any) {
+		if c.(map[string]any)["id"] == "empty1" {
+			t.Fatalf("a session with no activity should not be listed")
+		}
+	}
+	code, tl := call("GET", "/api/sessions/empty1/timeline", "")
+	if code != 200 {
+		t.Fatalf("status %d: %v", code, tl)
+	}
+	// null here crashed the page: it maps over rows and receipt.prompts.
+	if rows, ok := tl["rows"].([]any); !ok || len(rows) != 0 {
+		t.Errorf("rows = %#v, want an empty list", tl["rows"])
+	}
+	if prompts, ok := tl["receipt"].(map[string]any)["prompts"].([]any); !ok || len(prompts) != 0 {
+		t.Errorf("receipt.prompts = %#v, want an empty list", tl["receipt"].(map[string]any)["prompts"])
 	}
 }
