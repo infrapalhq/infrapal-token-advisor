@@ -42,7 +42,7 @@ and maintainers aim for agreement.
 - **Security reports** are handled in private by maintainers, through
   [GitHub Security Advisories](https://github.com/infrapalhq/infrapal-token-advisor/security/advisories).
 
-The roadmap records what's planned.
+The [roadmap](ROADMAP.md) records what's planned.
 
 ## Becoming a maintainer
 
