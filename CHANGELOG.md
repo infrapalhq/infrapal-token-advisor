@@ -33,6 +33,28 @@ The first release.
 - Support for adding other coding agents through adapters, with a contract test
   suite, an example adapter and a guide. Claude Code is the only agent so far.
 
+### Changed
+
+- The "connect to Claude Code" card moved from Fixes to Settings, with simpler
+  wording. The AI recommendations card on Fixes appears once you add a key.
+- Models with no share of your spend are left out of the model list on Overview.
+
+### Fixed
+
+- Findings that belong to no session, such as an unused MCP server, are labelled
+  install-wide and link to Fixes. Before, they showed as "1 session" or "0 sessions",
+  and the Fixes count differed between Overview and Fixes.
+- Opening a session with nothing in it no longer blanks the page, and a page that
+  crashes now shows a message and a way back instead of a white screen.
+- Sessions with no model or tool calls are left out of the lists and counts.
+- Assistant replies show their formatting (bold, lists, code) instead of raw
+  markdown.
+- Overview and Sessions offer the same time ranges and remember your choice. An
+  unknown range in the address falls back to 7 days.
+- Pages with no match, and sessions that don't exist, show a proper page inside the
+  dashboard.
+- The dashboard refreshes itself every minute, and opens each page at the top.
+
 ### Security
 
 - The collector and dashboard only answer to programs on your machine. They refuse

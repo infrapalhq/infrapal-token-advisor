@@ -34,6 +34,8 @@ export type SessionCards = {
   count_all: number;
   count_attention: number;
   count_new: number;
+  // count_install_wide is open findings tied to no session (an unused MCP server).
+  count_install_wide: number;
 };
 
 export type Item = {
@@ -69,7 +71,9 @@ export type Overview = {
   avoidable_usd: number;
   recovered: { usd: number; minutes: number };
   fix_first: Item[];
-  areas: { area: string; items: number; usd: number; severity: string; sessions: number }[];
+  // open_fixes is every open item with a copy-paste fix; fix_first is only the top three.
+  open_fixes: number;
+  areas: { area: string; items: number; usd: number; severity: string; sessions: number; install_wide: number }[];
   by_day: { day: string; cost_usd: number; avoidable_usd: number }[];
   by_project: { project: string; cost_usd: number; sessions: number }[];
   models: { model: string; cost_usd: number; share: number }[];

@@ -1,104 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link } from "react-router-dom";
 import { useAgents } from "./agentContext";
 import { SkippedChecks } from "./agents";
-import { api, type AiConfig, type AiResult, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
+import { api, type AiConfig, type AiResult, type Fixes as FixesData, type Item, type Progress } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
-import { AREA_NAME, dayShort, money } from "./format";
+import { AREA_NAME, dayShort, money, sessionsLabel } from "./format";
+import { useRefresh } from "./refresh";
 
 const AI_RANGE = "30d";
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const MCP_SAMPLE_PROMPT = "Use infrapal-token-advisor to find my three biggest sources of avoidable spend in the last 30 days, and tell me what to change first.";
-
-function CopyBlock({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <div className="mcp-copy">
-      <pre className="code">{text}</pre>
-      <button
-        className="btn"
-        type="button"
-        onClick={() => {
-          navigator.clipboard?.writeText(text).catch(() => {});
-          setCopied(true);
-        }}
-      >
-        {copied ? "Copied" : "Copy"}
-      </button>
-    </div>
-  );
-}
-
-function EnableMcp() {
-  const [setup, setSetup] = useState<McpSetup | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-
-  const load = useCallback(
-    () =>
-      api.mcpSetup()
-        .then((s) => {
-          setSetup(s);
-          setError(null);
-        })
-        .catch((e: Error) => setError(e.message)),
-    [],
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const check = () => {
-    setChecking(true);
-    load().finally(() => setChecking(false));
-  };
-
-  if (error && !setup) return <p className="hint-line">Could not load MCP setup: {error}</p>;
-  if (!setup) return null;
-
-  return (
-    <section className="card mcp" aria-label="Enable MCP">
-      <div className="card-top">
-        <strong>{setup.enabled ? "MCP is enabled" : `Enable MCP to ask ${setup.agent_name} about this data`}</strong>
-        <span className={`ok${setup.enabled ? "" : " dashed"}`}>{setup.enabled ? "On" : "Off"}</span>
-      </div>
-      <span className="body-copy">
-        {setup.agent_name} can query your spend, tokens, sessions and findings and work out insights this page doesn't show.
-        When it does, those results go to its model provider with the conversation. It gets numbers and ids only, not your prompts, responses, file paths or commands.
-      </span>
-      {!setup.enabled && (
-        <>
-          <div className="mcp-step">
-            <b>1. Paste this in your terminal</b>
-            <CopyBlock text={setup.command} />
-          </div>
-          <div className="mcp-step">
-            <b>2. Check that it shows as connected</b>
-            <CopyBlock text={setup.verify} />
-          </div>
-        </>
-      )}
-      <div className="mcp-step">
-        <b>{setup.enabled ? `Start a new ${setup.agent_name} session and ask` : `3. Start a new ${setup.agent_name} session and ask`}</b>
-        <CopyBlock text={MCP_SAMPLE_PROMPT} />
-      </div>
-      {setup.enabled ? (
-        <div className="mcp-step">
-          <b>To turn it off</b>
-          <CopyBlock text={setup.remove} />
-        </div>
-      ) : (
-        <div className="acts">
-          <button className="btn btn-k" type="button" disabled={checking} onClick={check}>{checking ? "Checking…" : "Check again"}</button>
-        </div>
-      )}
-    </section>
-  );
-}
-
 // AiInsights is the only control that sends anything to a model provider. Loading the
 // page reads saved results and never makes a call.
 function AiInsights() {
@@ -127,6 +38,8 @@ function AiInsights() {
 
   if (!aiLoaded) return null;
   const configured = ai?.configured ?? false;
+  // Without a key the card has nothing to offer; the key is added in Settings.
+  if (!configured) return null;
   const hasRun = Boolean(result?.batch_id);
   const recs = result?.recommendations ?? [];
   const dropped = result?.dropped_count ?? 0;
@@ -135,7 +48,7 @@ function AiInsights() {
     <section className="card ai" aria-label="AI recommendations">
       <div className="card-top">
         <strong>AI recommendations</strong>
-        <span className={`ok${configured ? "" : " dashed"}`}>{configured ? "Key added" : "Off"}</span>
+        <span className="ok">Key added</span>
       </div>
       <span className="body-copy">
         Optional. Generate sends the last 30 days of aggregated figures and labels to {ai?.provider_name ?? "your model provider"} with your key, never your prompts, responses, file paths or commands.
@@ -153,13 +66,9 @@ function AiInsights() {
       {dropped > 0 && <span className="note">Left out {dropped} {dropped === 1 ? "recommendation" : "recommendations"} that didn't match your data.</span>}
       {error && <span className="note" role="alert">Could not generate: {error}</span>}
       <div className="acts">
-        {configured ? (
-          <button className="btn btn-k" type="button" disabled={generating} onClick={() => generate(hasRun)}>
-            {generating ? "Generating…" : hasRun ? "Generate again" : "Generate"}
-          </button>
-        ) : (
-          <Link className="btn btn-k" to="/settings">Add a key in Settings</Link>
-        )}
+        <button className="btn btn-k" type="button" disabled={generating} onClick={() => generate(hasRun)}>
+          {generating ? "Generating…" : hasRun ? "Generate again" : "Generate"}
+        </button>
       </div>
       {hasRun && <span className="note" role="status">Last generated {dayShort(result?.generated_at ?? 0)}</span>}
     </section>
@@ -182,13 +91,15 @@ export default function Fixes() {
       .then(([f, p]) => {
         setData(f);
         setProgress(p);
+        setError(null);
       })
       .catch((e: Error) => setError(e.message));
   }, [agent]);
 
+  const tick = useRefresh();
   useEffect(() => {
     load();
-  }, [load, firstRun]);
+  }, [load, firstRun, tick]);
 
   const mark = async (it: Item, state: "fixed" | "reverted") => {
     setBusy(it.key);
@@ -212,13 +123,16 @@ export default function Fixes() {
   const first = weeks[0];
   const last = weeks[weeks.length - 1];
   const down = first && last && first.avoidable_usd > 0 ? Math.round((1 - last.avoidable_usd / first.avoidable_usd) * 100) : null;
+  const installWide = data?.to_fix.filter((it) => it.sessions === 0).length ?? 0;
   const maxAvoid = Math.max(1, ...weeks.map((w) => w.avoidable_usd));
 
   if (firstRun) return <Shell><FirstRun /></Shell>;
 
   return (
     <Shell fixesToDo={data?.to_fix.length} sessionCount={undefined}>
-      <EnableMcp />
+      <div className="top-row">
+        <p className="eb">Fixes</p>
+      </div>
 
       <div className="fixes-head">
         <div className="title-block">
@@ -242,6 +156,9 @@ export default function Fixes() {
                   <span className="num">{last ? `${Math.round(last.healthy_pct * 100)}%` : "—"}</span>
                   <span className="num-label">healthy sessions</span>
                 </div>
+                {installWide > 0 && (
+                  <p className="stat-note">Counts problems found inside sessions. {installWide} install-wide {installWide === 1 ? "fix" : "fixes"} below {installWide === 1 ? "isn't" : "aren't"} included.</p>
+                )}
                 {weeks.length > 0 && (
                   <div className="rows-bars" role="img" aria-label="Healthy sessions by week">
                     {weeks.slice(-4).map((w) => (
@@ -316,7 +233,12 @@ export default function Fixes() {
                   <span className="chip">{AREA_NAME[it.area]}</span>
                   <strong>{it.title}</strong>
                   <span className="sub">
-                    {it.usd !== undefined ? `≈ ${money(it.usd)}` : ""}{it.minutes !== undefined ? ` · ${Math.round(it.minutes)} min` : ""} · {it.sessions} session{it.sessions === 1 ? "" : "s"} · {it.conf}
+                    {[
+                      it.usd !== undefined ? `≈ ${money(it.usd)}` : "",
+                      it.minutes !== undefined ? `${Math.round(it.minutes)} min` : "",
+                      sessionsLabel(it.sessions),
+                      it.conf,
+                    ].filter(Boolean).join(" · ")}
                   </span>
                   {it.detail && <span className="body-copy">{it.detail}</span>}
                   {it.fix && <pre className="code">{it.fix}</pre>}
