@@ -107,6 +107,23 @@ token-advisor purge --all
 
 `purge` also deletes database backups, because they still hold the deleted data.
 
+## Reproducing a release
+
+Releases are reproducible: the same commit builds the same bytes on any machine,
+so you can check a download was built from the source it claims. You need the
+same Go version as the release, which is the `toolchain` line in `go.mod`, and
+Node.js 24 for the dashboard.
+
+1. Check out the release's tag, such as `git checkout v0.1.0`.
+2. Build it with the GoReleaser version the release workflow uses:
+
+   ```bash
+   go run github.com/goreleaser/goreleaser/v2@v2.19.0 release --clean --skip=publish,announce
+   ```
+
+3. Compare `dist/checksums.txt` with the `checksums.txt` attached to the release.
+   They should match line for line.
+
 ## Troubleshooting
 
 Start with `token-advisor doctor`. Run it in your own terminal: inside Claude Code
