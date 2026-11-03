@@ -104,7 +104,8 @@ These follow Saltzer and Schroeder's principles.
 | DNS rebinding | Both servers compare `Host` to loopback names, without resolving it | `localhttp.IsLoopbackHost` and its tests |
 | SQL injection (CWE-89) | Every query is parameterised. The only joined pieces are fixed strings in our code | `internal/api/insight_load.go`, `internal/ai/context.go` |
 | SQL from an AI agent | `run_sql` allows one `SELECT` or `WITH`, on views with no content columns, through a read-only handle | `internal/mcpserver/guard.go` and its tests |
-| Cross-site scripting (CWE-79) | React escapes all text, and nothing uses `dangerouslySetInnerHTML` | `web/src` |
+| Cross-site scripting (CWE-79) | React escapes all text, and nothing uses `dangerouslySetInnerHTML`. A content security policy allows only the dashboard's own scripts, so injected script wouldn't run | `web/src`, `internal/api/headers.go`, `TestSecurityHeaders_OnPagesAndAPI` |
+| Clickjacking (CWE-1021) | `frame-ancestors 'none'` and `X-Frame-Options: DENY`, so no page can frame the dashboard | `internal/api/headers.go` |
 | OS command injection (CWE-78) | No shell is ever run. Commands run with fixed arguments, and paths written into service files are escaped and quoted | `internal/service`, `FuzzSystemdExecPathRoundTrip` |
 | Path traversal (CWE-22) | The dashboard serves only files embedded in the binary, through `fs.FS` | `internal/api/spa.go` |
 | Resource exhaustion (CWE-400) | Body limits before and after decompression, server timeouts, bounded import batches and a bounded write buffer | `TestCollector_RefusesOversizedPayloads`, `internal/ingest` |
@@ -136,7 +137,5 @@ We'd rather you knew these than discovered them.
   provenance, but `install.sh` and `update` only check the SHA-256 checksums, so
   they trust the checksums file they download over HTTPS. You can check the
   signature yourself, as [OPERATIONS.md](OPERATIONS.md#checking-a-release) shows.
-- **The dashboard sends no security headers yet,** such as a content security
-  policy. The other protections don't depend on them.
 - **The adapter interface is new.** An adapter that maps data carelessly could
   mislead the dashboard. The contract tests limit this, but can't rule it out.

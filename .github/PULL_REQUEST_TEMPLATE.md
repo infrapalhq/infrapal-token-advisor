@@ -9,5 +9,6 @@
 ## Checklist
 
 - [ ] `gofmt -l .` prints nothing, and `go vet ./...`, `go test -race ./...` and `golangci-lint run` pass
+- [ ] If the dashboard changed: `npm --prefix web run lint` and `npm --prefix web run coverage` pass
 - [ ] If the schema changed: added a new migration, didn't edit an existing one
 - [ ] Commits are signed off (`git commit -s`)

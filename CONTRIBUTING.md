@@ -61,7 +61,7 @@ To add support for another coding agent, see
 2. Add tests. New features and bug fixes must come with tests, and a bug fix
    needs a test that fails without it. Changes to docs, or to code that's purely
    visual, are the exception. A maintainer will ask for tests before merging, and
-   CI fails if Go test coverage drops below 80%.
+   CI fails if test coverage drops below 80%, for the Go code or the dashboard.
 3. Run the same checks CI runs:
 
    ```sh
@@ -74,11 +74,13 @@ To add support for another coding agent, see
    If you changed code that reads outside input, run its fuzz test for a while,
    such as `go test ./internal/otlp -run '^$' -fuzz FuzzDecodeLogsRequest -fuzztime 1m`.
 
-4. If you changed anything under `web/`, check that it builds and lints:
+4. If you changed anything under `web/`, check that it builds, lints and passes
+   its tests:
 
    ```sh
    scripts/build-web.sh
    npm --prefix web run lint
+   npm --prefix web run coverage
    ```
 
 5. Schema changes go in a **new** migration file with the next number.
