@@ -114,4 +114,19 @@ describe("Sessions", () => {
     renderAt("/sessions");
     expect(await screen.findByRole("heading", { name: "Waiting for your first session." })).toBeTruthy();
   });
+
+  it("explains install-wide findings no session lists", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 6 } });
+    renderAt("/sessions");
+    expect(await screen.findByText(/6 open findings apply to your whole install/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "See fixes →" }).getAttribute("href")).toBe("/fixes");
+  });
+
+  it("starts filtered by the problem named in the address, and counts what matches", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": list() });
+    renderAt("/sessions?area=perm");
+    expect(await screen.findByText("1 of 4 sessions in the last 7 days · 2 need attention · 1 new since your last visit")).toBeTruthy();
+    expect(titles()).toEqual(["Speed up tests"]);
+  });
 });
+

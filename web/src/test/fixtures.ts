@@ -63,6 +63,7 @@ export const cards = (sessions: SessionCard[]): SessionCards => ({
   count_all: sessions.length,
   count_attention: sessions.filter((s) => s.priority !== "fine").length,
   count_new: sessions.filter((s) => s.is_new).length,
+  count_install_wide: 0,
 });
 
 export const overview = (o: Partial<Overview> = {}): Overview => ({
@@ -75,9 +76,10 @@ export const overview = (o: Partial<Overview> = {}): Overview => ({
   avoidable_usd: 3.4,
   recovered: { usd: 2.1, minutes: 4 },
   fix_first: [item(), item({ key: "wait|git", area: "perm", title: "Approved git status 9 times", usd: undefined, minutes: 3.4, sessions: 1, severity: "half" })],
+  open_fixes: 2,
   areas: [
-    { area: "context", items: 2, usd: 3.4, severity: "full", sessions: 2 },
-    { area: "perm", items: 1, usd: 0, severity: "fine", sessions: 1 },
+    { area: "context", items: 2, usd: 3.4, severity: "full", sessions: 2, install_wide: 0 },
+    { area: "perm", items: 1, usd: 0, severity: "fine", sessions: 1, install_wide: 0 },
   ],
   by_day: [
     { day: "2026-10-19", cost_usd: 4, avoidable_usd: 1 },

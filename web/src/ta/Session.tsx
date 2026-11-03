@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { Shell } from "./Shell";
 import { useTheme } from "./theme";
 import { api, type Occurrence, type SessionCard, type Timeline, type TimelineRow } from "./api";
+import { Markdown } from "./Markdown";
 import { AREA_LABEL, AREA_NAME, dayShort, durationS, money, tokensHuman } from "./format";
 
 type Mode = "issues" | "receipt";
@@ -44,11 +46,22 @@ export default function SessionPage() {
     return m;
   }, [issues]);
 
-  if (error) return <div className="shell"><p className="hint-line">Could not load: {error}</p></div>;
+  if (error) {
+    return (
+      <Shell>
+        <div className="empty">
+          <strong>{/not found/i.test(error) ? "Session not found" : "Could not load this session"}</strong>
+          <span>{/not found/i.test(error) ? "It may have been purged, or the link is wrong." : error}</span>
+          <Link className="btn" to="/sessions">← Back to Sessions</Link>
+        </div>
+      </Shell>
+    );
+  }
   if (!timeline) return <div className="shell"><p className="hint-line">Loading…</p></div>;
 
   const peak = Math.max(1, timeline.peak_context);
-  const ctxRows = timeline.rows.filter((r) => typeof r.context_tokens === "number");
+  const rows = timeline.rows ?? [];
+  const ctxRows = rows.filter((r) => typeof r.context_tokens === "number");
   const bars = groupBars(ctxRows, flagged, MAX_BARS);
   const jump = (rowId: string) => {
     setHighlight(rowId);
@@ -86,7 +99,7 @@ export default function SessionPage() {
         <header className="thread-head">
           <div className="thread-title-block">
             <p className="eb"><Link className="crumb" to="/sessions">← Sessions</Link> · {current?.project ?? ""}</p>
-            <h1 className="thread-title">{current?.title ?? id}</h1>
+            <h1 className="thread-title">{current?.title ?? (rows.length === 0 ? "Session with no activity" : id)}</h1>
             <div className="meta-row">
               <span className="pill">{dayShort(timeline.started_at)}</span>
               <span className="pill">{durationS(current?.duration_s ?? 0)}</span>
@@ -129,7 +142,8 @@ export default function SessionPage() {
         </header>
 
         <div className="thread-list" id="thread-list">
-          {timeline.rows.map((r) => (
+          {rows.length === 0 && <p className="hint-line">Nothing was recorded in this session: no prompts, replies or tool calls.</p>}
+          {rows.map((r) => (
             <ThreadRow key={r.id} row={r} agentName={timeline.agent_name} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
           ))}
         </div>
@@ -154,7 +168,7 @@ export default function SessionPage() {
 
         <div className="a-body">
           {mode === "receipt" ? (
-            <Receipt t={timeline} onPrompt={(pid) => { const row = timeline.rows.find((r) => r.kind === "div" && r.prompt_id === pid); if (row) jump(row.id); }} />
+            <Receipt t={timeline} onPrompt={(pid) => { const row = rows.find((r) => r.kind === "div" && r.prompt_id === pid); if (row) jump(row.id); }} />
           ) : (
             <>
               {(issues[area] ?? []).length === 0 && (
@@ -174,7 +188,7 @@ export default function SessionPage() {
                       <p className="lbl">Evidence</p>
                       {o.Evidence.slice(0, 8).map((ev) => (
                         <button key={ev} className="ev-btn" type="button" onClick={() => jump(ev)}>
-                          <span>{rowLabel(timeline.rows, ev)}</span>
+                          <span>{rowLabel(rows, ev)}</span>
                           <span>→</span>
                         </button>
                       ))}
@@ -227,7 +241,7 @@ function ThreadRow({ row, agentName, flagged, highlighted, onFlag }: { row: Time
           <div className="divider"><span className="mono">{row.text}</span><span className="rule" /><span className="mono meta-d">{row.meta}</span></div>
         )}
         {row.kind === "you" && <div className="you"><span className="lbl">You</span><p>{row.text || "(prompt not logged)"}</p></div>}
-        {row.kind === "claude" && <div className="claude"><span className="lbl">{agentName}</span><p>{row.text}</p></div>}
+        {row.kind === "claude" && <div className="claude"><span className="lbl">{agentName}</span><Markdown text={row.text} /></div>}
         {row.kind === "tool" && (
           <div className="tool-row">
             <span>▸ <b>{row.name}</b> {row.text}{flagged && <span className="tag">{flagged.Title}</span>}{row.wait_ms ? <span className="tag">waited {Math.round(row.wait_ms / 1000)}s</span> : null}</span>
@@ -269,19 +283,23 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
         </div>
       </div>
       <div className="rsec">BY PROMPT</div>
-      {r.prompts.map((p) => (
+      {(r.prompts ?? []).map((p) => (
         <button key={p.prompt_id} className="rl" type="button" onClick={() => onPrompt(p.prompt_id)}>
           <span><b>{p.label || "(prompt not logged)"}</b><small>{tokensHuman(p.tokens)} tok · {p.flags > 0 ? `${p.flags} flag${p.flags === 1 ? "" : "s"}` : "clean"}</small></span>
           <span className="mono">{money(p.cost_usd)}</span>
         </button>
       ))}
-      <div className="rsec">AVOIDABLE, BY PROBLEM</div>
-      {AREA_ORDER.filter((a) => (r.by_area_usd[a] ?? 0) > 0).map((a) => (
-        <div className="rl" key={a}>
-          <span className="lead-item"><span className="pip full" />{AREA_LABEL[a]}</span>
-          <span className="mono">{money(r.by_area_usd[a])}</span>
-        </div>
-      ))}
+      {AREA_ORDER.some((a) => ((r.by_area_usd ?? {})[a] ?? 0) > 0) && (
+        <>
+          <div className="rsec">AVOIDABLE, BY PROBLEM</div>
+          {AREA_ORDER.filter((a) => ((r.by_area_usd ?? {})[a] ?? 0) > 0).map((a) => (
+            <div className="rl" key={a}>
+              <span className="lead-item"><span className="pip full" />{AREA_LABEL[a]}</span>
+              <span className="mono">{money((r.by_area_usd ?? {})[a] ?? 0)}</span>
+            </div>
+          ))}
+        </>
+      )}
       <div className="rsec">WHERE THE TOKENS WENT</div>
       <div className="tokens-bar" role="img" aria-label={`Token mix: ${Math.round(cachePct)}% from cache, ${Math.round(freshPct)}% fresh input, ${Math.round(outPct)}% output`}>
         <div style={{ width: `${cachePct}%`, background: "var(--w)" }} />
