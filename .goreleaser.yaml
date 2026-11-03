@@ -57,6 +57,15 @@ archives:
 checksum:
   name_template: "checksums.txt"
 
+# Sign the checksums with Sigstore's keyless signing. The certificate names this
+# repository's release workflow, so there's no key to keep or lose, and one
+# signature covers every archive, since each one's hash is in checksums.txt.
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args: ["sign-blob", "--bundle=${signature}", "--yes", "${artifact}"]
+
 changelog:
   sort: asc
   filters:

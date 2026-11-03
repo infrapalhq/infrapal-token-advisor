@@ -57,8 +57,8 @@ lose write access, which they can get back by asking.
 The project mustn't depend on any single person.
 
 - At least two people have admin access to the repository at all times.
-- Releases are built in CI, never on a personal machine, and will be signed there
-  with keyless signing, so there's no personal key to lose. Secrets such as the
+- Releases are built and signed in CI, never on a personal machine. Signing is
+  keyless, so there's no personal key to lose. Secrets such as the
   Homebrew token are stored as repository secrets that any admin can rotate.
 - If a maintainer becomes unavailable, the remaining maintainers continue with
   their access. If no maintainer can act, Infrapal appoints new ones within 30 days.

@@ -107,6 +107,35 @@ token-advisor purge --all
 
 `purge` also deletes database backups, because they still hold the deleted data.
 
+## Checking a release
+
+Every release is signed, and carries provenance saying which commit and workflow
+built it. Both are tied to this repository's release workflow through GitHub's
+identity, so there's no key that could leak. Download the archive you want with
+`checksums.txt`, `checksums.txt.sigstore.json` and the `.intoto.jsonl` file.
+
+Check the signature on the checksums with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/),
+replacing `v0.1.0` with the release's tag:
+
+```bash
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json --certificate-identity "https://github.com/infrapalhq/infrapal-token-advisor/.github/workflows/release.yml@refs/tags/v0.1.0" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+```
+
+Then check your archive against the checksums:
+
+```bash
+shasum -a 256 --ignore-missing -c checksums.txt
+```
+
+Or check the archive's provenance with the [GitHub CLI](https://cli.github.com/):
+
+```bash
+gh attestation verify infrapal-token-advisor_0.1.0_darwin_arm64.tar.gz --repo infrapalhq/infrapal-token-advisor
+```
+
+`install.sh` and `token-advisor update` check the SHA-256 checksums, but not the
+signature, so you don't need cosign to install.
+
 ## Reproducing a release
 
 Releases are reproducible: the same commit builds the same bytes on any machine,
