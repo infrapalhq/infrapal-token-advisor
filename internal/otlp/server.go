@@ -3,11 +3,14 @@ package otlp
 import (
 	"compress/gzip"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/ingest"
+	"github.com/infrapalhq/infrapal-token-advisor/internal/localhttp"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 )
 
@@ -28,11 +31,10 @@ func NewServer(addr string, w *ingest.Writer, mw *ingest.MetricsWriter, sw *inge
 	mux.HandleFunc("/v1/logs", s.handleLogs)
 	mux.HandleFunc("/v1/metrics", s.handleMetrics)
 	mux.HandleFunc("/v1/traces", s.handleTraces)
-	s.http = &http.Server{
-		Addr:     addr,
-		Handler:  logging.RecoverHTTP("otlp", mux),
-		ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn),
-	}
+	// Only the agents on this machine may send here. A web page could otherwise
+	// plant telemetry, and so text in suggested fixes, or exhaust memory.
+	s.http = localhttp.Server(addr, logging.RecoverHTTP("otlp", localhttp.Guard(protobufOnly(mux))))
+	s.http.ErrorLog = slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn)
 	return s
 }
 
@@ -54,9 +56,9 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := readBody(r)
+	body, err := readBody(w, r)
 	if err != nil {
-		http.Error(w, "failed to read body", http.StatusBadRequest)
+		bodyError(w, err)
 		return
 	}
 
@@ -81,9 +83,9 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := readBody(r)
+	body, err := readBody(w, r)
 	if err != nil {
-		http.Error(w, "failed to read body", http.StatusBadRequest)
+		bodyError(w, err)
 		return
 	}
 
@@ -108,9 +110,9 @@ func (s *Server) handleTraces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := readBody(r)
+	body, err := readBody(w, r)
 	if err != nil {
-		http.Error(w, "failed to read body", http.StatusBadRequest)
+		bodyError(w, err)
 		return
 	}
 
@@ -129,19 +131,59 @@ func (s *Server) handleTraces(w http.ResponseWriter, r *http.Request) {
 	respondEmptyOTLPResponse(w)
 }
 
+// Limits on one export. Real exports are far smaller, and gzip can turn a
+// small request into a huge one, so the decompressed size is capped too.
+const (
+	maxBodyBytes         = 16 << 20
+	maxDecompressedBytes = 64 << 20
+)
+
+// errTooLarge is returned for a payload over the limits.
+var errTooLarge = errors.New("payload too large")
+
+// protobufOnly refuses anything but OTLP's binary encoding. Every exporter
+// sends it, and a web page can't: the browser would ask permission first,
+// which this server never gives.
+func protobufOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if r.Method == http.MethodPost && (err != nil || (mediaType != "application/x-protobuf" && mediaType != "application/protobuf")) {
+			// Logged, so an agent sending JSON shows up in `token-advisor logs`.
+			slog.Warn("otlp: refused a request that isn't protobuf", "path", r.URL.Path, "content_type", r.Header.Get("Content-Type"))
+			http.Error(w, "only application/x-protobuf is accepted", http.StatusUnsupportedMediaType)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // readBody returns the request body, transparently gunzipping it if
 // Content-Encoding: gzip is set (OTLP exporters may compress payloads).
-func readBody(r *http.Request) ([]byte, error) {
-	reader := io.Reader(r.Body)
+func readBody(w http.ResponseWriter, r *http.Request) ([]byte, error) {
+	reader := io.Reader(http.MaxBytesReader(w, r.Body, maxBodyBytes))
 	if r.Header.Get("Content-Encoding") == "gzip" {
-		gz, err := gzip.NewReader(r.Body)
+		gz, err := gzip.NewReader(reader)
 		if err != nil {
 			return nil, err
 		}
 		defer gz.Close()
 		reader = gz
 	}
-	return io.ReadAll(reader)
+	body, err := io.ReadAll(io.LimitReader(reader, maxDecompressedBytes+1))
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) || len(body) > maxDecompressedBytes {
+		return nil, errTooLarge
+	}
+	return body, err
+}
+
+// bodyError answers a body that couldn't be read.
+func bodyError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errTooLarge) {
+		http.Error(w, "payload too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+	http.Error(w, "failed to read body", http.StatusBadRequest)
 }
 
 // respondEmptyOTLPResponse writes a valid, fully-accepted OTLP export
