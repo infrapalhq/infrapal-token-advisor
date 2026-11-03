@@ -66,6 +66,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: coverage.out
+          flags: go
           use_oidc: true
           disable_search: true
           fail_ci_if_error: false
@@ -89,6 +90,9 @@ jobs:
     name: web / lint, build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # prove this workflow's identity to Codecov, instead of a stored token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -102,6 +106,19 @@ jobs:
       # into internal/webui/dist, which the Go binary embeds.
       - run: scripts/build-web.sh
       - run: npm --prefix web run lint
+      # Vitest fails the run if coverage drops below the thresholds in
+      # web/vite.config.ts.
+      - name: dashboard tests
+        run: npm --prefix web run coverage
+      - name: upload coverage to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: web/coverage/lcov.info
+          flags: web
+          use_oidc: true
+          disable_search: true
+          fail_ci_if_error: false
 
   release-snapshot:
     name: release / goreleaser snapshot
