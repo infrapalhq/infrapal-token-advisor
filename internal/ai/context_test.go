@@ -163,3 +163,23 @@ func TestBuildContext_IncludesWasteAndRetries(t *testing.T) {
 		t.Errorf("retries = %+v, want the retried request", c.Retries)
 	}
 }
+
+// Every view AI Mode reads: losing one must stop the request with an error that
+// names it, rather than send the model an incomplete picture.
+func TestBuildContext_ReportsEachMissingView(t *testing.T) {
+	for _, view := range []string{
+		"v_prompt_efficiency", "v_wasted_spend", "v_permission_friction", "v_mcp_inventory",
+		"v_session_summary", "v_model_performance", "v_tool_payload", "v_retry_waste",
+	} {
+		t.Run(view, func(t *testing.T) {
+			db := seedDB(t)
+			if _, err := db.Exec("DROP VIEW " + view); err != nil {
+				t.Fatal(err)
+			}
+			_, err := BuildContext(context.Background(), db, "all", 0, false, nil)
+			if err == nil || !strings.Contains(err.Error(), view) {
+				t.Errorf("err = %v, want one naming %s", err, view)
+			}
+		})
+	}
+}

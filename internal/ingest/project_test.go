@@ -468,3 +468,52 @@ func TestToolExecutionSpan_RecordsDurationAndResult(t *testing.T) {
 		t.Errorf("a span with no tool id should be skipped: %d rows", n)
 	}
 }
+
+// Spans the projection can't place must be kept raw and skipped, not fail the
+// batch, since that would lose every other record in it.
+func TestSpans_UnplaceableSpansDontFailTheBatch(t *testing.T) {
+	db := openTestDB(t)
+	spans := []Span{
+		{TraceID: "t", SpanID: "unknown-type", Name: "something.new", Attrs: map[string]any{}},
+		{TraceID: "t", SpanID: "tool-no-id", Name: "claude_code.tool", Attrs: map[string]any{}},
+		{TraceID: "t", SpanID: "blocked-no-parent", Name: "claude_code.tool.blocked_on_user", Attrs: map[string]any{}},
+		{TraceID: "", SpanID: "no-trace", Name: "claude_code.interaction", Attrs: map[string]any{}},
+		{TraceID: "t", SpanID: "kept", Name: "claude_code.tool", Attrs: map[string]any{"tool_use_id": "tu-kept"}},
+	}
+	if err := writeSpansBatch(db, spans); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var stored, tools int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM spans`).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM tool_calls WHERE tool_use_id = 'tu-kept'`).Scan(&tools); err != nil {
+		t.Fatal(err)
+	}
+	if stored != len(spans) || tools != 1 {
+		t.Errorf("spans stored = %d, want %d; tool rows = %d, want 1", stored, len(spans), tools)
+	}
+}
+
+func TestResolveSessionProject_LeavesAKnownProjectAlone(t *testing.T) {
+	db := openTestDB(t)
+	if _, err := db.Exec(`INSERT INTO sessions (session_id, project_dir) VALUES ('s', '/work/known')`); err != nil {
+		t.Fatal(err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sid := range []string{"s", "missing", ""} {
+		if err := resolveSessionProject(tx, sid); err != nil {
+			t.Errorf("resolveSessionProject(%q): %v", sid, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var dir string
+	if err := db.QueryRow(`SELECT project_dir FROM sessions WHERE session_id = 's'`).Scan(&dir); err != nil || dir != "/work/known" {
+		t.Errorf("project_dir = %q, %v", dir, err)
+	}
+}

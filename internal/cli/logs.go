@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
@@ -39,7 +37,7 @@ func runLogs(args []string) error {
 		return nil
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := untilInterrupted()
 	defer stop()
 	return followLog(ctx, os.Stdout, p.LogPath, offset, *errorsOnly)
 }
