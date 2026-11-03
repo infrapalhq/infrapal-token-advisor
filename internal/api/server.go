@@ -52,7 +52,7 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
-	s.http = localhttp.Server(addr, logging.RecoverHTTP("api", guard(mux)))
+	s.http = localhttp.Server(addr, logging.RecoverHTTP("api", securityHeaders(guard(mux))))
 	s.http.ErrorLog = slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn)
 	return s
 }
