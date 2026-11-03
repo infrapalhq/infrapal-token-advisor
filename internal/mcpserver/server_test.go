@@ -324,3 +324,28 @@ func TestGetFindings_RejectsBadRange(t *testing.T) {
 		t.Errorf("want an error, got %s", text)
 	}
 }
+
+// An agent can call a tool with arguments of the wrong shape. That should be a
+// clear tool error, never a crash or a silent default.
+func TestTools_RejectMalformedArguments(t *testing.T) {
+	s := newTestServer(t)
+	for _, c := range []struct {
+		tool string
+		args map[string]any
+	}{
+		{"run_sql", map[string]any{"query": 5}},
+		{"get_findings", map[string]any{"since": []string{"30d"}}},
+	} {
+		text, isErr := call(t, s, c.tool, c.args)
+		if !isErr || !strings.Contains(text, "invalid arguments") {
+			t.Errorf("%s with %v: %q, isError=%v", c.tool, c.args, text, isErr)
+		}
+	}
+}
+
+func TestGetFindings_DefaultsToThirtyDays(t *testing.T) {
+	text, isErr := call(t, newTestServer(t), "get_findings", map[string]any{})
+	if isErr || !strings.Contains(text, "findings") {
+		t.Errorf("get_findings with no range: %q, isError=%v", text, isErr)
+	}
+}

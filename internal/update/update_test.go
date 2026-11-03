@@ -202,3 +202,26 @@ func TestInstall_FailsWhenTheReleaseCantBeFetched(t *testing.T) {
 		t.Errorf("the old binary should be untouched: %q, %v", got, err)
 	}
 }
+
+func TestNewer_RefusesVersionsItCantCompare(t *testing.T) {
+	for _, pair := range [][2]string{{"v1.2", "v1.0.0"}, {"v1.2.3", "dev"}, {"v1.x.3", "v1.0.0"}} {
+		if _, err := Newer(pair[0], pair[1]); err == nil {
+			t.Errorf("Newer(%q, %q) should fail", pair[0], pair[1])
+		}
+	}
+}
+
+func TestNew_PointsAtGitHub(t *testing.T) {
+	c := New()
+	if c.APIBase != "https://api.github.com" || !strings.HasPrefix(c.ReleaseBase, "https://github.com/") || c.HTTP == nil {
+		t.Errorf("client = %+v", c)
+	}
+}
+
+func TestInstall_RefusesAPathItCantWriteNextTo(t *testing.T) {
+	c := release(t, archiveWith(t, binaryName, "new"), "")
+	path := filepath.Join(t.TempDir(), "no-such-dir", binaryName)
+	if err := c.Install(context.Background(), "v1.2.3", "linux", "amd64", path); err == nil {
+		t.Error("want an error when the binary's folder doesn't exist")
+	}
+}

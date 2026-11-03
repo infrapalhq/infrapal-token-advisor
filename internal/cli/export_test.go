@@ -231,3 +231,14 @@ func TestRunExport_NoRows(t *testing.T) {
 		t.Errorf("expected empty output on empty DB, got %q", out)
 	}
 }
+
+func TestExportAndPurge_RejectAnUnreadableDuration(t *testing.T) {
+	withFakeHome(t)
+	seedExportDB(t)
+	if err := runExport([]string{"--since", "soon"}); err == nil {
+		t.Error("export accepted --since soon")
+	}
+	if err := runPurge([]string{"--before", "soon"}); err == nil {
+		t.Error("purge accepted --before soon")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
@@ -278,5 +279,40 @@ func TestAIConfig_NeverReturnsTheKey(t *testing.T) {
 	}
 	if strings.Contains(buf.String(), "secret-from-env") {
 		t.Errorf("the key leaked: %s", buf.String())
+	}
+}
+
+func TestAIEndpoints_RejectBadRequests(t *testing.T) {
+	withFakeRequester(t, &fakeRequester{})
+	ts := newTestServer(t, seedDB(t))
+	req, err := http.NewRequest(http.MethodPut, ts.URL+"/api/ai/config", strings.NewReader(`{`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("broken config body: status %d, want 400", resp.StatusCode)
+	}
+
+	resp, err = http.Post(ts.URL+"/api/ai/recommendations", "application/json", strings.NewReader(`{"since":"forever"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("unknown range: status %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestPostAIRecommendations_OtherFailuresAreServerErrors(t *testing.T) {
+	withFakeRequester(t, &fakeRequester{err: errors.New("connection reset")})
+	ts := newTestServer(t, seedDB(t))
+	code, out := postAI(t, ts.URL)
+	if code != http.StatusInternalServerError || !strings.Contains(out["error"].(string), "connection reset") {
+		t.Errorf("status %d, body %v", code, out)
 	}
 }

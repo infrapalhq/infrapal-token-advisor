@@ -8,8 +8,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
@@ -74,7 +72,7 @@ func runStart(args []string) error {
 		slog.Info("resolved project directories", "sessions", n)
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := untilInterrupted()
 	defer stop()
 
 	agents := agentList(p.Home)

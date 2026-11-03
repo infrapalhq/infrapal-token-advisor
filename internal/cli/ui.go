@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/ai"
@@ -55,7 +53,7 @@ func runUI(args []string) error {
 		return nil
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := untilInterrupted()
 	defer stop()
 
 	distFS, err := webui.DistFS()
