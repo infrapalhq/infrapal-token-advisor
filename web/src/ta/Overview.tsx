@@ -17,15 +17,18 @@ const PERIODS: { value: Range; label: string }[] = [
 export default function Overview() {
   const [params, setParams] = useSearchParams();
   const range = (params.get("range") as Range) || "7d";
-  const [data, setData] = useState<OverviewData | null>(null);
+  // loaded remembers what its data was loaded for, so a change of range or
+  // agent shows "Loading…" until the new data arrives.
+  const [loaded, setLoaded] = useState<{ key: string; data: OverviewData } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const firstRun = useFirstRun();
   const { selected: agent } = useAgents();
 
+  const key = `${range}|${agent}|${firstRun}`;
   useEffect(() => {
-    setData(null);
-    api.overview(range, agent).then(setData).catch((e: Error) => setError(e.message));
-  }, [range, agent, firstRun]);
+    api.overview(range, agent).then((d) => setLoaded({ key, data: d })).catch((e: Error) => setError(e.message));
+  }, [range, agent, key]);
+  const data = loaded?.key === key ? loaded.data : null;
 
   const dayMax = useMemo(() => Math.max(1, ...(data?.by_day.map((d) => d.cost_usd) ?? [1])), [data]);
   const projMax = useMemo(() => Math.max(1, ...(data?.by_project.map((p) => p.cost_usd) ?? [1])), [data]);

@@ -136,12 +136,37 @@ func TestCheck_Settings(t *testing.T) {
 }
 
 func TestCheckShellEnv(t *testing.T) {
-	if c := checkShellEnv([]string{"PATH=/bin"}); !c.Pass {
+	if c := checkShellEnv([]string{"PATH=/bin"}, 4318); !c.Pass {
 		t.Errorf("clean shell: %+v", c)
 	}
-	c := checkShellEnv([]string{"PATH=/bin", "OTEL_SERVICE_NAME=x", "CLAUDE_CODE_USE_BEDROCK=1"})
-	if c.Pass || !strings.Contains(c.Fix, "OTEL_SERVICE_NAME, CLAUDE_CODE_USE_BEDROCK") {
+	// Variables that match init's values, or don't affect telemetry, are fine.
+	// The desktop app sets several of each.
+	harmless := []string{
+		"CLAUDE_CODE_ENABLE_TELEMETRY=1",
+		"CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1",
+		"OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318",
+		"CLAUDE_CODE_ENTRYPOINT=claude-desktop",
+		"CLAUDE_CODE_SESSION_ID=abc",
+		"OTEL_SERVICE_NAME=x",
+	}
+	if c := checkShellEnv(harmless, 4318); !c.Pass {
+		t.Errorf("harmless vars: %+v", c)
+	}
+	c := checkShellEnv([]string{
+		"PATH=/bin",
+		"OTEL_LOGS_EXPORTER=none",
+		"OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318",
+		"OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://elsewhere:4318",
+	}, 4318)
+	if c.Pass ||
+		!strings.Contains(c.Fix, "OTEL_LOGS_EXPORTER=none (init sets otlp)") ||
+		!strings.Contains(c.Fix, "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://elsewhere:4318") ||
+		strings.Contains(c.Fix, "OTEL_EXPORTER_OTLP_ENDPOINT") {
 		t.Errorf("conflicting shell: %+v", c)
+	}
+	// A different port is a conflict too.
+	if c := checkShellEnv([]string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318"}, 9999); c.Pass {
+		t.Errorf("wrong port passed: %+v", c)
 	}
 }
 
