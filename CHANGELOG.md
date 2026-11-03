@@ -38,5 +38,7 @@ The first release.
 - The collector and dashboard only answer to programs on your machine. They refuse
   web pages in your browser, DNS rebinding and oversized payloads.
 - Downloads are checked against SHA-256 checksums.
+- Releases are signed with Sigstore and carry SLSA build provenance. See
+  [checking a release](docs/OPERATIONS.md#checking-a-release).
 - Releases are reproducible, so anyone can check a download was built from its
   source. See [reproducing a release](docs/OPERATIONS.md#reproducing-a-release).
