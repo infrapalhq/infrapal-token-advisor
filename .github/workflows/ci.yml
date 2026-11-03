@@ -18,6 +18,9 @@ jobs:
     name: go / fmt, vet, test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # prove this workflow's identity to Codecov, instead of a stored token
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,16 +41,34 @@ jobs:
           go mod tidy
           git diff --exit-code -- go.mod go.sum
       - run: go vet ./...
+      # Coverage counts every package the tests run, since some code, such as
+      # the adapter contract, is only exercised from other packages' tests.
       - name: go test
         run: |
-          go test -race -covermode=atomic -coverprofile=coverage.out ./...
+          go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ { sub("%", "", $3); print $3 }')
           {
             echo '### Test coverage'
             echo
-            echo '```'
-            go tool cover -func=coverage.out | tail -1
-            echo '```'
+            echo "${total}% of statements, and at least ${MIN_COVERAGE}% is required."
           } >> "$GITHUB_STEP_SUMMARY"
+          if awk -v t="$total" -v min="$MIN_COVERAGE" 'BEGIN { exit !(t < min) }'; then
+            echo "::error::Test coverage is ${total}%, below the required ${MIN_COVERAGE}%. Add tests for the new code."
+            exit 1
+          fi
+        env:
+          MIN_COVERAGE: "80"
+      # Publishes the coverage report for the README badge and pull request
+      # comments. Only this repository's own runs can upload: a fork's pull
+      # request has no identity token. The 80% gate above is what blocks a merge.
+      - name: upload coverage to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: coverage.out
+          use_oidc: true
+          disable_search: true
+          fail_ci_if_error: false
 
   lint:
     name: go / golangci-lint

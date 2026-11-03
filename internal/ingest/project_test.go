@@ -401,3 +401,70 @@ func TestMetricsWriter_UpsertsSession(t *testing.T) {
 		t.Errorf("value = %v, want 42", value)
 	}
 }
+
+func TestAPIRequest_RecordsTokensAndCost(t *testing.T) {
+	db := openTestDB(t)
+	req := RawEvent{
+		Ts: 1000, SessionID: "s1", PromptID: "p1", EventName: "api_request", Body: "{}",
+		Attrs: map[string]any{
+			"model": "claude-sonnet-5-5", "request_id": "req-1", "query_source": "repl_main_thread",
+			"input_tokens": int64(10), "output_tokens": int64(20),
+			"cache_read_tokens": int64(300), "cache_creation_tokens": int64(40),
+			"cost_usd": 0.0125, "duration_ms": int64(900),
+		},
+	}
+	failed := RawEvent{
+		Ts: 2000, SessionID: "s1", PromptID: "p1", EventName: "claude_code.api_error", Body: "{}",
+		Attrs: map[string]any{"model": "claude-sonnet-5-5", "error": "overloaded", "status_code": int64(529), "cost_usd_micros": int64(0)},
+	}
+	if err := writeLogsBatch(db, []RawEvent{req, failed}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	var in, out, cacheRead, cacheWrite, cost, success int64
+	var source string
+	if err := db.QueryRow(`SELECT input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+		cost_usd_micros, success, query_source FROM api_requests WHERE request_id = 'req-1'`).
+		Scan(&in, &out, &cacheRead, &cacheWrite, &cost, &success, &source); err != nil {
+		t.Fatalf("read request: %v", err)
+	}
+	if in != 10 || out != 20 || cacheRead != 300 || cacheWrite != 40 || success != 1 || source != "repl_main_thread" {
+		t.Errorf("request = %d %d %d %d success=%d source=%q", in, out, cacheRead, cacheWrite, success, source)
+	}
+	if cost != 12500 {
+		t.Errorf("cost_usd_micros = %d, want 12500 from cost_usd 0.0125", cost)
+	}
+
+	var errText string
+	var status int64
+	if err := db.QueryRow(`SELECT error, status_code, success FROM api_requests WHERE ts = 2000`).Scan(&errText, &status, &success); err != nil {
+		t.Fatalf("read error: %v", err)
+	}
+	if errText != "overloaded" || status != 529 || success != 0 {
+		t.Errorf("error row = %q %d success=%d", errText, status, success)
+	}
+}
+
+func TestToolExecutionSpan_RecordsDurationAndResult(t *testing.T) {
+	db := openTestDB(t)
+	span := Span{
+		TraceID: "trace-1", SpanID: "exec-1", Name: "claude_code.tool.execution",
+		StartNs: 1_000_000_000, EndNs: 1_500_000_000,
+		Attrs: map[string]any{"tool_use_id": "tu-9", "duration_ms": int64(500), "success": true},
+	}
+	none := Span{TraceID: "trace-1", SpanID: "exec-2", Name: "claude_code.tool.execution", Attrs: map[string]any{}}
+	if err := writeSpansBatch(db, []Span{span, none}); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var ms, ok int64
+	if err := db.QueryRow(`SELECT execution_ms, success FROM tool_calls WHERE tool_use_id = 'tu-9'`).Scan(&ms, &ok); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if ms != 500 || ok != 1 {
+		t.Errorf("execution_ms = %d, success = %d", ms, ok)
+	}
+	var n int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM tool_calls`).Scan(&n); err != nil || n != 1 {
+		t.Errorf("a span with no tool id should be skipped: %d rows", n)
+	}
+}
