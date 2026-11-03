@@ -39,7 +39,9 @@ type View = (typeof VIEWS)[number]["value"];
 export default function Sessions() {
   const [params, setParams] = useSearchParams();
   const range = (params.get("range") as Range) || "7d";
-  const [data, setData] = useState<SessionCards | null>(null);
+  // loaded remembers what its data was loaded for, so a change of range or
+  // agent shows "Loading…" until the new data arrives.
+  const [loaded, setLoaded] = useState<{ key: string; data: SessionCards } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>("all");
   const [sort, setSort] = useState<Sort>("priority");
@@ -51,10 +53,11 @@ export default function Sessions() {
   const firstRun = useFirstRun();
   const { selected: agent } = useAgents();
 
+  const key = `${range}|${agent}|${firstRun}`;
   useEffect(() => {
-    setData(null);
-    api.sessionCards(range, agent).then(setData).catch((e: Error) => setError(e.message));
-  }, [range, agent, firstRun]);
+    api.sessionCards(range, agent).then((d) => setLoaded({ key, data: d })).catch((e: Error) => setError(e.message));
+  }, [range, agent, key]);
+  const data = loaded?.key === key ? loaded.data : null;
 
   const visible = useMemo(() => {
     if (!data) return [];
