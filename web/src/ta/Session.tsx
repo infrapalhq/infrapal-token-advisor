@@ -21,9 +21,8 @@ export default function SessionPage() {
   const [marked, setMarked] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState<Record<string, boolean>>({});
 
+  // App.tsx keys this page by id, so another session starts from empty state.
   useEffect(() => {
-    setTimeline(null);
-    setError(null);
     Promise.all([api.timeline(id), api.issues(id), api.sessionCards("all")])
       .then(([t, i, c]) => {
         setTimeline(t);

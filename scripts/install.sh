@@ -4,12 +4,15 @@
 #   curl -fsSL https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
 #
 # INSTALL_DIR               where to put it (default: ~/.local/bin)
+# DESTDIR                   a staging directory to put INSTALL_DIR under, for
+#                           packaging (default: none, install in place)
 # TOKEN_ADVISOR_VERSION     a version such as 1.2.3 (default: the latest)
 # TOKEN_ADVISOR_BASE_URL    where to fetch from, for testing a local build
 set -eu
 
 repo=infrapalhq/infrapal-token-advisor
 install_dir=${INSTALL_DIR:-$HOME/.local/bin}
+dest=${DESTDIR:-}$install_dir
 
 fail() {
 	echo "install.sh: $1" >&2
@@ -62,12 +65,16 @@ fi
 [ "$got" = "$want" ] || fail "checksum mismatch for $archive"
 
 tar -xzf "$tmp/$archive" -C "$tmp" token-advisor
-mkdir -p "$install_dir"
+mkdir -p "$dest"
 # mv within a directory is atomic, so a running binary is never half written.
-cp "$tmp/token-advisor" "$install_dir/.token-advisor.new"
-chmod 755 "$install_dir/.token-advisor.new"
-mv "$install_dir/.token-advisor.new" "$install_dir/token-advisor"
+cp "$tmp/token-advisor" "$dest/.token-advisor.new"
+chmod 755 "$dest/.token-advisor.new"
+mv "$dest/.token-advisor.new" "$dest/token-advisor"
 
+if [ -n "${DESTDIR:-}" ]; then
+	echo "staged $dest/token-advisor, to be installed as $install_dir/token-advisor"
+	exit 0
+fi
 echo "installed $install_dir/token-advisor"
 case ":$PATH:" in
 *":$install_dir:"*) ;;

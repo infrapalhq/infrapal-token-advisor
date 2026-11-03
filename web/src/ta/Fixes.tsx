@@ -36,20 +36,25 @@ function EnableMcp() {
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
 
-  const check = useCallback(() => {
-    setChecking(true);
-    api.mcpSetup()
-      .then((s) => {
-        setSetup(s);
-        setError(null);
-      })
-      .catch((e: Error) => setError(e.message))
-      .finally(() => setChecking(false));
-  }, []);
+  const load = useCallback(
+    () =>
+      api.mcpSetup()
+        .then((s) => {
+          setSetup(s);
+          setError(null);
+        })
+        .catch((e: Error) => setError(e.message)),
+    [],
+  );
 
   useEffect(() => {
-    check();
-  }, [check]);
+    load();
+  }, [load]);
+
+  const check = () => {
+    setChecking(true);
+    load().finally(() => setChecking(false));
+  };
 
   if (error && !setup) return <p className="hint-line">Could not load MCP setup: {error}</p>;
   if (!setup) return null;
@@ -167,6 +172,8 @@ export default function Fixes() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  // now is when the page loaded, which is precise enough for a 7-day window.
+  const [now] = useState(Date.now);
   const firstRun = useFirstRun();
   const { selected: agent } = useAgents();
 
@@ -326,7 +333,7 @@ export default function Fixes() {
               <div className="colh"><strong>Marked fixed</strong><span className="mono">{data.counts.marked}</span></div>
               {data.marked.length === 0 && <p className="hint-line">Nothing marked yet. Mark a fix once you have applied it.</p>}
               {data.marked.map((it) => {
-                const measuring = it.marked_at !== undefined && Date.now() - it.marked_at < MARK_WINDOW_MS;
+                const measuring = it.marked_at !== undefined && now - it.marked_at < MARK_WINDOW_MS;
                 return (
                   <article className="card dashed" key={it.key}>
                     <div className="card-top">
