@@ -190,7 +190,7 @@ func (a *Agent) Check(otlpPort int) ([]agent.Check, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []agent.Check{settings, checkShellEnv(os.Environ()), checkManagedSettings(runtime.GOOS)}, nil
+	return []agent.Check{settings, checkShellEnv(os.Environ(), otlpPort), checkManagedSettings(runtime.GOOS)}, nil
 }
 
 // checkSettings looks for our env block, with the endpoint matching our port.
@@ -235,18 +235,26 @@ func settingsProblem(doc Doc, existed bool, path string, otlpPort int) string {
 	return ""
 }
 
-// checkShellEnv looks for conflicting vars in doctor's own shell env.
-func checkShellEnv(environ []string) agent.Check {
+// checkShellEnv looks in doctor's own shell for variables that would change
+// where, or whether, Claude Code sends telemetry: one of init's keys with a
+// different value, or an endpoint for a single signal. Others, such as
+// CLAUDE_CODE_ENTRYPOINT, don't affect telemetry and aren't reported.
+func checkShellEnv(environ []string, otlpPort int) agent.Check {
+	want := TelemetryEnv(otlpPort)
 	var conflicting []string
 	for _, kv := range environ {
-		key, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(key, "OTEL_") || strings.HasPrefix(key, "CLAUDE_CODE_") {
-			conflicting = append(conflicting, key)
+		key, value, _ := strings.Cut(kv, "=")
+		wanted, ours := want[key]
+		switch {
+		case ours && value != wanted:
+			conflicting = append(conflicting, fmt.Sprintf("%s=%s (init sets %s)", key, value, wanted))
+		case !ours && strings.HasPrefix(key, "OTEL_EXPORTER_OTLP_"):
+			conflicting = append(conflicting, fmt.Sprintf("%s=%s", key, value))
 		}
 	}
-	check := agent.Check{Label: "no OTEL_*/CLAUDE_CODE_* vars exported in this shell", Pass: len(conflicting) == 0}
+	check := agent.Check{Label: "this shell doesn't override the telemetry settings", Pass: len(conflicting) == 0}
 	if !check.Pass {
-		check.Fix = fmt.Sprintf("this shell exports: %s — these can override settings.json for any `claude` launched from here; unset them or reconcile with `token-advisor init`'s values. Note: this only reflects the shell doctor was invoked from, not every shell you might launch `claude` from.", strings.Join(conflicting, ", "))
+		check.Fix = fmt.Sprintf("this shell sets %s, which can override settings.json for `claude` started from it. Unset them, or run `token-advisor init` again. Other shells may differ.", strings.Join(conflicting, ", "))
 	}
 	return check
 }

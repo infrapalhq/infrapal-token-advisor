@@ -117,6 +117,9 @@ Linux or macOS, without Homebrew. This installs to `~/.local/bin`, or to
 curl -fsSL https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
 ```
 
+Packagers can set `DESTDIR` to stage the binary under another directory, such as
+`DESTDIR=./pkg INSTALL_DIR=/usr/local/bin`.
+
 Then start collecting. This patches `~/.claude/settings.json`, keeping a backup,
 and installs a background service:
 
