@@ -60,7 +60,8 @@ To add support for another coding agent, see
 1. Branch from `main`.
 2. Add tests. New features and bug fixes must come with tests, and a bug fix
    needs a test that fails without it. Changes to docs, or to code that's purely
-   visual, are the exception. A maintainer will ask for tests before merging.
+   visual, are the exception. A maintainer will ask for tests before merging, and
+   CI fails if Go test coverage drops below 80%.
 3. Run the same checks CI runs:
 
    ```sh

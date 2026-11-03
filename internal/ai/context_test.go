@@ -20,6 +20,7 @@ var sensitiveFixtureStrings = []string{
 	"use flexbox and a wrapper div",
 	"rm -rf /some/secret/path --force",
 	"/home/user/private-project/config.yaml",
+	"git push --force origin secret-branch",
 }
 
 // seedDB builds a temp SQLite DB with one session/interaction/tool_call
@@ -48,6 +49,12 @@ func seedDB(t *testing.T) *sql.DB {
 			'rm -rf /some/secret/path --force', 512, 2048, 100)`,
 		`INSERT INTO mcp_server_connections (ts, session_id, server_name, status)
 			VALUES (1000, 's1', 'github', 'connected')`,
+		// A rejected tool call and a retried request, so the waste and retry
+		// facts have rows too.
+		`INSERT INTO tool_calls (tool_use_id, prompt_id, session_id, ts, tool_name, decision, decision_source, success, full_command)
+			VALUES ('tu-2', 'p1', 's1', 1060, 'Bash', 'reject', 'user_reject', 0, 'git push --force origin secret-branch')`,
+		`INSERT INTO api_requests (request_id, prompt_id, session_id, ts, model, cost_usd_micros, input_tokens, output_tokens, attempt, success)
+			VALUES ('req-2', 'p1', 's1', 1070, 'claude-3-opus', 50000, 100, 0, 2, 0)`,
 		`INSERT INTO metric_points (ts, name, value, session_id) VALUES (1000, 'claude_code.cost.usage', 0.1, 's1')`,
 		`INSERT INTO metric_points (ts, name, value, session_id) VALUES (1000, 'claude_code.token.usage', 300, 's1')`,
 	}
@@ -141,5 +148,18 @@ func mustExecAI(t *testing.T, db *sql.DB, query string, args ...any) {
 	t.Helper()
 	if _, err := db.Exec(query, args...); err != nil {
 		t.Fatalf("exec %q: %v", query, err)
+	}
+}
+
+func TestBuildContext_IncludesWasteAndRetries(t *testing.T) {
+	c, err := BuildContext(context.Background(), seedDB(t), "all", 0, false, nil)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+	if len(c.Waste) == 0 || c.Waste[0].RejectedToolCount != 1 {
+		t.Errorf("waste = %+v, want the rejected call", c.Waste)
+	}
+	if len(c.Retries) == 0 || c.Retries[0].RetriedRequests != 1 {
+		t.Errorf("retries = %+v, want the retried request", c.Retries)
 	}
 }
