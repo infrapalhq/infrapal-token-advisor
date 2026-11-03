@@ -110,5 +110,5 @@ same license ("inbound = outbound").
 ## Pull requests
 
 Fill in the PR template, keep the PR to one change, and make sure CI is
-green. A maintainer will review it. Please be patient: this is maintained
-by a small team.
+green. A maintainer will review it, as [GOVERNANCE.md](GOVERNANCE.md)
+describes. Please be patient: this is maintained by a small team.
