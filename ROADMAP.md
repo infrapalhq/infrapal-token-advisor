@@ -22,7 +22,6 @@ or start a [discussion](https://github.com/infrapalhq/infrapal-token-advisor/dis
   [adding an agent](docs/ADDING_AN_AGENT.md).
 - **More checks**, such as large tool results and unused context, using the
   [detector guide](docs/ADDING_A_DETECTOR.md).
-- **Security headers** on the dashboard.
 
 ## Later
 

@@ -37,6 +37,8 @@ The first release.
 
 - The collector and dashboard only answer to programs on your machine. They refuse
   web pages in your browser, DNS rebinding and oversized payloads.
+- The dashboard sends a content security policy and other security headers, so it
+  only runs its own scripts and can't be framed by another site.
 - Downloads are checked against SHA-256 checksums.
 - Releases are signed with Sigstore and carry SLSA build provenance. See
   [checking a release](docs/OPERATIONS.md#checking-a-release).
