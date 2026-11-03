@@ -604,3 +604,25 @@ func TestCommandShapes(t *testing.T) {
 		t.Errorf("truncate of a short string = %q", got)
 	}
 }
+
+func TestInstallWideItemsBelongToNoSession(t *testing.T) {
+	occ := []occurrence{
+		{Kind: "dead_mcp", Area: "context", Subject: "a", Severity: "half", Conf: "Measured", Title: "a", Fix: "x"},
+		{Kind: "re_read", Area: "context", Subject: "f", SessionID: "s1", Severity: "half", Conf: "Measured", Title: "f"},
+	}
+	items := aggregateItems(occ, 0)
+	got := map[string]int{}
+	for _, it := range items {
+		got[it.Kind] = it.Sessions
+	}
+	if got["dead_mcp"] != 0 {
+		t.Errorf("install-wide item counted %d sessions, want 0", got["dead_mcp"])
+	}
+	if got["re_read"] != 1 {
+		t.Errorf("session item counted %d sessions, want 1", got["re_read"])
+	}
+	areas := areaSummaries(items, occ)
+	if areas[0].Items != 2 || areas[0].Sessions != 1 || areas[0].InstallWide != 1 {
+		t.Errorf("context area = %+v, want 2 items, 1 session, 1 install-wide", areas[0])
+	}
+}

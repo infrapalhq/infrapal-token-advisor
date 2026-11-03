@@ -69,7 +69,11 @@ func aggregateItems(occ []occurrence, rate float64) []*insightItem {
 			order = append(order, key)
 		}
 		it.Occurrences++
-		it.sessionSet[o.SessionID] = struct{}{}
+		// Install-wide findings (an unused MCP server) belong to no session, so
+		// the empty id must not count as one.
+		if o.SessionID != "" {
+			it.sessionSet[o.SessionID] = struct{}{}
+		}
 		if o.Severity == "full" {
 			it.Severity = "full"
 		}
