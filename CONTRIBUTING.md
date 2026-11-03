@@ -82,6 +82,12 @@ To add support for another coding agent, see
    Never edit a migration that has already been released. See
    [docs/SCHEMA.md](docs/SCHEMA.md#adding-a-migration).
 
+## Changelog
+
+If your change is something a user would notice, add a line to
+[CHANGELOG.md](CHANGELOG.md) under **Unreleased**, in the right section: Added,
+Changed, Fixed, Removed or Security.
+
 ## Commit messages
 
 Start the subject with a type: `feat:`, `fix:`, `docs:`, `ci:`, `chore:`,
