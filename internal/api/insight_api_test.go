@@ -454,3 +454,50 @@ func TestTimeline_PromptDividerHasNoCostWhenUnknown(t *testing.T) {
 		t.Errorf("Claude's divider = %q, want its cost", got)
 	}
 }
+
+func TestSessionIssues_GroupsByArea(t *testing.T) {
+	call := insightDB(t)
+	code, body := call("GET", "/api/sessions/s1/issues", "")
+	if code != 200 {
+		t.Fatalf("status %d: %v", code, body)
+	}
+	areas, _ := body["areas"].(map[string]any)
+	if len(areas) == 0 {
+		t.Fatalf("areas = %v, want the fixture's issues", body)
+	}
+	for area, list := range areas {
+		for _, o := range list.([]any) {
+			if got := o.(map[string]any)["Area"]; got != area {
+				t.Errorf("an issue in %q has area %v", area, got)
+			}
+		}
+	}
+	if code, _ := call("GET", "/api/sessions/nope/issues", ""); code != 404 {
+		t.Errorf("unknown session: status %d, want 404", code)
+	}
+}
+
+func TestFixState_RejectsBadInput(t *testing.T) {
+	call := insightDB(t)
+	for _, c := range []struct {
+		path, body string
+		want       int
+	}{
+		{"/api/fixes/re_read%7C%2Fwork%2Finfra-repo%2Fmain.tf/state", `{`, 400},
+		{"/api/fixes/re_read%7C%2Fwork%2Finfra-repo%2Fmain.tf/state", `{"state":"maybe"}`, 400},
+		{"/api/fixes/no-such-fix/state", `{"state":"fixed"}`, 404},
+	} {
+		if code, body := call("POST", c.path, c.body); code != c.want {
+			t.Errorf("%s %s: status %d, want %d: %v", c.path, c.body, code, c.want, body)
+		}
+	}
+}
+
+func TestProgressAndOverview_RejectAnUnknownRange(t *testing.T) {
+	call := insightDB(t)
+	for _, path := range []string{"/api/progress?since=forever", "/api/overview?since=forever", "/api/fixes?since=forever", "/api/sessions/cards?since=forever"} {
+		if code, _ := call("GET", path, ""); code != 400 {
+			t.Errorf("%s: status %d, want 400", path, code)
+		}
+	}
+}

@@ -3,7 +3,10 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/infrapalhq/infrapal-token-advisor/internal/service"
 )
 
 func TestRunUninstall_RestoresSettingsAndRemovesBaseDir(t *testing.T) {
@@ -69,5 +72,44 @@ func TestRunUninstall_NoPriorInit(t *testing.T) {
 	// exist, no backup path recorded. Should no-op gracefully, not error.
 	if err := runUninstall(nil); err != nil {
 		t.Fatalf("runUninstall without prior init: %v", err)
+	}
+}
+
+func TestRunStop_StopsTheService(t *testing.T) {
+	withFakeHome(t)
+	fake := withFakeService(t)
+	if err := runStop(nil); err != nil {
+		t.Fatalf("runStop: %v", err)
+	}
+	if fake.stopCalls != 1 {
+		t.Errorf("stopCalls = %d", fake.stopCalls)
+	}
+}
+
+func TestRunStop_WithNoServiceManager(t *testing.T) {
+	withFakeHome(t)
+	orig := newService
+	newService = func(service.Paths) (service.Service, error) { return nil, service.ErrUnsupported }
+	t.Cleanup(func() { newService = orig })
+	if err := runStop(nil); err != nil {
+		t.Errorf("an unsupported platform should explain, not fail: %v", err)
+	}
+}
+
+func TestRunLogs_ShowsTheTail(t *testing.T) {
+	home := withFakeHome(t)
+	dir := filepath.Join(home, ".infrapal-token-advisor")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	log := "time=1 level=INFO msg=one\ntime=2 level=ERROR msg=two\ntime=3 level=INFO msg=three\n"
+	if err := os.WriteFile(filepath.Join(dir, "token-advisor.log"), []byte(log), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if out := stdout(t, func() error { return runLogs([]string{"-n", "2"}) }); strings.Contains(out, "msg=one") || !strings.Contains(out, "msg=three") {
+		t.Errorf("-n 2 output:\n%s", out)
+	}
+	if out := stdout(t, func() error { return runLogs([]string{"--errors"}) }); !strings.Contains(out, "msg=two") || strings.Contains(out, "msg=three") {
+		t.Errorf("--errors output:\n%s", out)
 	}
 }
