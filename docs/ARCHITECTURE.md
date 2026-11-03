@@ -40,6 +40,7 @@ flowchart LR
 | `cmd/token-advisor` | Entry point |
 | `internal/cli` | Commands: `init`, `start`, `doctor`, `purge` and the rest. Retention lives here too. |
 | `internal/otlp` | Receives OTLP over HTTP on `127.0.0.1:4318` and decodes it |
+| `internal/localhttp` | Keeps web pages in your browser away from both local servers |
 | `internal/agent` | The common model of a coding agent: events, tokens, tool categories and capabilities. Experimental until a second agent uses it |
 | `internal/ingest` | Batches writes and projects events into typed tables |
 | `internal/store` | Opens SQLite and runs migrations. See [SCHEMA.md](SCHEMA.md). |
@@ -143,9 +144,12 @@ one constant, `HaikuModel` in `internal/ai/client.go`.
 
 ## Security boundaries
 
-Both servers bind to `127.0.0.1`. The API holds prompts and has no login, so
-`internal/api/guard.go` refuses requests whose `Host` isn't localhost, which stops
-DNS rebinding, and refuses cross-origin writes. See [SECURITY.md](../SECURITY.md).
+Both servers bind to `127.0.0.1`, and neither has a login, so `internal/localhttp`
+refuses requests whose `Host` isn't localhost, which stops DNS rebinding, and
+refuses cross-origin writes. The collector also accepts only protobuf, which a web
+page can't send cross-origin, and limits the size of what it reads. See
+[ASSURANCE.md](ASSURANCE.md) for the full security argument, and
+[SECURITY.md](../SECURITY.md) to report a problem.
 
 ## Keeping it running
 

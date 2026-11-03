@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/localhttp"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/logging"
 )
 
@@ -51,11 +52,8 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	if uiFS != nil {
 		mux.Handle("/", newSPAHandler(uiFS))
 	}
-	s.http = &http.Server{
-		Addr:     addr,
-		Handler:  logging.RecoverHTTP("api", guard(mux)),
-		ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn),
-	}
+	s.http = localhttp.Server(addr, logging.RecoverHTTP("api", guard(mux)))
+	s.http.ErrorLog = slog.NewLogLogger(slog.Default().Handler(), slog.LevelWarn)
 	return s
 }
 
