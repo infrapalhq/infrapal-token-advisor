@@ -22,16 +22,37 @@ builds:
     goarch:
       - amd64
       - arm64
+    # Reproducible: the same commit builds the same bytes anywhere. -trimpath
+    # keeps the build machine's paths out of the binary, and the commit's own
+    # time stands in for the time of the build.
+    flags:
+      - -trimpath
     ldflags:
       - -s -w -X github.com/infrapalhq/infrapal-token-advisor/internal/cli.Version={{.Version}}
+    mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
   - id: infrapal-token-advisor
     formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    # The MIT license requires its notice to go with every copy.
     files:
-      - README.md
+      - src: LICENSE
+        info:
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+      - src: README.md
+        info:
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+    # A fixed owner too, or each archive records whoever ran the build.
+    builds_info:
+      owner: root
+      group: root
+      mtime: "{{ .CommitDate }}"
 
 checksum:
   name_template: "checksums.txt"
