@@ -133,21 +133,21 @@ export default function Overview() {
             </div>
             <div className="cores">
               {data.areas.map((a) => {
-                // Findings tied to sessions open the filtered Sessions list;
-                // install-wide ones have no session, so they open Fixes.
-                const to = a.sessions > 0 ? `/sessions?area=${a.area}` : a.install_wide > 0 ? "/fixes" : "/sessions";
-                const parts = [`${a.items} issue${a.items === 1 ? "" : "s"}`];
-                if (a.sessions > 0) parts.push(sessionsLabel(a.sessions));
-                if (a.install_wide > 0) parts.push(`${a.install_wide} install-wide`);
+                // A card counts the problems found in sessions. Global ones (an
+                // unused MCP server) belong to no session, so they are shown
+                // apart, and the card always opens the sessions it counts.
+                const own = a.items - a.install_wide;
+                const sessions = `${a.sessions} session${a.sessions === 1 ? "" : "s"}`;
                 return (
-                  <Link className={`core${a.area === "context" ? " heavy" : ""}`} key={a.area} to={to}>
+                  <Link className={`core${a.area === "context" ? " heavy" : ""}`} key={a.area} to={`/sessions?area=${a.area}`}>
                     <div className="core-top">
                       <strong>{AREA_NAME[a.area]}</strong>
                       <span className={`pip ${pipClass(a.severity === "fine" ? "" : a.severity)}`} />
                     </div>
-                    <span className="num">{a.usd > 0 ? `≈ ${money(a.usd)}` : `${a.items} open`}</span>
-                    <p>{parts.join(" · ")}</p>
-                    {a.items > 0 && <span className="go">{a.sessions > 0 ? `${sessionsLabel(a.sessions)} →` : "See fixes →"}</span>}
+                    <span className="num">{a.usd > 0 ? `≈ ${money(a.usd)}` : `${own} open`}</span>
+                    <p>{own} issue{own === 1 ? "" : "s"} · {sessions}</p>
+                    {a.install_wide > 0 && <p className="core-global">+ {a.install_wide} global {a.install_wide === 1 ? "fix" : "fixes"}, under Fixes</p>}
+                    {a.items > 0 && <span className="go">{sessions} →</span>}
                   </Link>
                 );
               })}

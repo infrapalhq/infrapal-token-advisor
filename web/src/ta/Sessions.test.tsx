@@ -115,10 +115,10 @@ describe("Sessions", () => {
     expect(await screen.findByRole("heading", { name: "Waiting for your first session." })).toBeTruthy();
   });
 
-  it("explains install-wide findings no session lists", async () => {
+  it("explains global fixes no session lists", async () => {
     fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 6 } });
     renderAt("/sessions");
-    expect(await screen.findByText(/6 open findings apply to your whole install/)).toBeTruthy();
+    expect(await screen.findByText(/6 global fixes apply to your whole install/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "See fixes →" }).getAttribute("href")).toBe("/fixes");
   });
 
@@ -129,21 +129,21 @@ describe("Sessions", () => {
     expect(titles()).toEqual(["Speed up tests"]);
   });
 
-  it("says 'finding' and 'it' for a single install-wide finding", async () => {
+  it("says 'fix' and 'it' for a single global fix", async () => {
     fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 1 } });
     renderAt("/sessions");
-    expect(await screen.findByText(/1 open finding applies to your whole install, not one session .* so no session below lists it\./)).toBeTruthy();
+    expect(await screen.findByText(/1 global fix applies to your whole install, not one session .* so no session below lists it\./)).toBeTruthy();
   });
 
-  it("suggests a longer range when a problem filter matches nothing and nothing is install-wide", async () => {
+  it("suggests a longer range when a problem filter matches nothing and nothing is global", async () => {
     fakeAPI({ ...base(), "/api/sessions/cards": list() });
     renderAt("/sessions?area=model");
     expect(await screen.findByText("Try a longer time range, or clear your filters.")).toBeTruthy();
   });
 
-  it("explains an empty problem filter when the findings are install-wide", async () => {
+  it("explains an empty problem filter when the fixes are global", async () => {
     fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 6 } });
     renderAt("/sessions?area=model");
-    expect(await screen.findByText(/No session has this problem\. Install-wide findings aren't tied to a session/)).toBeTruthy();
+    expect(await screen.findByText(/No session has this problem\. Global fixes aren't tied to a session/)).toBeTruthy();
   });
 });

@@ -88,17 +88,29 @@ describe("Overview", () => {
     expect(localStorage.getItem("ta-agent")).toBe("codex");
   });
 
-  it("sends install-wide findings to Fixes instead of an empty session list", async () => {
+  it("counts only session problems on a card, shows global fixes apart, and still opens Sessions", async () => {
     const o = overview({
-      areas: [{ area: "context", items: 6, usd: 0, severity: "half", sessions: 0, install_wide: 6 }],
+      areas: [{ area: "context", items: 6, usd: 0, severity: "fine", sessions: 0, install_wide: 6 }],
       fix_first: [{ ...overview().fix_first[0], sessions: 0 }],
     });
     fakeAPI({ ...base(), "/api/overview": o });
     renderAt("/");
-    expect(await screen.findByText("6 issues · 6 install-wide")).toBeTruthy();
-    expect(screen.queryByText(/0 sessions/)).toBeNull();
-    expect(screen.getByRole("link", { name: /Context health/ }).getAttribute("href")).toBe("/fixes");
-    expect(screen.getByText("See fixes →")).toBeTruthy();
+    const card = within(await screen.findByRole("link", { name: /Context health/ }));
+    expect(card.getByText("0 open")).toBeTruthy();
+    expect(card.getByText("0 issues · 0 sessions")).toBeTruthy();
+    expect(card.getByText("+ 6 global fixes, under Fixes")).toBeTruthy();
+    expect(card.getByText("0 sessions →")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Context health/ }).getAttribute("href")).toBe("/sessions?area=context");
+  });
+
+  it("counts a card's own problems apart from a global one in the same area", async () => {
+    const o = overview({ areas: [{ area: "context", items: 3, usd: 0, severity: "half", sessions: 2, install_wide: 1 }] });
+    fakeAPI({ ...base(), "/api/overview": o });
+    renderAt("/");
+    const card = within(await screen.findByRole("link", { name: /Context health/ }));
+    expect(card.getByText("2 open")).toBeTruthy();
+    expect(card.getByText("2 issues · 2 sessions")).toBeTruthy();
+    expect(card.getByText("+ 1 global fix, under Fixes")).toBeTruthy();
   });
 
   it("opens the Sessions list filtered by the problem", async () => {
@@ -134,12 +146,12 @@ describe("Overview", () => {
     expect((screen.getByLabelText("Period") as HTMLSelectElement).value).toBe("7d");
   });
 
-  it("links a problem with nothing open to Sessions, with no 'see' link", async () => {
+  it("links a problem with nothing open to Sessions, with no count link", async () => {
     const o = overview({ areas: [{ area: "perm", items: 0, usd: 0, severity: "fine", sessions: 0, install_wide: 0 }] });
     fakeAPI({ ...base(), "/api/overview": o });
     renderAt("/");
     const link = await screen.findByRole("link", { name: /Permission friction/ });
-    expect(link.getAttribute("href")).toBe("/sessions");
+    expect(link.getAttribute("href")).toBe("/sessions?area=perm");
     expect(link.textContent).not.toContain("→");
   });
 });
