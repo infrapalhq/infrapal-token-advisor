@@ -170,4 +170,26 @@ describe("Session", () => {
     expect(await screen.findByText("Done", { selector: "strong" })).toBeTruthy();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
   });
+
+  it("shows the error for any other failure", async () => {
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": new HTTPError(500, "database is locked") });
+    renderAt("/sessions/s1");
+    expect(await screen.findByText("Could not load this session")).toBeTruthy();
+    expect(screen.getByText("database is locked")).toBeTruthy();
+  });
+
+  it("names an empty session that is not in the list", async () => {
+    const empty = timeline({ rows: [] });
+    fakeAPI({ ...routes(), "/api/sessions/cards": cards([]), "/api/sessions/s1/timeline": empty });
+    renderAt("/sessions/s1");
+    expect(await screen.findByRole("heading", { name: "Session with no activity" })).toBeTruthy();
+  });
+
+  it("lists the avoidable spend by problem, and leaves the section out when there is none", async () => {
+    fakeAPI(routes());
+    renderAt("/sessions/s1");
+    await userEvent.click(await screen.findByRole("button", { name: "Receipt" }));
+    expect(screen.getByText("AVOIDABLE, BY PROBLEM")).toBeTruthy();
+    expect(screen.getByText("$0.75", { selector: ".rl .mono" })).toBeTruthy();
+  });
 });

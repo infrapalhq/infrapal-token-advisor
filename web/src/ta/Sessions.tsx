@@ -102,7 +102,7 @@ export default function Sessions() {
           <h1 className="title">Sessions</h1>
           <p className="sub">
             {data
-              ? `${filtered ? `${visible.length} of ${data.count_all}` : data.count_all} sessions ${TIME_LABEL[range] ?? ""} · ${data.count_attention} need attention · ${data.count_new} new since your last visit`
+              ? `${filtered ? `${visible.length} of ${data.count_all}` : data.count_all} sessions ${TIME_LABEL[range]} · ${data.count_attention} need attention · ${data.count_new} new since your last visit`
               : "Loading…"}
           </p>
         </div>

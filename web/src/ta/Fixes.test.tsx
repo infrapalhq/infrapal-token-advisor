@@ -48,6 +48,15 @@ describe("Fixes", () => {
     expect(screen.getByText(/1 install-wide fix below isn't included/)).toBeTruthy();
   });
 
+  it("counts several install-wide fixes, and shows minutes for one with no dollar figure", async () => {
+    const a = item({ key: "dead_mcp|a", sessions: 0, usd: undefined, minutes: 3.4, title: "a connected but never used" });
+    const b = item({ key: "dead_mcp|b", sessions: 0, usd: undefined, title: "b connected but never used" });
+    fakeAPI({ ...routes(), "/api/fixes": fixes({ to_fix: [a, b] }) });
+    renderAt("/fixes");
+    expect(await screen.findByText(/2 install-wide fixes below aren't included/)).toBeTruthy();
+    expect(screen.getByText("3 min · install-wide · Measured")).toBeTruthy();
+  });
+
   it("copies a fix, marks it fixed and moves one back", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
