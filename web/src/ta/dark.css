@@ -302,3 +302,12 @@ html[data-theme="dark"] .torn {
 }
 html[data-theme="dark"] .theme-toggle { border-color: var(--line-2); background: var(--slab); box-shadow: var(--hi); color: var(--ink-2); }
 html[data-theme="dark"] .theme-toggle:hover { color: #fff; border-color: rgba(255, 255, 255, .2); }
+
+html[data-theme="dark"] .settings-form input {
+  background: #0A1525;
+  color: #F4F5F7;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+}
+html[data-theme="dark"] .settings-form input::placeholder { color: var(--mut); }
+html[data-theme="dark"] .settings-form input:focus-visible { border-color: var(--blue); }

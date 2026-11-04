@@ -62,3 +62,9 @@ export const SYMPTOM_LABEL: Record<string, string> = {
 export function pipClass(sev: string | undefined): string {
   return sev === "full" ? "full" : sev === "half" ? "half" : "";
 }
+
+// sessionsLabel names how many sessions a finding spans. A finding with none
+// is install-wide, such as an MCP server that is connected but never used.
+export function sessionsLabel(n: number): string {
+  return n === 0 ? "install-wide" : `${n} session${n === 1 ? "" : "s"}`;
+}

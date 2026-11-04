@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type AiConfig } from "./api";
+import { EnableMcp } from "./McpSetup";
 import { Shell } from "./Shell";
 
 // Settings holds the provider key for AI insights. The key is written once
@@ -46,6 +47,12 @@ export default function Settings() {
       <div className="top-row">
         <p className="eb">Settings</p>
       </div>
+      <section className="section">
+        <div className="section-head">
+          <h2 className="h2">Claude Code</h2>
+        </div>
+        <EnableMcp />
+      </section>
       <section className="section">
         <div className="section-head">
           <h2 className="h2">AI insights</h2>

@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAgents } from "./agentContext";
 import { SkippedChecks } from "./agents";
-import { api, type Overview as OverviewData, type Range } from "./api";
+import { api, type Overview as OverviewData } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
-import { AREA_NAME, dayShort, money, pipClass, tokensHuman, waitMs } from "./format";
-
-const PERIODS: { value: Range; label: string }[] = [
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "today", label: "Today" },
-];
+import { AREA_NAME, dayShort, money, pipClass, sessionsLabel, tokensHuman, waitMs } from "./format";
+import { PERIODS, useRange } from "./range";
+import { useRefresh } from "./refresh";
 
 export default function Overview() {
-  const [params, setParams] = useSearchParams();
-  const range = (params.get("range") as Range) || "7d";
+  const [range, setRange] = useRange();
   // loaded remembers what its data was loaded for, so a change of range or
   // agent shows "Loading…" until the new data arrives.
   const [loaded, setLoaded] = useState<{ key: string; data: OverviewData } | null>(null);
@@ -25,14 +20,18 @@ export default function Overview() {
   const { selected: agent } = useAgents();
 
   const key = `${range}|${agent}|${firstRun}`;
+  const tick = useRefresh();
   useEffect(() => {
-    api.overview(range, agent).then((d) => setLoaded({ key, data: d })).catch((e: Error) => setError(e.message));
-  }, [range, agent, key]);
+    api.overview(range, agent).then((d) => {
+      setLoaded({ key, data: d });
+      setError(null);
+    }).catch((e: Error) => setError(e.message));
+  }, [range, agent, key, tick]);
   const data = loaded?.key === key ? loaded.data : null;
 
   const dayMax = useMemo(() => Math.max(1, ...(data?.by_day.map((d) => d.cost_usd) ?? [1])), [data]);
   const projMax = useMemo(() => Math.max(1, ...(data?.by_project.map((p) => p.cost_usd) ?? [1])), [data]);
-  const problemCount = data?.fix_first.length ?? 0;
+  const problemCount = data?.open_fixes ?? 0;
   const recoveredUsd = (data?.recovered.usd ?? 0) >= 0.005; // would show as $0.00 otherwise
   const recoveredMinutes = Math.round(data?.recovered.minutes ?? 0);
   const unknownCost = data?.cost_unknown_sessions ?? 0;
@@ -42,12 +41,12 @@ export default function Overview() {
   if (firstRun) return <Shell><FirstRun /></Shell>;
 
   return (
-    <Shell fixesToDo={data?.fix_first.length} sessionCount={data?.sessions_count}>
+    <Shell fixesToDo={data?.open_fixes} sessionCount={data?.sessions_count}>
       <div className="top-row">
         <p className="eb">Overview</p>
         <div className="top-actions">
           <label htmlFor="period" className="sr">Period</label>
-          <select id="period" className="btn" value={range} onChange={(e) => setParams({ range: e.target.value })}>
+          <select id="period" className="btn" value={range} onChange={(e) => setRange(e.target.value as typeof range)}>
             {PERIODS.map((p) => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
@@ -113,7 +112,7 @@ export default function Overview() {
                   <span className={`pip ${pipClass(it.severity)}`} />
                   <span>
                     <strong>{it.title}</strong>
-                    <small>{it.sessions} session{it.sessions === 1 ? "" : "s"} · {it.conf}</small>
+                    <small>{sessionsLabel(it.sessions)} · {it.conf}</small>
                   </span>
                   <span className="chip">{AREA_NAME[it.area]}</span>
                   <span className="cost">{it.usd !== undefined ? `≈ ${money(it.usd)}` : it.minutes !== undefined ? `${Math.round(it.minutes)}m` : ""}</span>
@@ -133,17 +132,25 @@ export default function Overview() {
               </div>
             </div>
             <div className="cores">
-              {data.areas.map((a) => (
-                <Link className={`core${a.area === "context" ? " heavy" : ""}`} key={a.area} to="/sessions">
-                  <div className="core-top">
-                    <strong>{AREA_NAME[a.area]}</strong>
-                    <span className={`pip ${pipClass(a.severity === "fine" ? "" : a.severity)}`} />
-                  </div>
-                  <span className="num">{a.usd > 0 ? `≈ ${money(a.usd)}` : `${a.items} open`}</span>
-                  <p>{a.items} issue{a.items === 1 ? "" : "s"} · {a.sessions} session{a.sessions === 1 ? "" : "s"}</p>
-                  <span className="go">{a.sessions} session{a.sessions === 1 ? "" : "s"} →</span>
-                </Link>
-              ))}
+              {data.areas.map((a) => {
+                // Findings tied to sessions open the filtered Sessions list;
+                // install-wide ones have no session, so they open Fixes.
+                const to = a.sessions > 0 ? `/sessions?area=${a.area}` : a.install_wide > 0 ? "/fixes" : "/sessions";
+                const parts = [`${a.items} issue${a.items === 1 ? "" : "s"}`];
+                if (a.sessions > 0) parts.push(sessionsLabel(a.sessions));
+                if (a.install_wide > 0) parts.push(`${a.install_wide} install-wide`);
+                return (
+                  <Link className={`core${a.area === "context" ? " heavy" : ""}`} key={a.area} to={to}>
+                    <div className="core-top">
+                      <strong>{AREA_NAME[a.area]}</strong>
+                      <span className={`pip ${pipClass(a.severity === "fine" ? "" : a.severity)}`} />
+                    </div>
+                    <span className="num">{a.usd > 0 ? `≈ ${money(a.usd)}` : `${a.items} open`}</span>
+                    <p>{parts.join(" · ")}</p>
+                    {a.items > 0 && <span className="go">{a.sessions > 0 ? `${sessionsLabel(a.sessions)} →` : "See fixes →"}</span>}
+                  </Link>
+                );
+              })}
             </div>
           </section>
 
@@ -185,9 +192,9 @@ export default function Overview() {
                   </div>
                 </div>
               ))}
-              {data.models.length > 0 && (
+              {data.models.some((m) => m.share >= 0.005) && (
                 <span className="foot">
-                  Models: {data.models.slice(0, 3).map((m) => `${m.model} ${Math.round(m.share * 100)}%`).join(" · ")}
+                  Models: {data.models.filter((m) => m.share >= 0.005).slice(0, 3).map((m) => `${m.model} ${Math.round(m.share * 100)}%`).join(" · ")}
                 </span>
               )}
             </div>
