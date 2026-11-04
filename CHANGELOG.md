@@ -42,8 +42,9 @@ The first release.
 ### Fixed
 
 - Findings that belong to no session, such as an unused MCP server, are labelled
-  install-wide and link to Fixes. Before, they showed as "1 session" or "0 sessions",
-  and the Fixes count differed between Overview and Fixes.
+  global, and Overview's problem cards count them apart from the problems found in
+  sessions. Before, they showed as "1 session" or "0 sessions", and the Fixes count
+  differed between Overview and Fixes.
 - Opening a session with nothing in it no longer blanks the page, and a page that
   crashes now shows a message and a way back instead of a white screen.
 - Sessions with no model or tool calls are left out of the lists and counts.
