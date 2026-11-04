@@ -157,7 +157,7 @@ export default function Fixes() {
                   <span className="num-label">healthy sessions</span>
                 </div>
                 {installWide > 0 && (
-                  <p className="stat-note">Counts problems found inside sessions. {installWide} install-wide {installWide === 1 ? "fix" : "fixes"} below {installWide === 1 ? "isn't" : "aren't"} included.</p>
+                  <p className="stat-note">Counts problems found inside sessions. {installWide} global {installWide === 1 ? "fix" : "fixes"} below {installWide === 1 ? "isn't" : "aren't"} included.</p>
                 )}
                 {weeks.length > 0 && (
                   <div className="rows-bars" role="img" aria-label="Healthy sessions by week">

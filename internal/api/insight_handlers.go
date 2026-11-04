@@ -326,7 +326,7 @@ type areaSummary struct {
 	USD      float64 `json:"usd"`
 	Severity string  `json:"severity"`
 	Sessions int     `json:"sessions"`
-	// InstallWide is how many of Items belong to no session.
+	// InstallWide is how many of Items belong to no session (global findings).
 	InstallWide int `json:"install_wide"`
 }
 
@@ -344,7 +344,10 @@ func areaSummaries(open []*insightItem, occ []occurrence) []areaSummary {
 			}
 			a.Items++
 			if it.Sessions == 0 {
+				// A global finding (an unused MCP server) is counted, but it
+				// sets no severity or dollars: it isn't a problem in any session.
 				a.InstallWide++
+				continue
 			}
 			if it.USD != nil {
 				a.USD += *it.USD

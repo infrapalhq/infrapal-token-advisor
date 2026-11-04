@@ -184,7 +184,7 @@ export default function Sessions() {
 
       {data && installWide > 0 && (
         <p className="hint-line install-note">
-          {installWide} open {installWide === 1 ? "finding applies" : "findings apply"} to your whole install, not one session (for example an unused MCP server), so no session below lists {installWide === 1 ? "it" : "them"}. <Link to="/fixes">See fixes →</Link>
+          {installWide} global {installWide === 1 ? "fix applies" : "fixes apply"} to your whole install, not one session (for example an unused MCP server), so no session below lists {installWide === 1 ? "it" : "them"}. <Link to="/fixes">See fixes →</Link>
         </p>
       )}
 
@@ -211,7 +211,7 @@ export default function Sessions() {
               <strong>No sessions match</strong>
               <span>
                 {areaFilter.length > 0 && installWide > 0
-                  ? "No session has this problem. Install-wide findings aren't tied to a session; they're listed under Fixes."
+                  ? "No session has this problem. Global fixes aren't tied to a session; they're listed under Fixes."
                   : "Try a longer time range, or clear your filters."}
               </span>
               <button className="btn" type="button" onClick={() => { setAreaFilter([]); setSymFilter([]); setView("all"); setQuery(""); }}>Clear filters</button>

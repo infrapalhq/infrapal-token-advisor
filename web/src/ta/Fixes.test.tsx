@@ -41,20 +41,20 @@ describe("Fixes", () => {
     expect(screen.getByText("1 item fixed by how you work, not by a setting")).toBeTruthy();
   });
 
-  it("labels a finding with no session as install-wide, and says so under session health", async () => {
+  it("labels a finding with no session as global, and says so under session health", async () => {
     fakeAPI({ ...routes(), "/api/fixes": fixes({ to_fix: [item({ sessions: 0, usd: undefined, title: "srv connected but never used" })] }) });
     renderAt("/fixes");
-    expect(await screen.findByText("install-wide · Measured")).toBeTruthy();
-    expect(screen.getByText(/1 install-wide fix below isn't included/)).toBeTruthy();
+    expect(await screen.findByText("global · Measured")).toBeTruthy();
+    expect(screen.getByText(/1 global fix below isn't included/)).toBeTruthy();
   });
 
-  it("counts several install-wide fixes, and shows minutes for one with no dollar figure", async () => {
+  it("counts several global fixes, and shows minutes for one with no dollar figure", async () => {
     const a = item({ key: "dead_mcp|a", sessions: 0, usd: undefined, minutes: 3.4, title: "a connected but never used" });
     const b = item({ key: "dead_mcp|b", sessions: 0, usd: undefined, title: "b connected but never used" });
     fakeAPI({ ...routes(), "/api/fixes": fixes({ to_fix: [a, b] }) });
     renderAt("/fixes");
-    expect(await screen.findByText(/2 install-wide fixes below aren't included/)).toBeTruthy();
-    expect(screen.getByText("3 min · install-wide · Measured")).toBeTruthy();
+    expect(await screen.findByText(/2 global fixes below aren't included/)).toBeTruthy();
+    expect(screen.getByText("3 min · global · Measured")).toBeTruthy();
   });
 
   it("copies a fix, marks it fixed and moves one back", async () => {

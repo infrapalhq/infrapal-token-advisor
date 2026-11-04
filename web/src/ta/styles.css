@@ -295,6 +295,7 @@ button, select, input { font: inherit; }
 .core-top strong { font-size: 16px; }
 .core .num { font-family: var(--mono); font-size: 26px; }
 .core p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.45; }
+.core .core-global { margin: 2px 0 0; font-size: 12px; color: var(--ink-3); }
 .core .go { font-size: 13px; font-weight: 600; margin-top: auto; }
 
 .charts { display: flex; flex-wrap: wrap; gap: 24px; }

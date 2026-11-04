@@ -623,6 +623,16 @@ func TestInstallWideItemsBelongToNoSession(t *testing.T) {
 	}
 	areas := areaSummaries(items, occ)
 	if areas[0].Items != 2 || areas[0].Sessions != 1 || areas[0].InstallWide != 1 {
-		t.Errorf("context area = %+v, want 2 items, 1 session, 1 install-wide", areas[0])
+		t.Errorf("context area = %+v, want 2 items, 1 session, 1 global", areas[0])
+	}
+	if areas[0].Severity != "half" {
+		t.Errorf("a session problem sets the area's severity, got %q", areas[0].Severity)
+	}
+
+	// A global finding is counted, but with no session problem the area is fine.
+	globalOnly := aggregateItems(occ[:1], 0)
+	only := areaSummaries(globalOnly, occ[:1])[0]
+	if only.Items != 1 || only.InstallWide != 1 || only.Sessions != 0 || only.Severity != "fine" {
+		t.Errorf("global-only area = %+v, want 1 item, 1 global, 0 sessions, fine", only)
 	}
 }
