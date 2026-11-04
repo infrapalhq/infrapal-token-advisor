@@ -133,4 +133,13 @@ describe("Overview", () => {
     expect(screen.queryByText(/Could not load/)).toBeNull();
     expect((screen.getByLabelText("Period") as HTMLSelectElement).value).toBe("7d");
   });
+
+  it("links a problem with nothing open to Sessions, with no 'see' link", async () => {
+    const o = overview({ areas: [{ area: "perm", items: 0, usd: 0, severity: "fine", sessions: 0, install_wide: 0 }] });
+    fakeAPI({ ...base(), "/api/overview": o });
+    renderAt("/");
+    const link = await screen.findByRole("link", { name: /Permission friction/ });
+    expect(link.getAttribute("href")).toBe("/sessions");
+    expect(link.textContent).not.toContain("→");
+  });
 });

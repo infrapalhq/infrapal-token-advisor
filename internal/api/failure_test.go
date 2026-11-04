@@ -78,3 +78,25 @@ func TestComputeInsights_ReportsEachMissingTable(t *testing.T) {
 		})
 	}
 }
+
+// Losing the fix-marks table must surface as an error on every endpoint that
+// reads it, not as a list that quietly shows marked fixes as open.
+func TestEndpoints_ReportMissingFixMarks(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	db := seedDB(t)
+	if _, err := db.Exec(`DROP TABLE fix_marks`); err != nil {
+		t.Fatal(err)
+	}
+	ts := newTestServer(t, db)
+
+	for _, path := range []string{"/api/overview?since=all", "/api/sessions/cards?since=all", "/api/fixes?since=all"} {
+		resp, err := http.Get(ts.URL + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusInternalServerError {
+			t.Errorf("GET %s: status %d, want 500", path, resp.StatusCode)
+		}
+	}
+}

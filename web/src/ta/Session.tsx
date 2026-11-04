@@ -260,6 +260,8 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
   const cachePct = (r.tokens.cache_read / total) * 100;
   const freshPct = (r.tokens.fresh_input / total) * 100;
   const outPct = (r.tokens.output / total) * 100;
+  const byArea = r.by_area_usd ?? {};
+  const avoidableAreas = AREA_ORDER.filter((a) => (byArea[a] ?? 0) > 0);
   return (
     <article className="receipt" aria-label="Session receipt">
       <div className="rc-head">
@@ -289,13 +291,13 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
           <span className="mono">{money(p.cost_usd)}</span>
         </button>
       ))}
-      {AREA_ORDER.some((a) => ((r.by_area_usd ?? {})[a] ?? 0) > 0) && (
+      {avoidableAreas.length > 0 && (
         <>
           <div className="rsec">AVOIDABLE, BY PROBLEM</div>
-          {AREA_ORDER.filter((a) => ((r.by_area_usd ?? {})[a] ?? 0) > 0).map((a) => (
+          {avoidableAreas.map((a) => (
             <div className="rl" key={a}>
               <span className="lead-item"><span className="pip full" />{AREA_LABEL[a]}</span>
-              <span className="mono">{money((r.by_area_usd ?? {})[a] ?? 0)}</span>
+              <span className="mono">{money(byArea[a])}</span>
             </div>
           ))}
         </>

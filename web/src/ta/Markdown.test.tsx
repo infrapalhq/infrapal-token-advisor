@@ -16,6 +16,12 @@ describe("Markdown", () => {
     expect(container.textContent).not.toContain("**");
   });
 
+  it("renders a heading as bold text and then carries on", () => {
+    const { container } = render(<Markdown text={"## Plan\ntext after"} />);
+    expect(container.querySelector(".md-h strong")?.textContent).toBe("Plan");
+    expect(screen.getByText("text after")).toBeTruthy();
+  });
+
   it("keeps line breaks inside a paragraph and renders fenced code as written", () => {
     const { container } = render(<Markdown text={"one\ntwo\n\n```sh\nls -la\n  cd x\n```"} />);
     expect(container.querySelectorAll("p br")).toHaveLength(1);
