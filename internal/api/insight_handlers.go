@@ -103,6 +103,19 @@ func (s *Server) handleSessionCards(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	marks, err := loadMarks(r.Context(), s.db)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	items := aggregateItems(occ, d.blendedRate)
+	applyMarks(items, marks)
+	installWide := 0
+	for _, it := range items {
+		if !it.Marked && it.Sessions == 0 {
+			installWide++
+		}
+	}
 	var attn, fresh int
 	for _, c := range cards {
 		if c.Priority != "fine" {
@@ -118,6 +131,9 @@ func (s *Server) handleSessionCards(w http.ResponseWriter, r *http.Request) {
 		"count_all":       len(cards),
 		"count_attention": attn,
 		"count_new":       fresh,
+		// count_install_wide is open findings tied to no session, such as an
+		// unused MCP server. No session card lists them.
+		"count_install_wide": installWide,
 	})
 }
 
@@ -211,10 +227,12 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 
 	fixFirst := []*insightItem{}
 	var recoveredUSD, recoveredMin float64
+	openFixes := 0
 	for _, it := range open {
 		if it.Fix == "" {
 			continue
 		}
+		openFixes++
 		if len(fixFirst) < 3 {
 			fixFirst = append(fixFirst, it)
 			if it.USD != nil {
@@ -274,6 +292,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		"avoidable_usd":  avoidable,
 		"recovered":      map[string]any{"usd": recoveredUSD, "minutes": recoveredMin},
 		"fix_first":      fixFirst,
+		"open_fixes":     openFixes,
 		"areas":          areas,
 		"by_day":         days,
 		"by_project":     projects,
@@ -307,6 +326,8 @@ type areaSummary struct {
 	USD      float64 `json:"usd"`
 	Severity string  `json:"severity"`
 	Sessions int     `json:"sessions"`
+	// InstallWide is how many of Items belong to no session.
+	InstallWide int `json:"install_wide"`
 }
 
 // areaSummaries rolls open items up by area, with the worst severity and the
@@ -322,6 +343,9 @@ func areaSummaries(open []*insightItem, occ []occurrence) []areaSummary {
 				continue
 			}
 			a.Items++
+			if it.Sessions == 0 {
+				a.InstallWide++
+			}
 			if it.USD != nil {
 				a.USD += *it.USD
 			}

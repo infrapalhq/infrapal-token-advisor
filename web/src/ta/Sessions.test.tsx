@@ -114,4 +114,36 @@ describe("Sessions", () => {
     renderAt("/sessions");
     expect(await screen.findByRole("heading", { name: "Waiting for your first session." })).toBeTruthy();
   });
+
+  it("explains install-wide findings no session lists", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 6 } });
+    renderAt("/sessions");
+    expect(await screen.findByText(/6 open findings apply to your whole install/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "See fixes →" }).getAttribute("href")).toBe("/fixes");
+  });
+
+  it("starts filtered by the problem named in the address, and counts what matches", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": list() });
+    renderAt("/sessions?area=perm");
+    expect(await screen.findByText("1 of 4 sessions in the last 7 days · 2 need attention · 1 new since your last visit")).toBeTruthy();
+    expect(titles()).toEqual(["Speed up tests"]);
+  });
+
+  it("says 'finding' and 'it' for a single install-wide finding", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 1 } });
+    renderAt("/sessions");
+    expect(await screen.findByText(/1 open finding applies to your whole install, not one session .* so no session below lists it\./)).toBeTruthy();
+  });
+
+  it("suggests a longer range when a problem filter matches nothing and nothing is install-wide", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": list() });
+    renderAt("/sessions?area=model");
+    expect(await screen.findByText("Try a longer time range, or clear your filters.")).toBeTruthy();
+  });
+
+  it("explains an empty problem filter when the findings are install-wide", async () => {
+    fakeAPI({ ...base(), "/api/sessions/cards": { ...list(), count_install_wide: 6 } });
+    renderAt("/sessions?area=model");
+    expect(await screen.findByText(/No session has this problem\. Install-wide findings aren't tied to a session/)).toBeTruthy();
+  });
 });

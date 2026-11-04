@@ -172,6 +172,11 @@ func buildCards(ctx context.Context, db *sql.DB, d *insightData, occ []occurrenc
 	out := make([]sessionCard, 0, len(d.sessions))
 	for sid, s := range d.sessions {
 		a := get(sid)
+		// A session with no model calls and no tool calls (a bare "/mcp", or one
+		// that was opened and closed) has nothing to show or fix.
+		if a.tokens == 0 && a.tools == 0 {
+			continue
+		}
 		c := sessionCard{
 			Areas:     []areaPip{},
 			Symptoms:  []string{},

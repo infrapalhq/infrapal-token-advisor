@@ -140,7 +140,8 @@ describe("Session", () => {
   it("shows why it couldn't load", async () => {
     fakeAPI({ ...routes(), "/api/sessions/s1/timeline": new HTTPError(404, "session not found") });
     renderAt("/sessions/s1");
-    expect(await screen.findByText("Could not load: session not found")).toBeTruthy();
+    expect(await screen.findByText("Session not found")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "← Back to Sessions" }).getAttribute("href")).toBe("/sessions");
   });
 
   it("switches theme from its own sidebar", async () => {
@@ -148,5 +149,47 @@ describe("Session", () => {
     renderAt("/sessions/s1");
     await userEvent.click(await screen.findByRole("button", { name: "Switch to light mode" }));
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+  });
+
+  it("opens a session with nothing in it instead of going blank", async () => {
+    // The API once sent null for these lists, and the page crashed on them.
+    const empty = timeline({ rows: null as never, receipt: { ...timeline().receipt, prompts: null as never, by_area_usd: null as never } });
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": empty });
+    renderAt("/sessions/s1");
+    expect(await screen.findByRole("heading", { name: "Fix the login bug" })).toBeTruthy();
+    expect(screen.getByText(/Nothing was recorded in this session/)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Receipt" }));
+    expect(screen.getByText("SESSION RECEIPT")).toBeTruthy();
+  });
+
+  it("renders the assistant's markdown", async () => {
+    const t = timeline();
+    t.rows = [...t.rows, { id: "c2", kind: "claude", ts: 99, text: "**Done**\n- one\n- two" }];
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": t });
+    renderAt("/sessions/s1");
+    expect(await screen.findByText("Done", { selector: "strong" })).toBeTruthy();
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+  });
+
+  it("shows the error for any other failure", async () => {
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": new HTTPError(500, "database is locked") });
+    renderAt("/sessions/s1");
+    expect(await screen.findByText("Could not load this session")).toBeTruthy();
+    expect(screen.getByText("database is locked")).toBeTruthy();
+  });
+
+  it("names an empty session that is not in the list", async () => {
+    const empty = timeline({ rows: [] });
+    fakeAPI({ ...routes(), "/api/sessions/cards": cards([]), "/api/sessions/s1/timeline": empty });
+    renderAt("/sessions/s1");
+    expect(await screen.findByRole("heading", { name: "Session with no activity" })).toBeTruthy();
+  });
+
+  it("lists the avoidable spend by problem, and leaves the section out when there is none", async () => {
+    fakeAPI(routes());
+    renderAt("/sessions/s1");
+    await userEvent.click(await screen.findByRole("button", { name: "Receipt" }));
+    expect(screen.getByText("AVOIDABLE, BY PROBLEM")).toBeTruthy();
+    expect(screen.getByText("$0.75", { selector: ".rl .mono" })).toBeTruthy();
   });
 });

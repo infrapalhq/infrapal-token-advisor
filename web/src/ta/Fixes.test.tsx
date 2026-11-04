@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { HTTPError, fakeAPI } from "../test/api";
-import { T0, aiConfig, base, fixes, mcpSetup, progress, status } from "../test/fixtures";
+import { T0, aiConfig, base, fixes, item, progress, status } from "../test/fixtures";
 import { renderAt } from "../test/render";
 import type { AiResult } from "./api";
 
@@ -20,7 +20,6 @@ const routes = () => ({
   ...base(),
   "/api/fixes": fixes(),
   "/api/progress": progress(),
-  "/api/mcp/setup": mcpSetup(),
   "/api/ai/recommendations": {},
 });
 
@@ -40,6 +39,22 @@ describe("Fixes", () => {
     expect(screen.getByText("Measured", { selector: ".ok" })).toBeTruthy();
     expect(screen.getByText("Long sessions re-send old context.")).toBeTruthy();
     expect(screen.getByText("1 item fixed by how you work, not by a setting")).toBeTruthy();
+  });
+
+  it("labels a finding with no session as install-wide, and says so under session health", async () => {
+    fakeAPI({ ...routes(), "/api/fixes": fixes({ to_fix: [item({ sessions: 0, usd: undefined, title: "srv connected but never used" })] }) });
+    renderAt("/fixes");
+    expect(await screen.findByText("install-wide · Measured")).toBeTruthy();
+    expect(screen.getByText(/1 install-wide fix below isn't included/)).toBeTruthy();
+  });
+
+  it("counts several install-wide fixes, and shows minutes for one with no dollar figure", async () => {
+    const a = item({ key: "dead_mcp|a", sessions: 0, usd: undefined, minutes: 3.4, title: "a connected but never used" });
+    const b = item({ key: "dead_mcp|b", sessions: 0, usd: undefined, title: "b connected but never used" });
+    fakeAPI({ ...routes(), "/api/fixes": fixes({ to_fix: [a, b] }) });
+    renderAt("/fixes");
+    expect(await screen.findByText(/2 install-wide fixes below aren't included/)).toBeTruthy();
+    expect(screen.getByText("3 min · install-wide · Measured")).toBeTruthy();
   });
 
   it("copies a fix, marks it fixed and moves one back", async () => {
@@ -90,47 +105,12 @@ describe("Fixes", () => {
   });
 });
 
-describe("MCP setup", () => {
-  it("shows how to turn it on, and checks again", async () => {
-    let enabled = false;
-    fakeAPI({ ...routes(), "/api/mcp/setup": () => mcpSetup({ enabled }) });
-    renderAt("/fixes");
-    const mcp = within(await screen.findByRole("region", { name: "Enable MCP" }));
-    expect(mcp.getByText("Enable MCP to ask Claude Code about this data")).toBeTruthy();
-    expect(mcp.getByText("claude mcp add infrapal-token-advisor")).toBeTruthy();
-    expect(mcp.getByText("claude mcp list")).toBeTruthy();
-    enabled = true;
-    await userEvent.click(mcp.getByRole("button", { name: "Check again" }));
-    expect(await mcp.findByText("MCP is enabled")).toBeTruthy();
-    expect(mcp.getByText("claude mcp remove infrapal-token-advisor")).toBeTruthy();
-    expect(mcp.queryByText("claude mcp list")).toBeNull();
-  });
-
-  it("copies a command", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
-    fakeAPI(routes());
-    renderAt("/fixes");
-    const mcp = within(await screen.findByRole("region", { name: "Enable MCP" }));
-    await userEvent.click(mcp.getAllByRole("button", { name: "Copy" })[0]);
-    expect(writeText).toHaveBeenCalledWith("claude mcp add infrapal-token-advisor");
-    expect(mcp.getByRole("button", { name: "Copied" })).toBeTruthy();
-  });
-
-  it("says why setup couldn't load", async () => {
-    fakeAPI({ ...routes(), "/api/mcp/setup": new HTTPError(500, "no binary path") });
-    renderAt("/fixes");
-    expect(await screen.findByText("Could not load MCP setup: no binary path")).toBeTruthy();
-  });
-});
-
 describe("AI recommendations", () => {
-  it("points to Settings when there's no key", async () => {
+  it("is not shown until a key is added in Settings", async () => {
     fakeAPI(routes());
     renderAt("/fixes");
-    const ai = within(await screen.findByRole("region", { name: "AI recommendations" }));
-    expect(ai.getByText("Off")).toBeTruthy();
-    expect(ai.getByRole("link", { name: "Add a key in Settings" }).getAttribute("href")).toBe("/settings");
+    await screen.findByRole("heading", { name: /Avoidable spend/ });
+    expect(screen.queryByRole("region", { name: "AI recommendations" })).toBeNull();
   });
 
   it("shows saved results, and generates again on request", async () => {

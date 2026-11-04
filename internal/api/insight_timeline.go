@@ -117,7 +117,7 @@ func buildTimeline(ctx context.Context, db *sql.DB, d *insightData, occ []occurr
 		return nil
 	}
 
-	var rows []timelineRow
+	rows := []timelineRow{} // never nil: an empty session must encode as [], not null
 	promptCost := map[string]float64{}
 	for _, r := range reqs {
 		promptCost[r.PromptID] += r.CostUSD
@@ -299,7 +299,7 @@ func buildReceipt(d *insightData, occ []occurrence, sid string) map[string]any {
 			well = 0
 		}
 	}
-	var prompts []map[string]any
+	prompts := []map[string]any{} // never nil: the page maps over it
 	for _, p := range d.prompts {
 		if p.SessionID != sid {
 			continue

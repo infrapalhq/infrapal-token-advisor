@@ -1,18 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { PERIODS, useRange } from "./range";
 import { useAgents } from "./agentContext";
-import { api, type Range, type SessionCard, type SessionCards } from "./api";
+import { api, type SessionCard, type SessionCards } from "./api";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
+import { useRefresh } from "./refresh";
 import { AREA_LABEL, SYMPTOM_LABEL, dayShort, durationS, money, pipClass, tokensHuman, waitMs } from "./format";
 
-const TIMES: { value: Range; label: string }[] = [
-  { value: "today", label: "Today" },
-  { value: "7d", label: "7 days" },
-  { value: "30d", label: "30 days" },
-  { value: "3m", label: "3 months" },
-];
 const VIEWS = [
   { value: "all", label: "All" },
   { value: "attn", label: "Needs attention" },
@@ -37,8 +33,8 @@ type Sort = (typeof SORTS)[number]["value"];
 type View = (typeof VIEWS)[number]["value"];
 
 export default function Sessions() {
-  const [params, setParams] = useSearchParams();
-  const range = (params.get("range") as Range) || "7d";
+  const [params] = useSearchParams();
+  const [range, setRange] = useRange();
   // loaded remembers what its data was loaded for, so a change of range or
   // agent shows "Loading…" until the new data arrives.
   const [loaded, setLoaded] = useState<{ key: string; data: SessionCards } | null>(null);
@@ -47,16 +43,24 @@ export default function Sessions() {
   const [sort, setSort] = useState<Sort>("priority");
   const [group, setGroup] = useState<"project" | "none">("project");
   const [query, setQuery] = useState("");
-  const [areaFilter, setAreaFilter] = useState<string[]>([]);
+  // ?area= comes from the Overview's problem cards.
+  const [areaFilter, setAreaFilter] = useState<string[]>(() => {
+    const a = params.get("area");
+    return a && a in AREA_LABEL ? [a] : [];
+  });
   const [symFilter, setSymFilter] = useState<string[]>([]);
   const [popOpen, setPopOpen] = useState(false);
   const firstRun = useFirstRun();
   const { selected: agent } = useAgents();
 
   const key = `${range}|${agent}|${firstRun}`;
+  const tick = useRefresh();
   useEffect(() => {
-    api.sessionCards(range, agent).then((d) => setLoaded({ key, data: d })).catch((e: Error) => setError(e.message));
-  }, [range, agent, key]);
+    api.sessionCards(range, agent).then((d) => {
+      setLoaded({ key, data: d });
+      setError(null);
+    }).catch((e: Error) => setError(e.message));
+  }, [range, agent, key, tick]);
   const data = loaded?.key === key ? loaded.data : null;
 
   const visible = useMemo(() => {
@@ -85,7 +89,9 @@ export default function Sessions() {
   }, [visible, group]);
 
   const activeFilters = areaFilter.length + symFilter.length;
-  const setTime = (value: Range) => setParams({ range: value });
+  const setTime = setRange;
+  const filtered = activeFilters > 0 || query.trim() !== "" || view !== "all";
+  const installWide = data?.count_install_wide ?? 0;
 
   if (firstRun) return <Shell><FirstRun /></Shell>;
 
@@ -96,7 +102,7 @@ export default function Sessions() {
           <h1 className="title">Sessions</h1>
           <p className="sub">
             {data
-              ? `${data.count_all} sessions ${TIME_LABEL[range] ?? ""} · ${data.count_attention} need attention · ${data.count_new} new since your last visit`
+              ? `${filtered ? `${visible.length} of ${data.count_all}` : data.count_all} sessions ${TIME_LABEL[range]} · ${data.count_attention} need attention · ${data.count_new} new since your last visit`
               : "Loading…"}
           </p>
         </div>
@@ -109,9 +115,9 @@ export default function Sessions() {
       <div className="toolbar">
         <div className="toolbar-l">
           <div className="seg-group" role="group" aria-label="Time range">
-            {TIMES.map((t) => (
+            {PERIODS.map((t) => (
               <button key={t.value} className={`seg${range === t.value ? " on" : ""}`} type="button" aria-pressed={range === t.value} onClick={() => setTime(t.value)}>
-                {t.label}
+                {t.short}
               </button>
             ))}
           </div>
@@ -176,6 +182,12 @@ export default function Sessions() {
       {error && <p className="hint-line">Could not load: {error}</p>}
       {!data && !error && <p className="hint-line">Loading…</p>}
 
+      {data && installWide > 0 && (
+        <p className="hint-line install-note">
+          {installWide} open {installWide === 1 ? "finding applies" : "findings apply"} to your whole install, not one session (for example an unused MCP server), so no session below lists {installWide === 1 ? "it" : "them"}. <Link to="/fixes">See fixes →</Link>
+        </p>
+      )}
+
       {data && (
         <div id="results">
           {activeFilters > 0 && (
@@ -197,7 +209,11 @@ export default function Sessions() {
           {visible.length === 0 ? (
             <div className="empty">
               <strong>No sessions match</strong>
-              <span>Try a longer time range, or clear your filters.</span>
+              <span>
+                {areaFilter.length > 0 && installWide > 0
+                  ? "No session has this problem. Install-wide findings aren't tied to a session; they're listed under Fixes."
+                  : "Try a longer time range, or clear your filters."}
+              </span>
               <button className="btn" type="button" onClick={() => { setAreaFilter([]); setSymFilter([]); setView("all"); setQuery(""); }}>Clear filters</button>
             </div>
           ) : (
