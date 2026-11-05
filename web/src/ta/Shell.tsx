@@ -51,7 +51,7 @@ function readOpen(): boolean {
 
 export function Sidebar({ fixesToDo, sessionCount, currentSessionId }: { fixesToDo?: number; sessionCount?: number; currentSessionId?: string }) {
   const status = useStatus();
-  const [aiOn, setAiOn] = useState(false);
+  const [mcpOn, setMcpOn] = useState(false);
   const [range, setRange] = useRange();
   const [sort, setSortState] = useState<SideSort>(readSort);
   const [open, setOpenState] = useState(readOpen);
@@ -60,7 +60,7 @@ export function Sidebar({ fixesToDo, sessionCount, currentSessionId }: { fixesTo
   const tick = useRefresh();
 
   useEffect(() => {
-    api.aiConfig().then((c) => setAiOn(c.configured)).catch(() => setAiOn(false));
+    api.mcpSetup().then((s) => setMcpOn(s.enabled)).catch(() => setMcpOn(false));
   }, []);
   useEffect(() => {
     api.sessionCards(range, agent).then((d) => setCards(d.sessions)).catch(() => setCards([]));
@@ -135,7 +135,7 @@ export function Sidebar({ fixesToDo, sessionCount, currentSessionId }: { fixesTo
         </div>
         <div className="foot-meta">
           <span>Prompt text: {status?.prompts_logged_7d ? "logged" : "not logged"}</span>
-          <NavLink to="/settings">{aiOn ? "AI insights · On" : "AI insights · Off — add key"}</NavLink>
+          <NavLink to="/settings">{mcpOn ? "Ask Claude · On" : "Ask Claude · Off — set up"}</NavLink>
         </div>
       </div>
     </aside>

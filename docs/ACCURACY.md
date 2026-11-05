@@ -13,8 +13,8 @@ Every issue and fix in the dashboard carries a label:
 | **Likely** | A rule applied to measured data, which can be wrong in some cases | A file re-read that wasn't needed |
 | **Estimated** | A derived figure, shown with `≈` | Tokens for a tool result, the dollar value of waste |
 
-No figure comes from an AI model. AI Mode only adds recommendations, and it
-checks them against your real figures, dropping any that cite something else.
+No figure on the dashboard comes from an AI model. If you ask Claude about your
+data through the MCP server, its answer is Claude's reading of these same figures.
 
 ## What's exact
 

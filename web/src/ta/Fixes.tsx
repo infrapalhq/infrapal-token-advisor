@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAgents } from "./agentContext";
 import { SkippedChecks } from "./agents";
-import { api, type AiConfig, type AiResult, type Fixes as FixesData, type Item, type Progress } from "./api";
+import { api, type Fixes as FixesData, type Item, type McpSetup, type Progress } from "./api";
+import { slashCommands } from "./mcp";
+import { CopyBlock } from "./McpSetup";
 import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
@@ -10,69 +12,37 @@ import { AREA_LABEL, AREA_NAME, dayShort, money, sessionsLabel, shortPath, token
 import { IconCheck, IconCopy, IconMinus, IconPlus, IconX } from "./icons";
 import { useRefresh } from "./refresh";
 
-const AI_RANGE = "30d";
 const MARK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-// AiInsights is the only control that sends anything to a model provider. Loading the
-// page reads saved results and never makes a call.
-function AiInsights() {
-  const [ai, setAi] = useState<AiConfig | null>(null);
-  const [aiLoaded, setAiLoaded] = useState(false);
-  const [result, setResult] = useState<AiResult | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
+// AskClaude points to the MCP server's slash commands, which have Claude
+// look further than the rules here, using the user's own Claude Code plan.
+function AskClaude() {
+  const [setup, setSetup] = useState<McpSetup | null>(null);
   useEffect(() => {
-    api.aiConfig().then(setAi).catch(() => {}).finally(() => setAiLoaded(true));
-    api.aiRecommendations(AI_RANGE).then(setResult).catch(() => {});
+    api.mcpSetup().then(setSetup).catch(() => {});
   }, []);
-
-  const generate = async (force: boolean) => {
-    setGenerating(true);
-    setError(null);
-    try {
-      setResult(await api.generateAI(AI_RANGE, force));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  if (!aiLoaded) return null;
-  const configured = ai?.configured ?? false;
-  // Without a key the card has nothing to offer; the key is added in Settings.
-  if (!configured) return null;
-  const hasRun = Boolean(result?.batch_id);
-  const recs = result?.recommendations ?? [];
-  const dropped = result?.dropped_count ?? 0;
-
+  if (!setup) return null;
   return (
-    <section className="card ai" aria-label="AI recommendations">
+    <section className="rail-card ask-claude" aria-label="Ask Claude">
       <div className="card-top">
-        <strong>AI recommendations</strong>
-        <span className="ok">Key added</span>
+        <p className="eb">Ask {setup.agent_name} for more</p>
+        <span className={`ok${setup.enabled ? "" : " dashed"}`}>{setup.enabled ? "On" : "Off"}</span>
       </div>
-      <span className="body-copy">
-        Optional. Generate sends the last 30 days of aggregated figures and labels to {ai?.provider_name ?? "your model provider"} with your key, never your prompts, responses, file paths or commands.
-      </span>
-      {recs.map((r, i) => (
-        <article className="ai-rec" key={i}>
-          <strong><span className={`pip ${r.severity === "warn" ? "full" : "half"}`} />{r.title}</strong>
-          <span className="body-copy">{r.detail}</span>
-          {r.evidence.length > 0 && (
-            <span className="sub">{r.evidence.map((e) => `${e.label}: ${e.value}`).join(" · ")}</span>
-          )}
-        </article>
-      ))}
-      {hasRun && recs.length === 0 && <span className="note">Nothing to recommend yet. Try again after a few more sessions.</span>}
-      {dropped > 0 && <span className="note">Left out {dropped} {dropped === 1 ? "recommendation" : "recommendations"} that didn't match your data.</span>}
-      {error && <span className="note" role="alert">Could not generate: {error}</span>}
-      <div className="acts">
-        <button className="btn btn-k" type="button" disabled={generating} onClick={() => generate(hasRun)}>
-          {generating ? "Generating…" : hasRun ? "Generate again" : "Generate"}
-        </button>
-      </div>
-      {hasRun && <span className="note" role="status">Last generated {dayShort(result?.generated_at ?? 0)}</span>}
+      {setup.enabled ? (
+        <>
+          <span className="rc-note">Run one of these in a new {setup.agent_name} session to look further than the rules here.</span>
+          {slashCommands(setup.server_name).map((c) => (
+            <div className="mcp-step" key={c.command}>
+              <b>{c.what}</b>
+              <CopyBlock text={c.command} />
+            </div>
+          ))}
+        </>
+      ) : (
+        <span className="rc-note">
+          Connect Token Advisor to {setup.agent_name} in <Link to="/settings">Settings</Link> to ask about this data and get more suggestions. There's no API key to add.
+        </span>
+      )}
     </section>
   );
 }
@@ -311,7 +281,7 @@ export default function Fixes() {
                 <span className="rc-note">{saved > 0.005 ? "less avoidable spend a week than your first week" : "each is measured for 7 days after you mark it"}</span>
                 <Link to="/fixes/progress">Full progress report →</Link>
               </section>
-              <AiInsights />
+              <AskClaude />
               {habitGroups.length > 0 && (
                 <section className="rail-card habits-card">
                   <p className="eb">Habits · no config needed</p>

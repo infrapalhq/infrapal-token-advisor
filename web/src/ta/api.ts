@@ -149,29 +149,6 @@ export type Progress = {
 
 export type Status = { collector_live: boolean; prompts_logged_7d: boolean; last_event_ms?: number };
 
-export type AiRecommendation = {
-  category: string;
-  severity: "info" | "warn";
-  title: string;
-  detail: string;
-  evidence: { label: string; value: string }[];
-};
-
-export type AiResult = {
-  batch_id: string;
-  generated_at: number;
-  recommendations: AiRecommendation[];
-  dropped_count: number;
-};
-
-export type AiConfig = {
-  configured: boolean;
-  provider: string;
-  provider_name: string;
-  key_hint: string;
-  providers: { id: string; name: string }[];
-};
-
 export type AgentInfo = { id: string; name: string; sessions: number; cost_known: boolean; skipped: string[] };
 
 export type McpSetup = { server_name: string; agent_name: string; enabled: boolean; command: string; verify: string; remove: string };
@@ -212,9 +189,4 @@ export const api = {
   status: () => get<Status>(`/api/status`),
   mcpSetup: () => get<McpSetup>(`/api/mcp/setup`),
   visit: () => send<{ last_visit_at: number; previous_visit_at: number }>("POST", `/api/ui/visit`),
-  aiConfig: () => get<AiConfig>(`/api/ai/config`),
-  aiRecommendations: (since: string) => get<AiResult>(`/api/ai/recommendations?since=${since}`),
-  generateAI: (since: string, force: boolean) => send<AiResult>("POST", `/api/ai/recommendations`, { since, force }),
-  saveAIKey: (key: string) => send<AiConfig>("PUT", `/api/ai/config`, { api_key: key }),
-  chooseAIProvider: (provider: string) => send<AiConfig>("PUT", `/api/ai/config`, { provider }),
 };

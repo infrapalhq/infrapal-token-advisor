@@ -2,30 +2,30 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { HTTPError, fakeAPI } from "../test/api";
-import { aiConfig, base, card, cards, overview, status, timeline } from "../test/fixtures";
+import { base, card, cards, mcpSetup, overview, status, timeline } from "../test/fixtures";
 import { renderAt } from "../test/render";
 
 describe("sidebar", () => {
-  it("says the collector is live, prompts are logged and AI is on", async () => {
-    fakeAPI({ ...base(), "/api/ai/config": aiConfig({ configured: true }) });
+  it("says the collector is live, prompts are logged and Claude is connected", async () => {
+    fakeAPI({ ...base(), "/api/mcp/setup": mcpSetup({ enabled: true }) });
     renderAt("/settings");
     expect(await screen.findByText("Local only · collector live")).toBeTruthy();
     expect(screen.getByText("Prompt text: logged")).toBeTruthy();
-    expect(await screen.findByText("AI insights · On")).toBeTruthy();
+    expect(await screen.findByText("Ask Claude · On")).toBeTruthy();
   });
 
-  it("says when the collector is idle, prompts aren't logged and AI is off", async () => {
-    fakeAPI({ ...base(), "/api/status": status({ collector_live: false, prompts_logged_7d: false }), "/api/ai/config": new HTTPError(500, "x") });
+  it("says when the collector is idle, prompts aren't logged and Claude isn't connected", async () => {
+    fakeAPI({ ...base(), "/api/status": status({ collector_live: false, prompts_logged_7d: false }), "/api/mcp/setup": new HTTPError(500, "x") });
     renderAt("/settings");
     expect(await screen.findByText("Local only · collector idle")).toBeTruthy();
     expect(screen.getByText("Prompt text: not logged")).toBeTruthy();
-    expect(screen.getByText("AI insights · Off — add key")).toBeTruthy();
+    expect(screen.getByText("Ask Claude · Off — set up")).toBeTruthy();
   });
 
   it("is still checking when the status can't be read", async () => {
     fakeAPI({ ...base(), "/api/status": new HTTPError(500, "x") });
     renderAt("/settings");
-    await screen.findAllByText(/API key/);
+    await screen.findByRole("region", { name: "Enable MCP" });
     expect(screen.getByText("Checking collector…")).toBeTruthy();
   });
 

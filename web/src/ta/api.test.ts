@@ -24,18 +24,16 @@ describe("api", () => {
   });
 
   it("sends JSON bodies, and no body when there's nothing to send", async () => {
-    const calls = fakeAPI({ "PUT /api/ai/config": {}, "POST /api/ui/visit": {}, "POST /api/ai/recommendations": {} });
-    await api.saveAIKey("k");
-    await api.chooseAIProvider("openai");
+    const calls = fakeAPI({ "POST /api/fixes/k/state": {}, "POST /api/ui/visit": {} });
+    await api.setFixState("k", "reverted");
     await api.visit();
-    await api.generateAI("30d", true);
-    expect(calls.map((c) => c.body)).toEqual([{ api_key: "k" }, { provider: "openai" }, undefined, { since: "30d", force: true }]);
+    expect(calls.map((c) => c.body)).toEqual([{ state: "reverted" }, undefined]);
   });
 
   it("throws the API's error message", async () => {
-    fakeAPI({ "/api/status": new HTTPError(500, "database is locked"), "PUT /api/ai/config": new HTTPError(400, "key is too short") });
+    fakeAPI({ "/api/status": new HTTPError(500, "database is locked"), "POST /api/fixes/k/state": new HTTPError(400, "unknown state") });
     await expect(api.status()).rejects.toThrow("database is locked");
-    await expect(api.saveAIKey("x")).rejects.toThrow("key is too short");
+    await expect(api.setFixState("k", "fixed")).rejects.toThrow("unknown state");
   });
 
   it("falls back to the status code when the error isn't JSON", async () => {
