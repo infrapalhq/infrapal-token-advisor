@@ -29,7 +29,6 @@ func TestEndpoints_ReportDatabaseFailures(t *testing.T) {
 		{"POST", "/api/ui/visit"},
 		{"GET", "/api/progress?since=all"},
 		{"GET", "/api/status"},
-		{"GET", "/api/ai/recommendations?since=30d"},
 	} {
 		body := strings.NewReader(`{"state":"fixed"}`)
 		req, err := http.NewRequest(c.method, ts.URL+c.path, body)

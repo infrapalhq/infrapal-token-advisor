@@ -1,4 +1,4 @@
-import type { AgentInfo, AiConfig, Fixes, Item, McpSetup, Overview, Progress, SessionCard, SessionCards, Status, Timeline } from "../ta/api";
+import type { AgentInfo, Fixes, Item, McpSetup, Overview, Progress, SessionCard, SessionCards, Status, Timeline } from "../ta/api";
 
 // Sample API answers for the tests. Each builder takes overrides, so a test
 // states only what it's about.
@@ -9,15 +9,6 @@ export const T0 = Date.parse("2026-10-20T09:00:00Z");
 export const status = (o: Partial<Status> = {}): Status => ({ collector_live: true, prompts_logged_7d: true, last_event_ms: T0, ...o });
 
 export const agent = (o: Partial<AgentInfo> = {}): AgentInfo => ({ id: "claude-code", name: "Claude Code", sessions: 3, cost_known: true, skipped: [], ...o });
-
-export const aiConfig = (o: Partial<AiConfig> = {}): AiConfig => ({
-  configured: false,
-  provider: "anthropic",
-  provider_name: "Anthropic",
-  key_hint: "sk-ant-…",
-  providers: [{ id: "anthropic", name: "Anthropic" }],
-  ...o,
-});
 
 export const item = (o: Partial<Item> = {}): Item => ({
   key: "reread|src/a.ts",
@@ -154,6 +145,6 @@ export const timeline = (o: Partial<Timeline> = {}): Timeline => ({
 export const base = () => ({
   "/api/status": status(),
   "/api/agents": { agents: [agent()] },
-  "/api/ai/config": aiConfig(),
+  "/api/mcp/setup": mcpSetup(),
   "POST /api/ui/visit": { last_visit_at: T0, previous_visit_at: T0 - DAY },
 });

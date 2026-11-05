@@ -40,9 +40,6 @@ func seedPurgeRow(t *testing.T, db *sql.DB, sessionID string, tsMs int64) {
 			[]any{tsMs, sessionID}},
 		{`INSERT INTO compactions (session_id, ts) VALUES (?, ?)`,
 			[]any{sessionID, tsMs}},
-		{`INSERT INTO ai_recommendations (batch_id, generated_at, since_range, input_hash, model, category, severity, title, detail, evidence_json)
-			VALUES (?, ?, '', 'h', 'm', 'waste', 'info', 't', 'd', '[]')`,
-			[]any{sessionID, tsMs}},
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s.query, s.args...); err != nil {
@@ -66,7 +63,6 @@ var allPurgeableTables = []string{
 	"events_raw", "sessions", "interactions", "assistant_responses",
 	"api_requests", "tool_calls", "spans", "metric_points",
 	"ingest_errors", "mcp_server_connections", "compactions",
-	"ai_recommendations",
 }
 
 func TestRunPurge_RequiresExactlyOneFlag(t *testing.T) {
@@ -114,8 +110,8 @@ func TestRunPurge_BySession(t *testing.T) {
 
 	for _, table := range allPurgeableTables {
 		want := 1 // s2's row always survives
-		if table == "ingest_errors" || table == "ai_recommendations" {
-			// These have no session_id column, so --session never
+		if table == "ingest_errors" {
+			// It has no session_id column, so --session never
 			// touches it — both s1's and s2's rows survive.
 			want = 2
 		}

@@ -15,7 +15,7 @@ source of truth for every column.
 | Requests | `api_requests`, `tool_calls`, `spans`, `metric_points`, `mcp_server_connections` | API calls, tool use, traces, metrics and MCP connections |
 | Search | `interactions_fts`, `assistant_responses_fts` | Full-text indexes, kept in step by triggers |
 | Staging | `pending_interaction_spans`, `pending_blocked_on_user_spans` | Spans waiting for the row they belong to |
-| Dashboard | `fix_marks`, `ai_recommendations`, `ui_state` | Your decisions on findings, AI Mode output and UI state |
+| Dashboard | `fix_marks`, `ui_state` | Your decisions on findings, and UI state |
 | Internal | `ingest_errors`, `schema_migrations` | Failed writes and the applied migrations |
 
 `sessions.agent` records which coding agent a session came from, such as

@@ -34,7 +34,6 @@ var purgeTables = []purgeTable{
 	{name: "ingest_errors", tsColumn: "ts", hasSessionID: false},
 	{name: "mcp_server_connections", tsColumn: "ts", hasSessionID: true},
 	{name: "compactions", tsColumn: "ts", hasSessionID: true},
-	{name: "ai_recommendations", tsColumn: "generated_at"},
 }
 
 // purgeOnlyOnAllTables are staging tables with no ts/session_id column to

@@ -61,16 +61,15 @@ See context grow step by step, with each issue marked where it happened.<br><br>
 <td width="50%" valign="top">
 <b>Fixes</b><br>
 Paste a fix in, mark it done, and see week by week whether it helped.<br><br>
-<img src="docs/assets/fixes.png" alt="The Fixes page, showing avoidable spend over time and AI recommendations">
+<img src="docs/assets/fixes.png" alt="The Fixes page, showing avoidable spend over time and the fixes to make">
 </td>
 <td width="50%" valign="top">
 <b>Numbers you can check</b><br>
 Everything is labelled <b>Measured</b>, <b>Likely</b> or <b>Estimated</b>, and
 <a href="docs/ACCURACY.md">the rules are documented</a>.<br><br>
-<b>Optional AI Mode</b><br>
-Add your own Anthropic API key for extra recommendations. It's off by default,
-runs only when you press <b>Generate</b> on the Fixes page, and never sends prompt
-text.
+<b>Ask Claude</b><br>
+Connect it to Claude Code and run <code>/infrapal-token-advisor:review</code> for
+more suggestions. It uses your Claude Code plan, so there's no API key to add.
 </td>
 </tr>
 </table>
@@ -188,8 +187,18 @@ Fixes page shows the exact command for your install, or run:
 claude mcp add --scope user infrapal-token-advisor -- "$(command -v token-advisor)" mcp
 ```
 
-Three read-only tools: `get_schema`, `run_sql` (limited to `v_*` views) and
-`get_findings`.
+Then start a new Claude Code session and run one of its slash commands, or just
+ask about your usage in your own words:
+
+| Command | What Claude does |
+| --- | --- |
+| `/infrapal-token-advisor:review` | Finds where tokens went, and the five changes that would save the most. Add a range, such as `7d` |
+| `/infrapal-token-advisor:session <id>` | Explains why one session cost what it did |
+| `/infrapal-token-advisor:compare` | Compares the last 7 days with the 7 days before |
+
+Behind these are three read-only tools: `get_schema`, `run_sql` (limited to
+`v_*` views) and `get_findings`. Claude runs them on your Claude Code plan, so
+there's no separate API key.
 
 Once you enable it, what these tools return goes to Anthropic with your
 conversation. They return metrics and ids only. Prompts, responses, file paths,
@@ -199,8 +208,8 @@ commands, error text and user identity are withheld.
 
 - The collector and dashboard only listen on `127.0.0.1`, and the dashboard
   refuses requests from web pages.
-- Nothing leaves your machine unless you use AI Mode, enable the MCP server or
-  run `token-advisor update`. There's no usage telemetry, automatic update check or
+- Nothing leaves your machine unless you enable the MCP server or run
+  `token-advisor update`. There's no usage telemetry, automatic update check or
   crash reporting.
 - Data older than 6 months is deleted automatically. You can change that, and
   `token-advisor purge` deletes data on demand.
@@ -212,9 +221,9 @@ commands, error text and user identity are withheld.
 <details>
 <summary><b>Does it send my prompts anywhere?</b></summary>
 <br>
-No. Telemetry goes from Claude Code to a service on your own machine. AI Mode and
-the MCP server are the exceptions to staying local. Both are off by default and
-never send prompt or response text. <a href="SECURITY.md#what-leaves-your-machine">See exactly what's sent</a>.
+No. Telemetry goes from Claude Code to a service on your own machine. The MCP
+server is the one exception to staying local. It's off until you enable it, and
+never sends prompt or response text. <a href="SECURITY.md#what-leaves-your-machine">See exactly what's sent</a>.
 </details>
 
 <details>
