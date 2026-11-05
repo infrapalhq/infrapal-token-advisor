@@ -13,14 +13,14 @@ flowchart LR
     C --> D[(SQLite<br>internal/store)]
     D --> E[internal/api]
     E --> F[React dashboard<br>web/]
-    G[internal/ai] -. only on Generate .-> H[Model provider API]
-    E --> G
+    D -. read-only .-> G[internal/mcpserver]
+    G -- stdio --> A
 ```
 
 ## Principles
 
-- **Local by default.** Nothing leaves the machine unless someone presses
-  **Generate** in AI Mode or runs `token-advisor update`.
+- **Local by default.** Nothing leaves the machine unless someone connects the
+  MCP server to their agent or runs `token-advisor update`.
 - **Rules first.** Every figure comes from telemetry and fixed rules. A model
   never produces a number, and the dashboard is complete without one.
 - **Say how sure we are.** Every issue is labelled Measured, Likely or Estimated.
@@ -46,7 +46,7 @@ flowchart LR
 | `internal/store` | Opens SQLite and runs migrations. See [SCHEMA.md](SCHEMA.md). |
 | `internal/api` | HTTP API on `127.0.0.1:4319`, the detectors, and serving the dashboard |
 | `internal/webui` | Embeds the built dashboard, or a placeholder without one |
-| `internal/ai` | AI Mode: builds the aggregate-only context, calls the API, checks the answer |
+| `internal/mcpserver` | `token-advisor mcp`: read-only tools and slash commands for Claude Code, over stdio |
 | `internal/project` | Works out which project a session belongs to |
 | `internal/agent/claudecode` | The Claude Code adapter: patches `~/.claude/settings.json` and checks the setup |
 | `internal/agent/all` | The list of supported agents |
@@ -130,17 +130,21 @@ agent picker only appears with two or more agents.
 
 To add one, see [ADDING_A_DETECTOR.md](ADDING_A_DETECTOR.md).
 
-### AI Mode
+### MCP server
 
-`internal/ai` sends only aggregated figures and labels. It never sends prompts,
-responses, tool content, file paths or commands, and a test fails if a sensitive
-fixture string reaches the payload. Each recommendation must cite facts found in
-what was sent, or it's dropped. Results are cached in `ai_recommendations`, so
-the Fixes page loads them without calling a provider.
+`token-advisor mcp` lets Claude Code ask about the data, on the user's own Claude
+Code plan, so token-advisor never needs an API key. Claude Code starts it and
+talks to it over stdio. It opens the database read-only, and offers:
 
-`internal/ai/provider.go` lists the model services. To add one, write a `Requester`
-for its API and add an entry. Anthropic is the only one today, and its model id is
-one constant, `HaikuModel` in `internal/ai/client.go`.
+- **Tools** (`tools.go`): `get_schema`, `run_sql` and `get_findings`. `run_sql`
+  only reads `v_*` views without content columns (`guard.go`), and
+  `get_findings` leaves out file paths and commands. What they return goes to
+  Anthropic with the conversation, and a test fails if a sensitive fixture
+  string comes back.
+- **Prompts** (`prompts.go`): `review`, `session` and `compare`, which Claude
+  Code lists as `/infrapal-token-advisor:review` and so on. Each tells Claude
+  which tools to use and to back every claim with a number. The dashboard's
+  copy of the list is `web/src/ta/mcp.ts`.
 
 ## Security boundaries
 

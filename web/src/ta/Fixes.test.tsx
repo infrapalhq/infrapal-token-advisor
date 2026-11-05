@@ -2,25 +2,13 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { HTTPError, fakeAPI } from "../test/api";
-import { T0, aiConfig, base, fixes, item, progress, status } from "../test/fixtures";
+import { base, fixes, item, mcpSetup, progress, status } from "../test/fixtures";
 import { renderAt } from "../test/render";
-import type { AiResult } from "./api";
-
-const rec: AiResult = {
-  batch_id: "b1",
-  generated_at: T0,
-  dropped_count: 1,
-  recommendations: [
-    { category: "context", severity: "warn", title: "Split long sessions", detail: "They re-send old context.", evidence: [{ label: "sessions", value: "4" }] },
-    { category: "perm", severity: "info", title: "Allow git status", detail: "It's read-only.", evidence: [] },
-  ],
-};
 
 const routes = () => ({
   ...base(),
   "/api/fixes": fixes(),
   "/api/progress": progress(),
-  "/api/ai/recommendations": {},
 });
 
 describe("Fixes", () => {
@@ -211,36 +199,30 @@ describe("Progress report", () => {
   });
 });
 
-describe("AI recommendations", () => {
-  it("is not shown until a key is added in Settings", async () => {
+describe("Ask Claude", () => {
+  it("points to Settings until Claude Code is connected", async () => {
     fakeAPI(routes());
     renderAt("/fixes");
+    const card = within(await screen.findByRole("region", { name: "Ask Claude" }));
+    expect(card.getByText("Off")).toBeTruthy();
+    expect(card.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+    expect(card.queryByRole("button", { name: "Copy" })).toBeNull();
+  });
+
+  it("lists the slash commands once it's connected", async () => {
+    fakeAPI({ ...routes(), "/api/mcp/setup": mcpSetup({ enabled: true }) });
+    renderAt("/fixes");
+    const card = within(await screen.findByRole("region", { name: "Ask Claude" }));
+    expect(card.getByText("/infrapal-token-advisor:review")).toBeTruthy();
+    expect(card.getByText("/infrapal-token-advisor:session <session id>")).toBeTruthy();
+    expect(card.getByText("/infrapal-token-advisor:compare")).toBeTruthy();
+    expect(card.getAllByRole("button", { name: "Copy" })).toHaveLength(3);
+  });
+
+  it("is left out when the setup can't be read", async () => {
+    fakeAPI({ ...routes(), "/api/mcp/setup": new HTTPError(500, "x") });
+    renderAt("/fixes");
     await screen.findByText("Re-read src/a.ts 6 times");
-    expect(screen.queryByRole("region", { name: "AI recommendations" })).toBeNull();
-  });
-
-  it("shows saved results, and generates again on request", async () => {
-    const calls = fakeAPI({ ...routes(), "/api/ai/config": aiConfig({ configured: true }), "/api/ai/recommendations": rec, "POST /api/ai/recommendations": { ...rec, dropped_count: 0, recommendations: [] } });
-    renderAt("/fixes");
-    const ai = within(await screen.findByRole("region", { name: "AI recommendations" }));
-    expect(await ai.findByText("Split long sessions")).toBeTruthy();
-    expect(ai.getByText("sessions: 4")).toBeTruthy();
-    expect(ai.getByText("Left out 1 recommendation that didn't match your data.")).toBeTruthy();
-    expect(ai.getByText("Last generated Oct 20")).toBeTruthy();
-    // Opening the page only reads saved results.
-    expect(calls.some((c) => c.method === "POST")).toBe(false);
-    await userEvent.click(ai.getByRole("button", { name: "Generate again" }));
-    expect(await ai.findByText("Nothing to recommend yet. Try again after a few more sessions.")).toBeTruthy();
-    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ since: "30d", force: true });
-  });
-
-  it("generates for the first time, and shows a failure", async () => {
-    const calls = fakeAPI({ ...routes(), "/api/ai/config": aiConfig({ configured: true }), "POST /api/ai/recommendations": new HTTPError(502, "the provider timed out") });
-    renderAt("/fixes");
-    const ai = within(await screen.findByRole("region", { name: "AI recommendations" }));
-    await userEvent.click(await ai.findByRole("button", { name: "Generate" }));
-    expect(await ai.findByRole("alert")).toBeTruthy();
-    expect(ai.getByText("Could not generate: the provider timed out")).toBeTruthy();
-    expect(calls.find((c) => c.method === "POST")?.body).toEqual({ since: "30d", force: false });
+    expect(screen.queryByRole("region", { name: "Ask Claude" })).toBeNull();
   });
 });

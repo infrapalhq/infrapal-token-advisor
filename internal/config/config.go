@@ -33,16 +33,6 @@ type Config struct {
 	// know what to disconnect and restore.
 	Agents map[string]AgentState `json:"agents,omitempty"`
 
-	// AIProvider is the model service AI Mode uses, by ID. Empty means the
-	// default (see internal/ai).
-	AIProvider string `json:"ai_provider,omitempty"`
-
-	// AIKeys holds the user's own API keys by provider, pasted into the AI
-	// Mode settings panel. Used only in direct response to the "Generate"
-	// button (internal/ai, internal/api/ai.go) — infrapal-token-advisor's one deliberate
-	// network-egress exception; see ResolveAIKey.
-	AIKeys map[string]string `json:"ai_keys,omitempty"`
-
 	// RetentionMonths is how long captured data is kept before the collector
 	// deletes it. 0 keeps everything.
 	RetentionMonths int `json:"retention_months"`
@@ -57,16 +47,6 @@ type AgentState struct {
 	// BackupPath is the agent's settings from before init first changed them.
 	// Empty if init changed nothing that already existed.
 	BackupPath string `json:"backup_path,omitempty"`
-}
-
-// ResolveAIKey returns the key a provider should use: its environment variable
-// if set (never persisted back to config.json), else the key stored in cfg.
-// Empty means AI Mode is unconfigured.
-func ResolveAIKey(cfg Config, providerID, keyEnv string) string {
-	if v := os.Getenv(keyEnv); v != "" {
-		return v
-	}
-	return cfg.AIKeys[providerID]
 }
 
 // Default returns infrapal-token-advisor's out-of-the-box configuration.
@@ -91,12 +71,10 @@ func Load(p paths.Paths) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, err
 	}
-	// Installs from before multi-agent support kept one backup path and one
-	// API key. Carry them over, or uninstall would forget what to restore and
-	// AI Mode would lose its key.
+	// Installs from before multi-agent support kept one backup path. Carry it
+	// over, or uninstall would forget what to restore.
 	var old struct {
 		SettingsBackupPath string `json:"settings_backup_path"`
-		AnthropicAPIKey    string `json:"anthropic_api_key"`
 	}
 	if err := json.Unmarshal(data, &old); err != nil {
 		return Config{}, err
@@ -104,11 +82,24 @@ func Load(p paths.Paths) (Config, error) {
 	if cfg.Agents == nil && old.SettingsBackupPath != "" {
 		cfg.Agents = map[string]AgentState{"claude-code": {BackupPath: old.SettingsBackupPath}}
 	}
-	if cfg.AIKeys == nil && old.AnthropicAPIKey != "" {
-		cfg.AIKeys = map[string]string{"anthropic": old.AnthropicAPIKey}
+	// AI Mode, now removed, kept the user's API key here. Rewrite the file
+	// without it, so a key nothing uses isn't left on disk. If the rewrite
+	// fails, the next Save removes it instead.
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return Config{}, err
+	}
+	for _, key := range removedFields {
+		if _, ok := fields[key]; ok {
+			_ = Save(p, cfg)
+			break
+		}
 	}
 	return cfg, nil
 }
+
+// removedFields are config.json fields from removed features. Load drops them.
+var removedFields = []string{"ai_keys", "ai_provider", "anthropic_api_key"}
 
 // Save writes cfg to config.json inside the infrapal-token-advisor base directory.
 func Save(p paths.Paths, cfg Config) error {
@@ -122,9 +113,8 @@ func Save(p paths.Paths, cfg Config) error {
 	if err := os.WriteFile(p.ConfigPath, data, paths.FileMode); err != nil {
 		return err
 	}
-	// config.json can now hold a secret (AIKeys). WriteFile only
-	// applies FileMode when creating the file, so explicitly chmod to
-	// tighten a pre-existing looser-mode file too — mirrors store.Open's
-	// belt-and-suspenders chmod on token-advisor.db.
+	// WriteFile only applies FileMode when creating the file, so explicitly
+	// chmod to tighten a pre-existing looser-mode file too — mirrors
+	// store.Open's belt-and-suspenders chmod on token-advisor.db.
 	return os.Chmod(p.ConfigPath, paths.FileMode)
 }

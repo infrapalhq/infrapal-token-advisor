@@ -50,7 +50,7 @@ To add support for another coding agent, see
 | `internal/ingest` | Turns OTLP logs, metrics and spans into rows |
 | `internal/store` | SQLite store and numbered migrations (`migrations/NNNN_*.sql`) |
 | `internal/api` | Dashboard API, insight checks and fix suggestions |
-| `internal/ai` | Optional AI Mode (Anthropic API) |
+| `internal/mcpserver` | MCP server: read-only tools and slash commands for Claude Code |
 | `internal/service` | launchd / systemd service install |
 | `web/` | React dashboard (see [web/README.md](web/README.md)) |
 | `internal/webui/dist` | Built dashboard, embedded into the binary (git-ignored) |

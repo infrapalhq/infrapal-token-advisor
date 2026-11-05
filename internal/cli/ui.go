@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/infrapalhq/infrapal-token-advisor/internal/ai"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/api"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/webui"
@@ -41,10 +40,6 @@ func runUI(args []string) error {
 	if *port == 0 && dashboardRunning(cfg.APIPort) {
 		url := fmt.Sprintf("http://127.0.0.1:%d", cfg.APIPort)
 		fmt.Printf("token-advisor dashboard: %s\n", url)
-		provider := ai.FindProvider(cfg.AIProvider)
-		if os.Getenv(provider.KeyEnv) != "" && cfg.AIKeys[provider.ID] == "" {
-			fmt.Printf("note: the background service can't see %s from this shell — save the key in Settings to use AI Mode\n", provider.KeyEnv)
-		}
 		if !*noBrowser {
 			if err := openBrowser(url); err != nil {
 				fmt.Fprintf(os.Stderr, "token-advisor: couldn't open a browser automatically (%v) — open %s yourself\n", err, url)
