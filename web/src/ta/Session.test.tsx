@@ -258,6 +258,34 @@ describe("Session", () => {
     expect(thread.getByText("Likely")).toBeTruthy();
   });
 
+  it("names the agent on a turn that starts with tool calls", async () => {
+    fakeAPI(routes());
+    renderAt("/sessions/s1");
+    const thread = within(await screen.findByRole("region", { name: "Session thread" }));
+    // Prompt 1 opens with Read, and its text reply comes later.
+    const read = (await thread.findByText("Read")).closest(".trow") as HTMLElement;
+    expect(within(read).getByText("Claude", { selector: ".who b" })).toBeTruthy();
+    const bash = thread.getByText("Bash").closest(".trow") as HTMLElement;
+    expect(within(bash).queryByText("Claude", { selector: ".who b" })).toBeNull();
+  });
+
+  it("lists the costliest prompts first on the receipt, a few at a time", async () => {
+    const t = timeline();
+    t.receipt.prompts = Array.from({ length: 12 }, (_, i) => ({ prompt_id: `q${i}`, label: `Ask ${i + 1}`, cost_usd: i === 3 ? 9 : 1 + i / 100, tokens: 1000, flags: 0 }));
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": t });
+    renderAt("/sessions/s1");
+    await userEvent.click(await screen.findByRole("button", { name: "Receipt" }));
+    const receipt = within(screen.getByRole("article", { name: "Session receipt" }));
+    const names = () => receipt.getAllByText(/^\d+ · Ask \d+$/).map((e) => e.textContent);
+    expect(names()).toEqual(["4 · Ask 4", "12 · Ask 12", "11 · Ask 11", "10 · Ask 10", "9 · Ask 9"]);
+    await userEvent.click(receipt.getByRole("button", { name: "Show 5 more of 7" }));
+    expect(names()).toHaveLength(10);
+    await userEvent.click(receipt.getByRole("button", { name: "Show 2 more" }));
+    expect(names()).toHaveLength(12);
+    await userEvent.click(receipt.getByRole("button", { name: "Show less" }));
+    expect(names()).toHaveLength(5);
+  });
+
   it("names the project, length and model on the receipt", async () => {
     fakeAPI(routes());
     renderAt("/sessions/s1");

@@ -1470,6 +1470,8 @@ button, select, input { font: inherit; }
 .claude { padding: 10px 4px 6px; }
 .claude .md { margin-left: 48px; }
 .claude .md p, .claude .md ul, .claude .md ol { font-size: 18px; }
+.claude.turn-head { padding-bottom: 12px; }
+.rc-more { display: block; margin: 10px 0 4px 12px; }
 .tool-row { align-items: center; font-size: 15px; padding: 14px 20px; border-radius: 12px; }
 .tl, .wl { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 .tl .args, .wl .args { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
