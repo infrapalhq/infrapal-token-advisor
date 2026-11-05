@@ -153,7 +153,7 @@ export default function Fixes() {
   const expanded = openKey === undefined ? byArea(openGroups)[0]?.key ?? null : openKey;
 
   const mark = async (items: Item[], state: "fixed" | "reverted") => {
-    setBusy(items[0]?.key ?? null);
+    setBusy(items[0].key);
     try {
       for (const it of items) await api.setFixState(it.key, state);
       load();
@@ -164,9 +164,9 @@ export default function Fixes() {
     }
   };
 
+  // Only cards with a fix show Copy.
   const copy = (g: FixGroup) => {
-    if (!g.fix) return;
-    navigator.clipboard?.writeText(g.fix).catch(() => {});
+    navigator.clipboard?.writeText(g.fix ?? "").catch(() => {});
     setCopied({ ...copied, [g.key]: true });
   };
 
@@ -249,7 +249,7 @@ export default function Fixes() {
                             )}
                             {g.note && <span className="note">{g.note}</span>}
                             <div className="acts">
-                              <button className="btn" type="button" onClick={() => copy(g)}><IconCopy size={16} />{copied[g.key] ? "Copied" : "Copy"}</button>
+                              {g.fix && <button className="btn" type="button" onClick={() => copy(g)}><IconCopy size={16} />{copied[g.key] ? "Copied" : "Copy"}</button>}
                               <button className="btn btn-k" type="button" disabled={busy === g.items[0].key} onClick={() => mark(g.items, "fixed")}><IconCheck size={16} />Mark as fixed</button>
                               <button className="btn btn-q" type="button" onClick={() => setDismissed([...new Set([...dismissed, ...g.items.map((it) => it.key)])])}><IconX size={14} /><span className="u">Not relevant</span></button>
                             </div>

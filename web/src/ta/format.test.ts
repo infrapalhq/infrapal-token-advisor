@@ -67,5 +67,6 @@ describe("isClaude", () => {
     expect(isClaude("Claude Code")).toBe(true);
     expect(isClaude("Codex")).toBe(false);
     expect(isClaude("Claudette")).toBe(false);
+    expect(isClaude("  claude code ")).toBe(true);
   });
 });

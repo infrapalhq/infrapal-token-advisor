@@ -5,15 +5,15 @@ import markUrl from "../assets/infrapal-mark.svg";
 import claudeUrl from "../assets/claude.png";
 import { isClaude } from "./format";
 
-function Svg({ size = 16, children, className }: { size?: number; children: ReactNode; className?: string }) {
+function Svg({ size = 16, children }: { size?: number; children: ReactNode }) {
   return (
-    <svg className={`ico${className ? ` ${className}` : ""}`} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <svg className="ico" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
       {children}
     </svg>
   );
 }
 
-type P = { size?: number; className?: string };
+type P = { size?: number };
 
 export const IconGrid = (p: P) => (
   <Svg {...p}><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /></Svg>

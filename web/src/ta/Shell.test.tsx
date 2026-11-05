@@ -1,8 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { HTTPError, fakeAPI } from "../test/api";
-import { aiConfig, base, card, cards, overview, status } from "../test/fixtures";
+import { aiConfig, base, card, cards, overview, status, timeline } from "../test/fixtures";
 import { renderAt } from "../test/render";
 
 describe("sidebar", () => {
@@ -74,4 +74,31 @@ describe("sidebar", () => {
     await userEvent.selectOptions(screen.getByLabelText("Time range"), "30d");
     await waitFor(() => expect(calls.some((c) => c.path === "/api/sessions/cards?since=30d")).toBe(true));
   });
+
+  it("keeps the open session in the list even when it would be cut", async () => {
+    const many = [
+      ...Array.from({ length: 6 }, (_, i) => card({ id: `b${i}`, project: `busy${i}`, title: `Busy ${i}`, started_at: 100 - i })),
+      ...Array.from({ length: 4 }, (_, i) => card({ id: `q${i}`, project: "quiet", title: `Quiet ${i}`, priority: "fine", started_at: 10 - i })),
+    ];
+    fakeAPI({ ...base(), "/api/sessions/cards": cards(many), "/api/sessions/q3/timeline": timeline(), "/api/sessions/q3/issues": { session_id: "q3", areas: {} } });
+    localStorage.setItem("ta-side-sort", "newest");
+    renderAt("/sessions/q3");
+    const recents = within(await screen.findByRole("region", { name: "Recent sessions" }));
+    const open = await recents.findByRole("link", { name: /Quiet 3/ });
+    expect(open.getAttribute("aria-current")).toBe("page");
+    expect(recents.getByText("quiet")).toBeTruthy();
+    expect(recents.queryByText("busy5")).toBeNull();
+    expect(recents.getAllByRole("link", { name: /Quiet/ })).toHaveLength(3);
+  });
+
+  it("falls back to defaults when storage can't be read", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    fakeAPI({ ...base(), "/api/sessions/cards": cards([card()]) });
+    renderAt("/settings");
+    expect(await screen.findByRole("link", { name: /Fix the login bug/ })).toBeTruthy();
+    expect((screen.getByLabelText("Sort recent sessions") as HTMLSelectElement).value).toBe("priority");
+  });
 });
+
