@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type AiConfig } from "./api";
 import { EnableMcp } from "./McpSetup";
 import { Shell } from "./Shell";
+import { useTheme } from "./theme";
 
 // Settings holds the provider key for AI insights. The key is written once
 // through the API and never read back, so the page only learns whether one is
@@ -12,6 +13,7 @@ export default function Settings() {
   const [key, setKey] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [theme, toggleTheme] = useTheme();
 
   useEffect(() => {
     api.aiConfig().then(setAi).catch(() => {});
@@ -95,6 +97,9 @@ export default function Settings() {
           {message && <span className="hint-line" role="status">{message}</span>}
         </article>
       </section>
+      <button type="button" className="theme-line" onClick={toggleTheme}>
+        {theme === "dark" ? "Light Mode" : "Dark Mode"}
+      </button>
     </Shell>
   );
 }

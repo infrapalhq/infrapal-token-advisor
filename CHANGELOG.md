@@ -38,6 +38,20 @@ The first release.
 - The "connect to Claude Code" card moved from Fixes to Settings, with simpler
   wording. The AI recommendations card on Fixes appears once you add a key.
 - Models with no share of your spend are left out of the model list on Overview.
+- The dashboard follows the approved design. The sidebar has the infrapal logo,
+  icons, a time range, and your recent sessions by project. Rows on Overview and
+  Sessions are cards, and the session page uses the full sidebar.
+- Fixes lists what to fix with tabs for To fix, Marked fixed and Not relevant, and
+  filters by problem. Findings that share one fix show as one card. The progress
+  report moved to its own page.
+- Overview's spend chart shows a bar per week for ranges longer than two weeks,
+  and the project list shows the top five and the rest as "Other".
+- The light and dark theme switch moved from the sidebar to the bottom of
+  Settings.
+- A session's receipt lists its prompts costliest first, five at a time, with
+  Show more for the rest.
+- Every agent turn in a session shows the agent's name, including turns that
+  start with tool calls.
 
 ### Fixed
 
@@ -55,6 +69,8 @@ The first release.
 - Pages with no match, and sessions that don't exist, show a proper page inside the
   dashboard.
 - The dashboard refreshes itself every minute, and opens each page at the top.
+- The sidebar now highlights the page you are on.
+- Long names and commands no longer make the Fixes page wider than the window.
 
 ### Security
 

@@ -48,7 +48,7 @@ export const AREA_LABEL: Record<string, string> = {
 export const AREA_NAME: Record<string, string> = {
   model: "Model–task mismatch",
   context: "Context health",
-  exec: "Wasteful agent execution",
+  exec: "Wasteful execution",
   perm: "Permission friction",
 };
 
@@ -67,4 +67,28 @@ export function pipClass(sev: string | undefined): string {
 // is global, such as an MCP server that is connected but never used.
 export function sessionsLabel(n: number): string {
   return n === 0 ? "global" : `${n} session${n === 1 ? "" : "s"}`;
+}
+
+// cleanTitle turns a raw first prompt into a readable title: it drops the
+// <pasted_content …> wrappers editors add around pasted text, leading @file
+// references, and runs of whitespace or separator characters.
+export function cleanTitle(raw: string): string {
+  let s = raw;
+  s = s.replace(/<\/?pasted_content[^>]*>/gi, " ");
+  s = s.replace(/^\s*@"[^"]*"\s*/, "").replace(/^\s*@\S+\s*/, "");
+  s = s.replace(/```[a-z]*/gi, " ").replace(/([=#*_~-])\1{3,}/g, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s || raw.trim() || "(untitled session)";
+}
+
+// shortPath replaces a home directory (/Users/<name>/ or /home/<name>/) with ~,
+// so long absolute paths in commands stay readable and don't show a username.
+export function shortPath(s: string): string {
+  return s.replace(/(["'\s(=]|^)\/(?:Users|home)\/[^/\s"']+/g, "$1~");
+}
+
+// isClaude says whether an agent name is Claude Code's, whose replies show
+// Claude's own name and mark.
+export function isClaude(agentName: string): boolean {
+  return /^claude\b/i.test(agentName.trim());
 }

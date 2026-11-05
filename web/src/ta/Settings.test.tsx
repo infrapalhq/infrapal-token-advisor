@@ -95,4 +95,13 @@ describe("MCP setup", () => {
     renderAt("/settings");
     expect(await screen.findByText("Could not load MCP setup: no binary path")).toBeTruthy();
   });
+
+  it("switches between dark and light at the bottom of the page", async () => {
+    fakeAPI(base());
+    renderAt("/settings");
+    await userEvent.click(await screen.findByRole("button", { name: "Light Mode" }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+    await userEvent.click(screen.getByRole("button", { name: "Dark Mode" }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
 });
