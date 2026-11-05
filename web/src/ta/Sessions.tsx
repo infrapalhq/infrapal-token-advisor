@@ -7,7 +7,8 @@ import { FirstRun } from "./FirstRun";
 import { Shell } from "./Shell";
 import { useFirstRun } from "./status";
 import { useRefresh } from "./refresh";
-import { AREA_LABEL, SYMPTOM_LABEL, dayShort, durationS, money, pipClass, tokensHuman, waitMs } from "./format";
+import { AREA_LABEL, SYMPTOM_LABEL, cleanTitle, dayShort, durationS, money, pipClass, tokensHuman, waitMs } from "./format";
+import { IconFilter, IconFolder, IconSearch } from "./icons";
 
 const VIEWS = [
   { value: "all", label: "All" },
@@ -108,7 +109,8 @@ export default function Sessions() {
         </div>
         <div className="search">
           <label htmlFor="q" className="sr">Search sessions</label>
-          <input id="q" type="search" placeholder="Search sessions" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <IconSearch size={16} />
+          <input id="q" type="search" placeholder="Search prompts" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
       </div>
 
@@ -138,7 +140,7 @@ export default function Sessions() {
             ))}
           </select>
           <button className="btn" type="button" aria-expanded={popOpen} onClick={() => setPopOpen((o) => !o)}>
-            Filters{activeFilters > 0 && <span className="cnt solid">{activeFilters}</span>}
+            <IconFilter size={16} />Filters{activeFilters > 0 && <span className="cnt solid">{activeFilters}</span>}
           </button>
           {popOpen && (
             <div className="pop" role="dialog" aria-label="Filters">
@@ -227,7 +229,7 @@ export default function Sessions() {
                   <div className="group" key={g.name || "all"}>
                     {g.name && (
                       <div className="group-head">
-                        <span>{g.name}</span>
+                        <span className="gname"><IconFolder size={16} />{g.name}</span>
                         <span className="meta-r">{g.rows.length} session{g.rows.length === 1 ? "" : "s"} · {g.rows.every((s) => s.cost_unknown) ? "—" : money(g.rows.reduce((n, s) => n + s.cost_usd, 0))}</span>
                       </div>
                     )}
@@ -256,7 +258,7 @@ function SessionRow({ s, showProject }: { s: SessionCard; showProject: boolean }
     <Link className={`grid-row srow${s.priority === "fine" ? " fine" : ""}`} to={`/sessions/${encodeURIComponent(s.id)}`}>
       <span className={`pr ${s.priority}`}>{label}</span>
       <span className="title-cell">
-        <strong>{s.title}</strong>
+        <strong className="q">{cleanTitle(s.title)}</strong>
         {s.is_new && <span className="new">NEW</span>}
         <span className="meta-line">{meta}</span>
       </span>

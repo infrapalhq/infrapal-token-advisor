@@ -55,8 +55,8 @@ describe("visits", () => {
 
   it("shows a way back when a page crashes, not a blank screen", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    // An overview with no areas list makes the page throw while it renders.
-    fakeAPI({ ...routes(), "/api/overview": { ...overview(), areas: null } });
+    // An overview with no fix list makes the page throw while it renders.
+    fakeAPI({ ...routes(), "/api/overview": { ...overview(), fix_first: null } });
     renderAt("/");
     expect(await screen.findByText("This page hit a problem")).toBeTruthy();
     expect(screen.getByRole("link", { name: "← Back to Overview" })).toBeTruthy();
