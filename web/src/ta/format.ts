@@ -73,7 +73,7 @@ export function sessionsLabel(n: number): string {
 // <pasted_content …> wrappers editors add around pasted text, leading @file
 // references, and runs of whitespace or separator characters.
 export function cleanTitle(raw: string): string {
-  let s = raw ?? "";
+  let s = raw;
   s = s.replace(/<\/?pasted_content[^>]*>/gi, " ");
   s = s.replace(/^\s*@"[^"]*"\s*/, "").replace(/^\s*@\S+\s*/, "");
   s = s.replace(/```[a-z]*/gi, " ").replace(/([=#*_~-])\1{3,}/g, " ");
@@ -84,7 +84,7 @@ export function cleanTitle(raw: string): string {
 // shortPath replaces a home directory (/Users/<name>/ or /home/<name>/) with ~,
 // so long absolute paths in commands stay readable and don't show a username.
 export function shortPath(s: string): string {
-  return (s ?? "").replace(/(["'\s(=]|^)\/(?:Users|home)\/[^/\s"']+/g, "$1~");
+  return s.replace(/(["'\s(=]|^)\/(?:Users|home)\/[^/\s"']+/g, "$1~");
 }
 
 // isClaude says whether an agent name is Claude Code's, whose replies show

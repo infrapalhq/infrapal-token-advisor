@@ -113,6 +113,48 @@ describe("Fixes", () => {
     expect(screen.getByText("Re-read src/a.ts 6 times")).toBeTruthy();
   });
 
+  it("puts fixes with no measurable impact last, and shows a second figure under the first", async () => {
+    const none = item({ key: "a|none", title: "No impact yet", usd: undefined, score: 99, fix: "x" });
+    const both = item({ key: "b|both", title: "Tokens and dollars", tokens: 4000, usd: 0.5, score: 1, fix: "y" });
+    const wait = item({ key: "c|wait", area: "perm", title: "Dollars and waiting", usd: 0.2, minutes: 4, score: 2, fix: "z" });
+    fakeAPI({ ...routes(), "/api/fixes": fixes({ to_fix: [none, both, wait] }) });
+    renderAt("/fixes");
+    await screen.findByText("No impact yet");
+    const titles = [...document.querySelectorAll(".fx-t strong")].map((e) => e.textContent);
+    expect(titles).toEqual(["Dollars and waiting", "Tokens and dollars", "No impact yet"]);
+    expect(screen.getByText("≈ 4K tok")).toBeTruthy();
+    expect(screen.getByText("≈ $0.50")).toBeTruthy();
+    expect(screen.getByText("4 min waiting")).toBeTruthy();
+  });
+
+  it("folds habits with the same advice together, and shows the rest on request", async () => {
+    const habits = [
+      item({ key: "h|1", title: "Bash(curl:*) approved by hand 2×", fix: undefined, note: "Not read-only.", score: 5 }),
+      item({ key: "h|2", title: "Bash(env:*) approved by hand 2×", fix: undefined, note: "Not read-only.", score: 4 }),
+      item({ key: "h|3", title: "Start fresh sessions", fix: undefined, note: "Long sessions cost more.", score: 3 }),
+      item({ key: "h|4", title: "Split tasks", fix: undefined, note: "Mixed tasks re-send context.", score: 2 }),
+      item({ key: "h|5", title: "Check MCP credentials", fix: undefined, note: "Calls failed.", score: 1 }),
+    ];
+    fakeAPI({ ...routes(), "/api/fixes": fixes({ habits }) });
+    renderAt("/fixes");
+    expect(await screen.findByText("Bash(curl:*) approved by hand 2×, and 1 more like it.")).toBeTruthy();
+    expect(screen.queryByText("Check MCP credentials.")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Show all 4" }));
+    expect(screen.getByText("Check MCP credentials.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Show fewer" }));
+    expect(screen.queryByText("Check MCP credentials.")).toBeNull();
+  });
+
+  it("ignores a broken not-relevant list in storage", async () => {
+    localStorage.setItem("ta-fix-dismissed", "{nope");
+    fakeAPI(routes());
+    renderAt("/fixes");
+    expect(await screen.findByText("Re-read src/a.ts 6 times")).toBeTruthy();
+    localStorage.setItem("ta-fix-dismissed", JSON.stringify({ a: 1 }));
+    renderAt("/fixes");
+    expect((await screen.findAllByText("Re-read src/a.ts 6 times")).length).toBeGreaterThan(0);
+  });
+
   it("shows why a fix couldn't be marked", async () => {
     fakeAPI({ ...routes(), "POST /api/fixes/reread%7Csrc%2Fa.ts/state": new HTTPError(500, "database is locked") });
     renderAt("/fixes");

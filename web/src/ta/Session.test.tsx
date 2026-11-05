@@ -198,4 +198,71 @@ describe("Session", () => {
     expect(screen.getByText("AVOIDABLE, BY PROBLEM")).toBeTruthy();
     expect(screen.getByText("$0.75", { selector: ".rl .mono" })).toBeTruthy();
   });
+
+  it("hides and shows the context chart", async () => {
+    fakeAPI(routes());
+    renderAt("/sessions/s1");
+    await userEvent.click(await screen.findByRole("button", { name: "Hide" }));
+    expect(screen.queryByRole("group", { name: "Context size after each step" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.getByRole("group", { name: "Context size after each step" })).toBeTruthy();
+  });
+
+  it("labels where each prompt starts on the chart, skipping ones too close to read", async () => {
+    const rows = [
+      { id: "d1", kind: "div" as const, ts: 1, text: "PROMPT 1", prompt_id: "p1" },
+      ...Array.from({ length: 10 }, (_, i) => ({ id: `a${i}`, kind: "tool" as const, ts: 2 + i, name: "Read", text: `a${i}`, prompt_id: "p1", context_tokens: 1000 })),
+      { id: "d2", kind: "div" as const, ts: 20, text: "PROMPT 2", prompt_id: "p2" },
+      { id: "b0", kind: "tool" as const, ts: 21, name: "Read", text: "b0", prompt_id: "p2", context_tokens: 2000 },
+      { id: "d3", kind: "div" as const, ts: 30, text: "PROMPT 3", prompt_id: "p3" },
+      ...Array.from({ length: 10 }, (_, i) => ({ id: `c${i}`, kind: "tool" as const, ts: 31 + i, name: "Read", text: `c${i}`, prompt_id: "p3", context_tokens: 3000 })),
+    ];
+    fakeAPI({ ...routes({}), "/api/sessions/s1/timeline": timeline({ rows }) });
+    renderAt("/sessions/s1");
+    expect(await screen.findByText("PROMPT 1", { selector: ".prompt-axis span" })).toBeTruthy();
+    expect(screen.getByText("PROMPT 2", { selector: ".prompt-axis span" })).toBeTruthy();
+    // Prompt 3 starts one bar after prompt 2, too close for a second label.
+    expect(screen.queryByText("PROMPT 3", { selector: ".prompt-axis span" })).toBeNull();
+    expect(document.querySelectorAll(".bar.pstart")).toHaveLength(1);
+  });
+
+  it("collapses a long prompt until it is opened", async () => {
+    const long = "word ".repeat(200).trim();
+    const t = timeline();
+    t.rows = [...t.rows, { id: "u3", kind: "you", ts: 99, text: long, prompt_id: "p3" }];
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": t });
+    renderAt("/sessions/s1");
+    const text = await screen.findByText(long);
+    expect(text.className).toBe("clamp");
+    await userEvent.click(screen.getByRole("button", { name: "Show more" }));
+    expect(text.className).toBe("");
+    await userEvent.click(screen.getByRole("button", { name: "Show less" }));
+    expect(text.className).toBe("clamp");
+  });
+
+  it("rates each area's health, and the session's", async () => {
+    fakeAPI(routes({ perm: [{ ...waits, Severity: "half" }] }));
+    renderAt("/sessions/s1");
+    expect(await screen.findByText("Worth a look", { selector: ".ctx-top .hbadge" })).toBeTruthy();
+    expect(screen.getByText("Worth a look", { selector: ".ap-head .hbadge" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", { name: /Model/ }));
+    expect(screen.getByText("Healthy", { selector: ".ap-head .hbadge" })).toBeTruthy();
+  });
+
+  it("marks a flagged step with the finding's kind, and a flagged compaction with its confidence", async () => {
+    const compacted: Occurrence = { ...reread, Kind: "compaction", Evidence: ["e1"], Conf: "Likely", Title: "Compacted once" };
+    fakeAPI(routes({ context: [{ ...reread, Kind: "re_read" }, compacted] }));
+    renderAt("/sessions/s1");
+    const thread = within(await screen.findByRole("region", { name: "Session thread" }));
+    expect(await thread.findByText("re-read")).toBeTruthy();
+    expect(thread.getByText("Likely")).toBeTruthy();
+  });
+
+  it("names the project, length and model on the receipt", async () => {
+    fakeAPI(routes());
+    renderAt("/sessions/s1");
+    await userEvent.click(await screen.findByRole("button", { name: "Receipt" }));
+    expect(screen.getByText(/^api · .* · 1h 05m · claude-opus-5-5$/)).toBeTruthy();
+  });
 });
+

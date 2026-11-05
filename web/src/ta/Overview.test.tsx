@@ -155,4 +155,29 @@ describe("Overview", () => {
     expect(link.getAttribute("href")).toBe("/sessions?area=perm");
     expect(link.textContent).not.toContain("→");
   });
+
+  it("shows a bar per week past two weeks, and folds small projects into Other", async () => {
+    const by_day = Array.from({ length: 21 }, (_, i) => ({ day: `2026-10-${String(i + 1).padStart(2, "0")}`, cost_usd: 1, avoidable_usd: 0.5 }));
+    const by_project = Array.from({ length: 8 }, (_, i) => ({ project: `p${i}`, cost_usd: 2 ** (8 - i), sessions: 1 }));
+    fakeAPI({ ...base(), "/api/overview": overview({ by_day, by_project }) });
+    renderAt("/");
+    await screen.findByText("Spend by day");
+    const bars = screen.getByRole("img", { name: "Daily spend" }).children;
+    expect(bars).toHaveLength(3);
+    expect(bars[0].getAttribute("title")).toBe("Oct 1: $7.00");
+    expect(screen.getByText("Other (3 projects)")).toBeTruthy();
+    expect(screen.getByText("$14.00", { selector: ".proj-row .mono" })).toBeTruthy();
+    expect(screen.queryByText("p5")).toBeNull();
+  });
+
+  it("thins the day labels when there are many bars", async () => {
+    const by_day = Array.from({ length: 12 }, (_, i) => ({ day: `2026-10-${String(i + 1).padStart(2, "0")}`, cost_usd: 1, avoidable_usd: 0 }));
+    fakeAPI({ ...base(), "/api/overview": overview({ by_day }) });
+    renderAt("/");
+    await screen.findByText("Spend by day");
+    const labels = [...document.querySelectorAll(".axis-x span")].map((s) => s.textContent);
+    expect(labels).toHaveLength(12);
+    expect(labels.filter(Boolean)).toEqual(["Oct 1", "Oct 3", "Oct 5", "Oct 7", "Oct 9", "Oct 11"]);
+  });
 });
+
