@@ -18,7 +18,7 @@ import (
 )
 
 // protocolVersions lists the MCP revisions this server can speak, newest first.
-// The subset used here (initialize, ping, tools) is the same in all of them.
+// The subset used here (initialize, ping, tools, prompts) is the same in all of them.
 var protocolVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"}
 
 const instructions = "Token Advisor holds this user's coding agent usage: spend, tokens, cache, tools, permissions, and sessions. " +
@@ -121,6 +121,10 @@ func (s *Server) dispatch(ctx context.Context, req request) (any, *rpcError) {
 		return map[string]any{"tools": tools}, nil
 	case "tools/call":
 		return s.callTool(ctx, req.Params)
+	case "prompts/list":
+		return map[string]any{"prompts": prompts}, nil
+	case "prompts/get":
+		return getPrompt(req.Params)
 	case "":
 		return nil, &rpcError{codeInvalidRequest, "missing method"}
 	}
@@ -140,7 +144,7 @@ func (s *Server) initialize(params json.RawMessage) any {
 	}
 	return map[string]any{
 		"protocolVersion": version,
-		"capabilities":    map[string]any{"tools": map[string]any{}},
+		"capabilities":    map[string]any{"tools": map[string]any{}, "prompts": map[string]any{}},
 		"serverInfo":      map[string]any{"name": "infrapal-token-advisor", "version": s.version},
 		"instructions":    instructions,
 	}

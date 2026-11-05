@@ -12,8 +12,6 @@ const routes = () => ({
   "/api/sessions/s%201/issues": { session_id: "s 1", areas: {} },
   "/api/fixes": fixes(),
   "/api/progress": progress(),
-  "/api/mcp/setup": {},
-  "/api/ai/recommendations": {},
 });
 
 describe("old links", () => {

@@ -61,13 +61,8 @@ These live in `config.json`. Run `token-advisor restart` after changing one.
 | `api_port` | `4319` | Dashboard port |
 | `retention_months` | `6` | How long to keep data. `0` keeps everything. |
 | `log_level` | `info` | `debug`, `info`, `warn` or `error` |
-| `ai_keys` | none | Your keys for AI Mode, by provider. Save it in the dashboard's Settings. It's stored in plain text, private to your user. |
 
 `raw_bodies` and `agents` are managed by `init`, so leave them alone.
-
-The service can't see your shell's environment, so `ANTHROPIC_API_KEY` from your
-shell only reaches a dashboard you run with `token-advisor start` or
-`token-advisor ui` in that shell.
 
 ## Logs
 
@@ -168,7 +163,7 @@ its own commands.
 | Page says "Dashboard not built" | Built without the dashboard | Run `scripts/build-web.sh`, then build again |
 | "Database is newer than this build" | An older binary ran against a newer database | `token-advisor update`, or see [restoring a backup](SCHEMA.md#restoring-a-backup) |
 | Dashboard won't start, collector runs | Something else has the port | `token-advisor logs --errors`, then change `api_port` |
-| AI Mode says no key | The service can't see your shell's key | Save the key in Settings |
+| No `/infrapal-token-advisor:` commands in Claude Code | The MCP server isn't connected, or the session started before it was | Run the command on the Settings page, check `claude mcp list`, then start a new session |
 
 If it's still not working, [open an issue](https://github.com/infrapalhq/infrapal-token-advisor/issues/new/choose)
 with the output of `token-advisor doctor` and `token-advisor logs --errors`. Check

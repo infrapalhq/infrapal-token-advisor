@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/infrapalhq/infrapal-token-advisor/internal/paths"
@@ -34,35 +35,30 @@ func TestLoad_CarriesOverTheOldBackupPath(t *testing.T) {
 	}
 }
 
-func TestLoad_CarriesOverTheOldAPIKey(t *testing.T) {
+func TestLoad_RemovesAIModeKeys(t *testing.T) {
 	p := paths.Paths{BaseDir: t.TempDir()}
 	p.ConfigPath = filepath.Join(p.BaseDir, "config.json")
-	if err := os.WriteFile(p.ConfigPath, []byte(`{"anthropic_api_key":"sk-old"}`), 0o600); err != nil {
+	old := `{"api_port":5000,"anthropic_api_key":"sk-old","ai_provider":"anthropic","ai_keys":{"anthropic":"sk-new"}}`
+	if err := os.WriteFile(p.ConfigPath, []byte(old), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(p)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got := cfg.AIKeys["anthropic"]; got != "sk-old" {
-		t.Errorf("key = %q", got)
+	if cfg.APIPort != 5000 {
+		t.Errorf("APIPort = %d, want the saved 5000", cfg.APIPort)
 	}
-}
-
-func TestResolveAIKey_EnvWinsAndKeysStaySeparate(t *testing.T) {
-	cfg := Config{AIKeys: map[string]string{"one": "stored-one", "two": "stored-two"}}
-	t.Setenv("KEY_ONE", "")
-	if got := ResolveAIKey(cfg, "one", "KEY_ONE"); got != "stored-one" {
-		t.Errorf("stored = %q", got)
+	data, err := os.ReadFile(p.ConfigPath)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if got := ResolveAIKey(cfg, "two", "KEY_ONE"); got != "stored-two" {
-		t.Errorf("another provider's = %q", got)
+	for _, field := range removedFields {
+		if strings.Contains(string(data), field) {
+			t.Errorf("config.json still has %s: %s", field, data)
+		}
 	}
-	t.Setenv("KEY_ONE", "from-env")
-	if got := ResolveAIKey(cfg, "one", "KEY_ONE"); got != "from-env" {
-		t.Errorf("env = %q", got)
-	}
-	if got := ResolveAIKey(Config{}, "none", "KEY_NONE"); got != "" {
-		t.Errorf("nothing configured = %q", got)
+	if strings.Contains(string(data), "sk-") {
+		t.Errorf("config.json still has a key: %s", data)
 	}
 }

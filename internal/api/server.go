@@ -1,10 +1,6 @@
 // Package api implements infrapal-token-advisor's HTTP API over the captured
 // telemetry, serving the dashboard: insights, session timelines, and fixes.
-//
-// The API only ever talks to this machine, with one exception:
-// POST /api/ai/recommendations calls a model provider, but only in direct
-// response to a user's request, and only once a key has been configured. See
-// internal/ai and the README's network note.
+// It never makes a network request of its own.
 package api
 
 import (
@@ -34,10 +30,6 @@ type Server struct {
 func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 	s := &Server{db: db}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/ai/config", s.handleGetAIConfig)
-	mux.HandleFunc("PUT /api/ai/config", s.handlePutAIConfig)
-	mux.HandleFunc("GET /api/ai/recommendations", s.handleGetAIRecommendations)
-	mux.HandleFunc("POST /api/ai/recommendations", s.handlePostAIRecommendations)
 	mux.HandleFunc("GET /api/agents", s.handleAgents)
 	mux.HandleFunc("GET /api/overview", s.handleOverview)
 	mux.HandleFunc("GET /api/sessions/cards", s.handleSessionCards)
@@ -61,10 +53,6 @@ func NewServer(addr string, db *sql.DB, uiFS fs.FS) *Server {
 // (e.g. from `token-advisor ui`).
 func Endpoints() []string {
 	return []string{
-		"GET /api/ai/config",
-		"PUT /api/ai/config",
-		"GET /api/ai/recommendations?since=",
-		"POST /api/ai/recommendations",
 		"GET /api/agents",
 		"GET /api/overview?since=&agent=",
 		"GET /api/sessions/cards?since=&agent=",
