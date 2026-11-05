@@ -592,3 +592,4 @@ html[data-theme="dark"] .habits-card { background: transparent; border: 1.5px da
 html[data-theme="dark"] .habit-line { color: var(--soft); }
 html[data-theme="dark"] .habit-line b { color: #fff; }
 html[data-theme="dark"] .card.dashed { border-style: dashed; }
+html[data-theme="dark"] .theme-line { color: #050C16; }
