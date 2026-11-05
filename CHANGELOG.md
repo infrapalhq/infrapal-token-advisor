@@ -46,6 +46,8 @@ The first release.
   report moved to its own page.
 - Overview's spend chart shows a bar per week for ranges longer than two weeks,
   and the project list shows the top five and the rest as "Other".
+- The light and dark theme switch moved from the sidebar to the bottom of
+  Settings.
 
 ### Fixed
 

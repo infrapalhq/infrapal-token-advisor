@@ -4,11 +4,10 @@ import { useAgents } from "./agentContext";
 import { AgentPicker } from "./agents";
 import { api, type SessionCard } from "./api";
 import { cleanTitle, money } from "./format";
-import { IconChat, IconChevronDown, IconFolder, IconGrid, IconMoon, IconSettings, IconSun, IconWrench, Logo } from "./icons";
+import { IconChat, IconChevronDown, IconFolder, IconGrid, IconSettings, IconWrench, Logo } from "./icons";
 import { PERIODS, useRange } from "./range";
 import { useRefresh } from "./refresh";
 import { useStatus } from "./status";
-import { useTheme } from "./theme";
 
 // Shell is the sidebar layout shared by Overview, Sessions, Fixes and Settings.
 export function Shell({ children, fixesToDo, sessionCount }: { children: ReactNode; fixesToDo?: number; sessionCount?: number }) {
@@ -53,7 +52,6 @@ function readOpen(): boolean {
 export function Sidebar({ fixesToDo, sessionCount, currentSessionId }: { fixesToDo?: number; sessionCount?: number; currentSessionId?: string }) {
   const status = useStatus();
   const [aiOn, setAiOn] = useState(false);
-  const [theme, toggleTheme] = useTheme();
   const [range, setRange] = useRange();
   const [sort, setSortState] = useState<SideSort>(readSort);
   const [open, setOpenState] = useState(readOpen);
@@ -134,9 +132,6 @@ export function Sidebar({ fixesToDo, sessionCount, currentSessionId }: { fixesTo
         </span>
         <div className="foot-row">
           <NavLink className="foot-link" to="/settings"><IconSettings size={14} />Settings</NavLink>
-          <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-            {theme === "dark" ? <><IconSun size={14} />Light</> : <><IconMoon size={14} />Dark</>}
-          </button>
         </div>
         <div className="foot-meta">
           <span>Prompt text: {status?.prompts_logged_7d ? "logged" : "not logged"}</span>

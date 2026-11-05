@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { HTTPError, fakeAPI } from "../test/api";
@@ -144,13 +144,6 @@ describe("Session", () => {
     renderAt("/sessions/s1");
     expect(await screen.findByText("Session not found")).toBeTruthy();
     expect(screen.getByRole("link", { name: "← Back to Sessions" }).getAttribute("href")).toBe("/sessions");
-  });
-
-  it("switches theme from its own sidebar", async () => {
-    fakeAPI(routes());
-    renderAt("/sessions/s1");
-    await userEvent.click(await screen.findByRole("button", { name: "Switch to light mode" }));
-    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
   });
 
   it("opens a session with nothing in it instead of going blank", async () => {

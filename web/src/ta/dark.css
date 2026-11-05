@@ -275,25 +275,6 @@ html[data-theme="dark"] .g-fresh { color: var(--purple); }
 html[data-theme="dark"] .g-out { color: var(--amber); }
 html[data-theme="dark"] .g-write { color: rgba(244, 245, 247, .28); }
 
-/* ---------- Theme toggle ---------- */
-.theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, .2);
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  align-self: flex-start;
-}
-html[data-theme="dark"] .theme-toggle { border-color: var(--line-2); background: var(--slab); box-shadow: var(--hi); color: var(--ink-2); }
-html[data-theme="dark"] .theme-toggle:hover { color: #fff; border-color: rgba(255, 255, 255, .2); }
-
 html[data-theme="dark"] .settings-form input {
   background: #0A1525;
   color: #F4F5F7;
