@@ -97,12 +97,9 @@ export default function Settings() {
           {message && <span className="hint-line" role="status">{message}</span>}
         </article>
       </section>
-      <p className="foot-note theme-line">
-        {theme === "dark" ? "Dark" : "Light"} theme.{" "}
-        <button type="button" className="btn btn-q linkish" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-          Switch
-        </button>
-      </p>
+      <button type="button" className="theme-line" onClick={toggleTheme}>
+        {theme === "dark" ? "Light Mode" : "Dark Mode"}
+      </button>
     </Shell>
   );
 }

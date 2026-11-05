@@ -99,10 +99,9 @@ describe("MCP setup", () => {
   it("switches between dark and light at the bottom of the page", async () => {
     fakeAPI(base());
     renderAt("/settings");
-    await userEvent.click(await screen.findByRole("button", { name: "Switch to light mode" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Light Mode" }));
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(screen.getByText(/Light theme/)).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
+    await userEvent.click(screen.getByRole("button", { name: "Dark Mode" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
   });
 });
