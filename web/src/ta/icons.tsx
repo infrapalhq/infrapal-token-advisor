@@ -37,10 +37,6 @@ export const IconPlus = (p: P) => <Svg {...p}><path d="M12 5v14" /><path d="M5 1
 export const IconMinus = (p: P) => <Svg {...p}><path d="M5 12h14" /></Svg>;
 export const IconChevronDown = (p: P) => <Svg {...p}><path d="m6 9 6 6 6-6" /></Svg>;
 export const IconChevronUp = (p: P) => <Svg {...p}><path d="m18 15-6-6-6 6" /></Svg>;
-export const IconSun = (p: P) => (
-  <Svg {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></Svg>
-);
-export const IconMoon = (p: P) => <Svg {...p}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" /></Svg>;
 // IconUser is Lucide's "user-round", used for the person's avatar in a thread.
 export const IconUser = (p: P) => <Svg {...p}><circle cx="12" cy="8" r="4.5" /><path d="M20 21a8 8 0 0 0-16 0" /></Svg>;
 

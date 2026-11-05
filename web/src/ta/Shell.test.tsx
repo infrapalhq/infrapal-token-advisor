@@ -29,13 +29,11 @@ describe("sidebar", () => {
     expect(screen.getByText("Checking collector…")).toBeTruthy();
   });
 
-  it("switches between dark and light", async () => {
+  it("has no theme switch", async () => {
     fakeAPI(base());
-    renderAt("/settings");
-    await userEvent.click(await screen.findByRole("button", { name: "Switch to light mode" }));
-    expect(document.documentElement.dataset.theme).toBe("light");
-    await userEvent.click(screen.getByRole("button", { name: "Switch to dark mode" }));
-    expect(document.documentElement.dataset.theme).toBe("dark");
+    renderAt("/");
+    await screen.findByText("Local only · collector live");
+    expect(screen.queryByRole("button", { name: /Switch to (light|dark) mode/ })).toBeNull();
   });
 
   it("marks the open page in the nav, with counts", async () => {
