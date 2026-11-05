@@ -48,6 +48,10 @@ The first release.
   and the project list shows the top five and the rest as "Other".
 - The light and dark theme switch moved from the sidebar to the bottom of
   Settings.
+- A session's receipt lists its prompts costliest first, five at a time, with
+  Show more for the rest.
+- Every agent turn in a session shows the agent's name, including turns that
+  start with tool calls.
 
 ### Fixed
 

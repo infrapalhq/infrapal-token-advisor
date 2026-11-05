@@ -64,6 +64,7 @@ export default function SessionPage() {
   const ctxRows = rows.filter((r) => typeof r.context_tokens === "number");
   const bars = groupBars(ctxRows, flagged, MAX_BARS);
   const promptCount = rows.filter((r) => r.kind === "div").length;
+  const turnStarts = agentTurnStarts(rows);
   const health = worst(Object.values(issues).flat());
   const axis = promptLabels(bars, rows);
   const jump = (rowId: string) => {
@@ -141,7 +142,7 @@ export default function SessionPage() {
         <div className="thread-list" id="thread-list">
           {rows.length === 0 && <p className="hint-line">Nothing was recorded in this session: no prompts, replies or tool calls.</p>}
           {rows.map((r) => (
-            <ThreadRow key={r.id} row={r} agentName={timeline.agent_name} model={current?.model} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
+            <ThreadRow key={r.id} row={r} turnStart={turnStarts.has(r.id)} agentName={timeline.agent_name} model={current?.model} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
           ))}
         </div>
       </section>
@@ -245,7 +246,7 @@ function YouBubble({ text }: { text: string }) {
   );
 }
 
-function ThreadRow({ row, agentName, model, flagged, highlighted, onFlag }: { row: TimelineRow; agentName: string; model?: string; flagged?: Occurrence; highlighted: boolean; onFlag: () => void }) {
+function ThreadRow({ row, turnStart, agentName, model, flagged, highlighted, onFlag }: { row: TimelineRow; turnStart: boolean; agentName: string; model?: string; flagged?: Occurrence; highlighted: boolean; onFlag: () => void }) {
   const waited = row.kind === "tool" && (row.wait_ms ?? 0) > 0;
   return (
     <div className={`trow${flagged ? " fl" : ""}${highlighted ? " hl" : ""}`} id={`row-${row.id}`}>
@@ -261,10 +262,11 @@ function ThreadRow({ row, agentName, model, flagged, highlighted, onFlag }: { ro
         {row.kind === "you" && <YouBubble text={row.text} />}
         {row.kind === "claude" && (
           <div className="claude">
-            <div className="who"><AgentAvatar name={agentName} /><b>{isClaude(agentName) ? "Claude" : agentName}</b><span className="who-m">{[model, agentName].filter(Boolean).join(" · ")}</span></div>
+            <AgentWho agentName={agentName} model={model} />
             <Markdown text={row.text} />
           </div>
         )}
+        {turnStart && <div className="claude turn-head"><AgentWho agentName={agentName} model={model} /></div>}
         {row.kind === "tool" && waited && (
           <div className="wait-row">
             <span className="wl"><span className="pause" aria-hidden="true">‖</span><span className="wl-k">Waiting on you ·</span><b>{row.name}</b>{row.text ? <span className="args">({shortPath(row.text)})</span> : null}<span className="tag red">Approved by hand</span>{flagged && <span className="tag red">{flagTag(flagged)}</span>}</span>
@@ -283,6 +285,27 @@ function ThreadRow({ row, agentName, model, flagged, highlighted, onFlag }: { ro
       </div>
     </div>
   );
+}
+
+function AgentWho({ agentName, model }: { agentName: string; model?: string }) {
+  return <div className="who"><AgentAvatar name={agentName} /><b>{isClaude(agentName) ? "Claude" : agentName}</b><span className="who-m">{[model, agentName].filter(Boolean).join(" · ")}</span></div>;
+}
+
+// agentTurnStarts finds the steps that open the agent's turn without a reply
+// first, such as a turn that starts with tool calls. Those steps carry the
+// agent's name, so every turn shows who answered.
+function agentTurnStarts(rows: TimelineRow[]): Set<string> {
+  const starts = new Set<string>();
+  let named = true;
+  for (const r of rows) {
+    if (r.kind === "you") named = false;
+    else if (r.kind === "claude") named = true;
+    else if (r.kind !== "div" && !named) {
+      starts.add(r.id);
+      named = true;
+    }
+  }
+  return starts;
 }
 
 // flagTag is the short badge on a flagged step, from the finding's kind:
@@ -321,6 +344,13 @@ function promptLabels(bars: Bar[], rows: TimelineRow[]): { starts: Set<number>; 
   return { starts, labels };
 }
 
+// The receipt lists this many prompts at first, and this many more per click.
+const RECEIPT_PROMPTS = 5;
+
+function moreLabel(left: number): string {
+  return left > RECEIPT_PROMPTS ? `Show ${RECEIPT_PROMPTS} more of ${left}` : `Show ${left} more`;
+}
+
 function Receipt({ t, project, duration, model, onPrompt }: { t: Timeline; project?: string; duration?: number; model?: string; onPrompt: (promptID: string) => void }) {
   const r = t.receipt;
   const total = r.tokens.fresh_input + r.tokens.output + r.tokens.cache_read + r.tokens.cache_write || 1;
@@ -329,6 +359,9 @@ function Receipt({ t, project, duration, model, onPrompt }: { t: Timeline; proje
   const outPct = (r.tokens.output / total) * 100;
   const byArea = r.by_area_usd ?? {};
   const avoidableAreas = AREA_ORDER.filter((a) => (byArea[a] ?? 0) > 0);
+  // Prompts keep their number in the session but are listed costliest first.
+  const prompts = (r.prompts ?? []).map((p, i) => ({ p, n: i + 1 })).sort((a, b) => b.p.cost_usd - a.p.cost_usd);
+  const [shown, setShown] = useState(RECEIPT_PROMPTS);
   return (
     <article className="receipt" aria-label="Session receipt">
       <div className="rc-head">
@@ -352,12 +385,17 @@ function Receipt({ t, project, duration, model, onPrompt }: { t: Timeline; proje
         </div>
       </div>
       <div className="rsec">BY PROMPT</div>
-      {(r.prompts ?? []).map((p, i) => (
+      {prompts.slice(0, shown).map(({ p, n }) => (
         <button key={p.prompt_id} className="rl" type="button" onClick={() => onPrompt(p.prompt_id)}>
-          <span><b>{i + 1} · {p.label ? cleanTitle(p.label) : "(prompt not logged)"}</b><small>{tokensHuman(p.tokens)} tok · {p.flags > 0 ? `${p.flags} flag${p.flags === 1 ? "" : "s"}` : "clean"}</small></span>
+          <span><b>{n} · {p.label ? cleanTitle(p.label) : "(prompt not logged)"}</b><small>{tokensHuman(p.tokens)} tok · {p.flags > 0 ? `${p.flags} flag${p.flags === 1 ? "" : "s"}` : "clean"}</small></span>
           <span className="mono">{money(p.cost_usd)}</span>
         </button>
       ))}
+      {prompts.length > RECEIPT_PROMPTS && (
+        <button type="button" className="more rc-more" onClick={() => setShown(shown < prompts.length ? shown + RECEIPT_PROMPTS : RECEIPT_PROMPTS)}>
+          {shown < prompts.length ? moreLabel(prompts.length - shown) : "Show less"}
+        </button>
+      )}
       {avoidableAreas.length > 0 && (
         <>
           <div className="rsec">AVOIDABLE, BY PROBLEM</div>
