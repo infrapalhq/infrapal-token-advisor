@@ -21,7 +21,7 @@ describe("Overview", () => {
     expect(screen.getByText("Re-read src/a.ts 6 times")).toBeTruthy();
     expect(screen.getByText("≈ $1.25")).toBeTruthy();
     expect(screen.getByText("3m")).toBeTruthy();
-    expect(screen.getByText("1 issue · 1 session")).toBeTruthy();
+    expect(screen.getByText("1 issue · repeat approvals and rejections")).toBeTruthy();
     expect(screen.getByText("Models: claude-opus-5-5 100%")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Fix the login bug/ }).getAttribute("href")).toBe("/sessions/s1");
     expect(screen.getByText("2 to do")).toBeTruthy();
@@ -97,7 +97,7 @@ describe("Overview", () => {
     renderAt("/");
     const card = within(await screen.findByRole("link", { name: /Context health/ }));
     expect(card.getByText("0 open")).toBeTruthy();
-    expect(card.getByText("0 issues · 0 sessions")).toBeTruthy();
+    expect(card.getByText("0 issues · re-reads, compactions, mixed tasks")).toBeTruthy();
     expect(card.getByText("+ 6 global fixes, under Fixes")).toBeTruthy();
     expect(card.getByText("0 sessions →")).toBeTruthy();
     expect(screen.getByRole("link", { name: /Context health/ }).getAttribute("href")).toBe("/sessions?area=context");
@@ -109,7 +109,8 @@ describe("Overview", () => {
     renderAt("/");
     const card = within(await screen.findByRole("link", { name: /Context health/ }));
     expect(card.getByText("2 open")).toBeTruthy();
-    expect(card.getByText("2 issues · 2 sessions")).toBeTruthy();
+    expect(card.getByText("2 issues · re-reads, compactions, mixed tasks")).toBeTruthy();
+    expect(card.getByText("2 sessions →")).toBeTruthy();
     expect(card.getByText("+ 1 global fix, under Fixes")).toBeTruthy();
   });
 

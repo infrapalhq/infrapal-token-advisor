@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Shell } from "./Shell";
-import { useTheme } from "./theme";
+import { Shell, Sidebar } from "./Shell";
 import { api, type Occurrence, type SessionCard, type Timeline, type TimelineRow } from "./api";
 import { Markdown } from "./Markdown";
-import { AREA_LABEL, AREA_NAME, dayShort, durationS, money, tokensHuman } from "./format";
+import { AREA_LABEL, AREA_NAME, cleanTitle, dayShort, durationS, isClaude, money, shortPath, tokensHuman } from "./format";
+import { AgentAvatar, IconCheck, IconChevronDown, IconChevronUp, IconCopy, IconSearch, YouAvatar } from "./icons";
 
 type Mode = "issues" | "receipt";
 type AreaKey = "context" | "exec" | "perm" | "model";
-const AREA_ORDER: AreaKey[] = ["context", "exec", "perm", "model"];
+const AREA_ORDER: AreaKey[] = ["model", "context", "exec", "perm"];
 
 export default function SessionPage() {
-  const [theme, toggleTheme] = useTheme();
   const { id = "" } = useParams();
   const [timeline, setTimeline] = useState<Timeline | null>(null);
   const [issues, setIssues] = useState<Record<string, Occurrence[]>>({});
@@ -22,6 +21,7 @@ export default function SessionPage() {
   const [highlight, setHighlight] = useState<string | null>(null);
   const [marked, setMarked] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState<Record<string, boolean>>({});
+  const [chartOpen, setChartOpen] = useState(true);
 
   // App.tsx keys this page by id, so another session starts from empty state.
   useEffect(() => {
@@ -63,46 +63,29 @@ export default function SessionPage() {
   const rows = timeline.rows ?? [];
   const ctxRows = rows.filter((r) => typeof r.context_tokens === "number");
   const bars = groupBars(ctxRows, flagged, MAX_BARS);
+  const promptCount = rows.filter((r) => r.kind === "div").length;
+  const health = worst(Object.values(issues).flat());
+  const axis = promptLabels(bars, rows);
   const jump = (rowId: string) => {
     setHighlight(rowId);
     document.getElementById(`row-${rowId}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
   const fixKey = (o: Occurrence) => `${o.Kind}|${o.Subject}`;
+  const areaIssues = issues[area] ?? [];
+  const areaHealth = worst(areaIssues);
 
   return (
-    <div className="shell">
-      <aside className="side side-compact" aria-label="Sessions">
-        <div className="brand brand-sm">
-          <div className="brand-mark" aria-hidden="true" />
-          <span>infrapal</span>
-        </div>
-        <nav className="side-nav" aria-label="Main">
-          <Link to="/">Overview</Link>
-          <Link className="on" to="/sessions" aria-current="page">Sessions</Link>
-          <Link to="/fixes">Fixes</Link>
-        </nav>
-        <div className="sl-group">
-          {cards.map((c) => (
-            <Link key={c.id} className={`sl${c.id === id ? " on" : ""}${c.priority === "fine" ? " quiet" : ""}`} to={`/sessions/${encodeURIComponent(c.id)}`}>
-              <span className={`pip ${c.priority === "now" ? "wfull" : c.priority === "look" ? "whalf" : "woff"}`} />
-              <span className="name">{c.title}</span>
-              <span className="cost">{c.cost_unknown ? "—" : money(c.cost_usd)}</span>
-            </Link>
-          ))}
-        </div>
-        <button type="button" className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-          {theme === "dark" ? "☀ Light mode" : "☾ Dark mode"}
-        </button>
-      </aside>
+    <div className="shell session-shell">
+      <Sidebar currentSessionId={id} />
 
       <section className="thread" aria-label="Session thread">
         <header className="thread-head">
           <div className="thread-title-block">
-            <p className="eb"><Link className="crumb" to="/sessions">← Sessions</Link> · {current?.project ?? ""}</p>
-            <h1 className="thread-title">{current?.title ?? (rows.length === 0 ? "Session with no activity" : id)}</h1>
+            <p className="eb"><Link className="crumb" to="/sessions">← Sessions</Link>{current?.project ? <> / {current.project}</> : null}{promptCount > 0 && <> · {promptCount} {promptCount === 1 ? "prompt" : "prompts"}</>}</p>
+            <h1 className={`thread-title${current ? " q" : ""}`} title={current?.title}>{current ? cleanTitle(current.title) : (rows.length === 0 ? "Session with no activity" : id)}</h1>
             <div className="meta-row">
               <span className="pill">{dayShort(timeline.started_at)}</span>
-              <span className="pill">{durationS(current?.duration_s ?? 0)}</span>
+              <span className="pill">{durationS(current?.duration_s ?? 0)} active</span>
               <span className="pill strong">{timeline.cost_unknown ? "—" : money(timeline.receipt.cost_usd)}</span>
               <span className="pill">{tokensHuman(timeline.receipt.tokens.fresh_input + timeline.receipt.tokens.output + timeline.receipt.tokens.cache_read + timeline.receipt.tokens.cache_write)} tok</span>
               {current?.model && <span className="pill">{current.model}</span>}
@@ -111,40 +94,54 @@ export default function SessionPage() {
           <div className="ctx-card">
             <div className="ctx-top">
               <span className="ctx-title">Context per step</span>
-              <span className="ctx-state">
-                <span className={`pip ${timeline.compactions > 0 ? "full" : ""} sm`} />
-                Peaked ~{tokensHuman(timeline.peak_context)}{timeline.compactions > 0 ? ` · compacted ${timeline.compactions}×` : ""}
+              {health && <span className={`hbadge ${health}`}>{health === "full" ? "Unhealthy" : "Worth a look"}</span>}
+              <span className="ctx-state mono">
+                peak ~{tokensHuman(timeline.peak_context)}{timeline.compactions > 0 ? ` · compacted ${timeline.compactions === 1 ? "once" : `${timeline.compactions}×`}` : ""}
               </span>
+              <button type="button" className="ctx-hide" aria-expanded={chartOpen} onClick={() => setChartOpen(!chartOpen)}>
+                {chartOpen ? <>Hide<IconChevronUp size={16} /></> : <>Show<IconChevronDown size={16} /></>}
+              </button>
             </div>
-            <div className="ctx-chart">
-              <div className="axis" aria-hidden="true"><span>{tokensHuman(peak)}</span><span>{tokensHuman(peak / 2)}</span><span>0</span></div>
-              <div className="ctx-col">
-                <div className="plot">
-                  <div className="bars-ctx" role="group" aria-label="Context size after each step">
-                    {bars.map((b) => (
-                      <button
-                        key={b.first}
-                        className={`bar${b.flagged ? " fl" : ""}${b.rows.includes(highlight ?? "") ? " on" : ""}`}
-                        type="button"
-                        aria-label={`${b.label} · ~${tokensHuman(b.context)} context`}
-                        style={{ height: `${Math.max(3, Math.round((b.context / peak) * 100))}%` }}
-                        onClick={() => jump(b.target)}
-                      >
-                        {b.flagged && <span className="bar-flag" aria-hidden="true">!</span>}
-                      </button>
-                    ))}
+            {chartOpen && (
+              <>
+                <div className="ctx-chart">
+                  <div className="axis" aria-hidden="true"><span>{tokensHuman(peak)}</span><span>{tokensHuman(peak / 2)}</span><span>0</span></div>
+                  <div className="ctx-col">
+                    <div className="plot">
+                      <div className="gridline" style={{ top: 0 }} />
+                      <div className="gridline" style={{ top: "50%" }} />
+                      <div className="bars-ctx" role="group" aria-label="Context size after each step">
+                        {bars.map((b, i) => (
+                          <button
+                            key={b.first}
+                            className={`bar${b.flagged ? ` fl ${b.severity}` : ""}${b.rows.includes(highlight ?? "") ? " on" : ""}${i > 0 && axis.starts.has(i) ? " pstart" : ""}`}
+                            type="button"
+                            aria-label={`${b.label} · ~${tokensHuman(b.context)} context`}
+                            style={{ height: `${Math.max(3, Math.round((b.context / peak) * 100))}%` }}
+                            onClick={() => jump(b.target)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {axis.labels.length > 0 && (
+                      <div className="prompt-axis" aria-hidden="true">
+                        {axis.labels.map((l) => <span key={l.n} style={{ left: `${l.left}%` }}>PROMPT {l.n}</span>)}
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            </div>
-            <span className="hint">Highlighted bars are flagged steps. Click any bar to jump to it in the thread.</span>
+                <div className="hint">
+                  <span className="key now" />Fix now<span className="key look" />Worth a look<span className="hint-t">Click a bar to jump to that step.</span>
+                </div>
+              </>
+            )}
           </div>
         </header>
 
         <div className="thread-list" id="thread-list">
           {rows.length === 0 && <p className="hint-line">Nothing was recorded in this session: no prompts, replies or tool calls.</p>}
           {rows.map((r) => (
-            <ThreadRow key={r.id} row={r} agentName={timeline.agent_name} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
+            <ThreadRow key={r.id} row={r} agentName={timeline.agent_name} model={current?.model} flagged={flagged.get(r.id)} highlighted={highlight === r.id} onFlag={() => { const o = flagged.get(r.id); if (o) { setArea(o.Area as AreaKey); setMode("issues"); } jump(r.id); }} />
           ))}
         </div>
       </section>
@@ -158,8 +155,8 @@ export default function SessionPage() {
           {mode === "issues" && (
             <div className="a-tabs" role="tablist" aria-label="Problem areas">
               {AREA_ORDER.map((a) => (
-                <button key={a} className={`a-tab${area === a ? " on" : ""}`} role="tab" type="button" aria-selected={area === a} onClick={() => setArea(a)}>
-                  {AREA_LABEL[a]}<span className="mono">{issues[a]?.length ?? 0}</span>
+                <button key={a} className={`a-tab area-${a}${area === a ? " on" : ""}`} role="tab" type="button" aria-selected={area === a} onClick={() => setArea(a)}>
+                  <span className="adot" aria-hidden="true" />{AREA_LABEL[a]}<span className="mono">{issues[a]?.length ?? 0}</span>
                 </button>
               ))}
             </div>
@@ -168,34 +165,39 @@ export default function SessionPage() {
 
         <div className="a-body">
           {mode === "receipt" ? (
-            <Receipt t={timeline} onPrompt={(pid) => { const row = rows.find((r) => r.kind === "div" && r.prompt_id === pid); if (row) jump(row.id); }} />
+            <Receipt t={timeline} project={current?.project} duration={current?.duration_s} model={current?.model} onPrompt={(pid) => { const row = rows.find((r) => r.kind === "div" && r.prompt_id === pid); if (row) jump(row.id); }} />
           ) : (
-            <>
-              {(issues[area] ?? []).length === 0 && (
+            <div className={`area-panel area-${area}`}>
+              <div className="ap-head">
+                <span className="ap-ico" aria-hidden="true"><IconSearch size={18} /></span>
+                <h2>{AREA_NAME[area]}</h2>
+                <span className={`hbadge ${areaHealth ?? "ok"}`}>{areaHealth === "full" ? "Unhealthy" : areaHealth === "half" ? "Worth a look" : "Healthy"}</span>
+              </div>
+              {areaIssues.length === 0 && (
                 <article className="fcard dashed">
                   <strong className="big">No {AREA_NAME[area].toLowerCase()} issues in this session</strong>
                 </article>
               )}
-              {(issues[area] ?? []).map((o) => {
+              {areaIssues.map((o) => {
                 const key = fixKey(o);
                 return (
                   <article className="fcard" key={`${o.Kind}-${o.Subject}-${o.Evidence[0]}`}>
                     <div>
-                      <strong className="big">{o.Title}</strong>
+                      <strong className="big">{shortPath(o.Title)}</strong>
                       <span className="sub">{impactLine(o)} · {o.Conf}</span>
                     </div>
                     <div className="fix-stack">
                       <p className="lbl">Evidence</p>
                       {o.Evidence.slice(0, 8).map((ev) => (
-                        <button key={ev} className="ev-btn" type="button" onClick={() => jump(ev)}>
-                          <span>{rowLabel(rows, ev)}</span>
+                        <button key={ev} className={`ev-btn${highlight === ev ? " on" : ""}`} type="button" onClick={() => jump(ev)}>
+                          <span>{shortPath(rowLabel(rows, ev))}</span>
                           <span>→</span>
                         </button>
                       ))}
                     </div>
                     <div className="fix-stack">
                       <p className="lbl">{o.Fix ? `Fix · ${o.FixWhere}` : "Habit"}</p>
-                      {o.Fix ? <pre className="code">{o.Fix}</pre> : <span className="body-copy">{o.Note || o.Detail}</span>}
+                      {o.Fix ? <pre className="code">{shortPath(o.Fix)}</pre> : <span className="body-copy">{o.Note || o.Detail}</span>}
                       {o.Fix && o.Note && <span className="body-copy">{o.Note}</span>}
                     </div>
                     {marked[key] ? (
@@ -204,18 +206,18 @@ export default function SessionPage() {
                       <div className="actions">
                         {o.Fix && (
                           <button className="btn" type="button" onClick={() => { navigator.clipboard?.writeText(o.Fix ?? "").catch(() => {}); setCopied({ ...copied, [key]: true }); }}>
-                            {copied[key] ? "Copied" : "Copy"}
+                            <IconCopy size={16} />{copied[key] ? "Copied" : "Copy"}
                           </button>
                         )}
                         <button className="btn btn-k" type="button" onClick={() => api.setFixState(key, "fixed").then(() => setMarked({ ...marked, [key]: true })).catch(() => {})}>
-                          Mark as fixed
+                          <IconCheck size={16} />Mark as fixed
                         </button>
                       </div>
                     )}
                   </article>
                 );
               })}
-            </>
+            </div>
           )}
         </div>
 
@@ -228,10 +230,26 @@ export default function SessionPage() {
   );
 }
 
-function ThreadRow({ row, agentName, flagged, highlighted, onFlag }: { row: TimelineRow; agentName: string; flagged?: Occurrence; highlighted: boolean; onFlag: () => void }) {
+// A prompt longer than this many characters starts collapsed.
+const LONG_PROMPT = 600;
+
+function YouBubble({ text }: { text: string }) {
+  const long = text.length > LONG_PROMPT;
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="you">
+      <div className="who"><YouAvatar /><b>You</b></div>
+      <p className={long && !open ? "clamp" : undefined}>{text || "(prompt not logged)"}</p>
+      {long && <button type="button" className="more" onClick={() => setOpen(!open)}>{open ? "Show less" : "Show more"}</button>}
+    </div>
+  );
+}
+
+function ThreadRow({ row, agentName, model, flagged, highlighted, onFlag }: { row: TimelineRow; agentName: string; model?: string; flagged?: Occurrence; highlighted: boolean; onFlag: () => void }) {
+  const waited = row.kind === "tool" && (row.wait_ms ?? 0) > 0;
   return (
     <div className={`trow${flagged ? " fl" : ""}${highlighted ? " hl" : ""}`} id={`row-${row.id}`}>
-      <div>
+      <div className="gutter">
         {flagged && (
           <button className="flagbtn" type="button" aria-label={`Show issue in ${AREA_NAME[flagged.Area]}`} onClick={onFlag}>!</button>
         )}
@@ -240,21 +258,70 @@ function ThreadRow({ row, agentName, flagged, highlighted, onFlag }: { row: Time
         {row.kind === "div" && (
           <div className="divider"><span className="mono">{row.text}</span><span className="rule" /><span className="mono meta-d">{row.meta}</span></div>
         )}
-        {row.kind === "you" && <div className="you"><span className="lbl">You</span><p>{row.text || "(prompt not logged)"}</p></div>}
-        {row.kind === "claude" && <div className="claude"><span className="lbl">{agentName}</span><Markdown text={row.text} /></div>}
-        {row.kind === "tool" && (
-          <div className="tool-row">
-            <span>▸ <b>{row.name}</b> {row.text}{flagged && <span className="tag">{flagged.Title}</span>}{row.wait_ms ? <span className="tag">waited {Math.round(row.wait_ms / 1000)}s</span> : null}</span>
-            <span className="m">{row.meta ?? ""}</span>
+        {row.kind === "you" && <YouBubble text={row.text} />}
+        {row.kind === "claude" && (
+          <div className="claude">
+            <div className="who"><AgentAvatar name={agentName} /><b>{isClaude(agentName) ? "Claude" : agentName}</b><span className="who-m">{[model, agentName].filter(Boolean).join(" · ")}</span></div>
+            <Markdown text={row.text} />
           </div>
         )}
-        {row.kind === "event" && <div className="event"><span className="evt">{row.text}</span></div>}
+        {row.kind === "tool" && waited && (
+          <div className="wait-row">
+            <span className="wl"><span className="pause" aria-hidden="true">‖</span><span className="wl-k">Waiting on you ·</span><b>{row.name}</b>{row.text ? <span className="args">({shortPath(row.text)})</span> : null}<span className="tag red">Approved by hand</span>{flagged && <span className="tag red">{flagTag(flagged)}</span>}</span>
+            <span className="ws">{Math.round((row.wait_ms ?? 0) / 1000)}s</span>
+          </div>
+        )}
+        {row.kind === "tool" && !waited && (
+          <div className="tool-row">
+            <span className="tl"><span className="tdot" aria-hidden="true" /><b>{row.name}</b>{row.text ? <span className="args">({shortPath(row.text)})</span> : null}{flagged && <span className="tag red">{flagTag(flagged)}</span>}</span>
+            <span className="m">{(row.meta ?? "").replace(/^≈\s*/, "")}</span>
+          </div>
+        )}
+        {row.kind === "event" && (
+          <div className="event"><b className="evt">{row.text.replace(/^Context compacted/, "Conversation compacted")}</b>{flagged && <span className="tag">{flagged.Conf}</span>}</div>
+        )}
       </div>
     </div>
   );
 }
 
-function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) => void }) {
+// flagTag is the short badge on a flagged step, from the finding's kind:
+// "re_read" -> "RE-READ".
+function flagTag(o: Occurrence): string {
+  return (o.Kind || o.Title).replace(/_/g, "-");
+}
+
+// worst is the most severe level among some findings, or null for none.
+function worst(list: Occurrence[]): "full" | "half" | null {
+  if (list.some((o) => o.Severity === "full")) return "full";
+  return list.length > 0 ? "half" : null;
+}
+
+// promptLabels finds the bars where a new prompt starts and labels them under
+// the chart. Prompts too close to the last label get neither a label nor a
+// divider, so a session with many short prompts stays readable.
+function promptLabels(bars: Bar[], rows: TimelineRow[]): { starts: Set<number>; labels: { n: number; left: number }[] } {
+  const promptOf = new Map(rows.map((r) => [r.id, r.prompt_id ?? ""]));
+  const order = rows.filter((r) => r.kind === "div").map((r) => r.prompt_id ?? "");
+  const starts = new Set<number>();
+  const labels: { n: number; left: number }[] = [];
+  let prev = "";
+  bars.forEach((b, i) => {
+    const p = promptOf.get(b.first) ?? "";
+    if (p && p !== prev) {
+      const left = (i / Math.max(1, bars.length)) * 100;
+      const last = labels[labels.length - 1];
+      if (!last || left - last.left >= 14) {
+        labels.push({ n: order.indexOf(p) + 1 || labels.length + 1, left });
+        starts.add(i);
+      }
+    }
+    prev = p || prev;
+  });
+  return { starts, labels };
+}
+
+function Receipt({ t, project, duration, model, onPrompt }: { t: Timeline; project?: string; duration?: number; model?: string; onPrompt: (promptID: string) => void }) {
   const r = t.receipt;
   const total = r.tokens.fresh_input + r.tokens.output + r.tokens.cache_read + r.tokens.cache_write || 1;
   const cachePct = (r.tokens.cache_read / total) * 100;
@@ -267,7 +334,7 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
       <div className="rc-head">
         <div>
           <strong>SESSION RECEIPT</strong>
-          <div className="rc-sub">{r.calls} model calls</div>
+          <div className="rc-sub">{[project, dayShort(t.started_at), duration ? durationS(duration) : "", model].filter(Boolean).join(" · ")}</div>
         </div>
         <div>
           <div className="rc-total">{t.cost_unknown ? "—" : money(r.cost_usd)}</div>
@@ -276,18 +343,18 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
       </div>
       <div className="rc-split">
         <div className="rc-bar" role="img" aria-label={`${Math.round(r.well_spent * 100)}% well spent`}>
-          <div style={{ width: `${r.well_spent * 100}%`, background: "var(--k)" }} />
+          <div className="seg-spent" style={{ width: `${r.well_spent * 100}%` }} />
           <div className="hatch" style={{ width: `${(1 - r.well_spent) * 100}%` }} />
         </div>
         <div className="rc-row">
-          <span><b>{Math.round(r.well_spent * 100)}%</b> well spent</span>
-          <span>Avoidable (est.) <b className="mono">{money(r.avoidable_usd)}</b></span>
+          <span className="ws-pct"><b>{Math.round(r.well_spent * 100)}% well spent</b></span>
+          <span>Avoidable (est.) <b className="mono av">{money(r.avoidable_usd)}</b></span>
         </div>
       </div>
       <div className="rsec">BY PROMPT</div>
-      {(r.prompts ?? []).map((p) => (
+      {(r.prompts ?? []).map((p, i) => (
         <button key={p.prompt_id} className="rl" type="button" onClick={() => onPrompt(p.prompt_id)}>
-          <span><b>{p.label || "(prompt not logged)"}</b><small>{tokensHuman(p.tokens)} tok · {p.flags > 0 ? `${p.flags} flag${p.flags === 1 ? "" : "s"}` : "clean"}</small></span>
+          <span><b>{i + 1} · {p.label ? cleanTitle(p.label) : "(prompt not logged)"}</b><small>{tokensHuman(p.tokens)} tok · {p.flags > 0 ? `${p.flags} flag${p.flags === 1 ? "" : "s"}` : "clean"}</small></span>
           <span className="mono">{money(p.cost_usd)}</span>
         </button>
       ))}
@@ -296,7 +363,7 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
           <div className="rsec">AVOIDABLE, BY PROBLEM</div>
           {avoidableAreas.map((a) => (
             <div className="rl" key={a}>
-              <span className="lead-item"><span className="pip full" />{AREA_LABEL[a]}</span>
+              <span className={`lead-item area-${a}`}><span className="adot" />{AREA_NAME[a]}</span>
               <span className="mono">{money(byArea[a])}</span>
             </div>
           ))}
@@ -304,17 +371,18 @@ function Receipt({ t, onPrompt }: { t: Timeline; onPrompt: (promptID: string) =>
       )}
       <div className="rsec">WHERE THE TOKENS WENT</div>
       <div className="tokens-bar" role="img" aria-label={`Token mix: ${Math.round(cachePct)}% from cache, ${Math.round(freshPct)}% fresh input, ${Math.round(outPct)}% output`}>
-        <div style={{ width: `${cachePct}%`, background: "var(--w)" }} />
-        <div style={{ width: `${freshPct}%`, background: "var(--k)" }} />
+        <div className="seg-cache" style={{ width: `${cachePct}%` }} />
+        <div className="seg-fresh" style={{ width: `${freshPct}%` }} />
         <div className="hatch" style={{ width: `${outPct}%` }} />
-        <div style={{ width: `${(r.tokens.cache_write / total) * 100}%`, background: "var(--ink-5)" }} />
+        <div className="seg-write" style={{ width: `${(r.tokens.cache_write / total) * 100}%` }} />
       </div>
       <div className="legend-grid">
-        <span><span>□ From cache</span><span className="mono">{tokensHuman(r.tokens.cache_read)}</span></span>
-        <span><span>■ Fresh input</span><span className="mono">{tokensHuman(r.tokens.fresh_input)}</span></span>
-        <span><span>▨ Output</span><span className="mono">{tokensHuman(r.tokens.output)}</span></span>
-        <span><span><span className="soft-ink">■</span> Cache writes</span><span className="mono">{tokensHuman(r.tokens.cache_write)}</span></span>
+        <span><span><span className="g-cache">□</span> From cache</span><span className="mono">{tokensHuman(r.tokens.cache_read)}</span></span>
+        <span><span><span className="g-fresh">■</span> Fresh input</span><span className="mono">{tokensHuman(r.tokens.fresh_input)}</span></span>
+        <span><span><span className="g-out">▨</span> Output</span><span className="mono">{tokensHuman(r.tokens.output)}</span></span>
+        <span><span><span className="g-write">■</span> Cache writes</span><span className="mono">{tokensHuman(r.tokens.cache_write)}</span></span>
       </div>
+      <div className="receipt-foot">{r.calls} model calls</div>
       <div className="torn" aria-hidden="true" />
     </article>
   );
@@ -332,7 +400,7 @@ function impactLine(o: Occurrence): string {
 // is. Each bar stands for a run of consecutive steps.
 const MAX_BARS = 60;
 
-type Bar = { first: string; rows: string[]; target: string; context: number; flagged: boolean; label: string };
+type Bar = { first: string; rows: string[]; target: string; context: number; flagged: boolean; severity: "full" | "half"; label: string };
 
 function groupBars(rows: TimelineRow[], flagged: Map<string, Occurrence>, max: number): Bar[] {
   const size = Math.max(1, Math.ceil(rows.length / max));
@@ -346,6 +414,7 @@ function groupBars(rows: TimelineRow[], flagged: Map<string, Occurrence>, max: n
       target: (hit ?? group[0]).id,
       context: Math.max(...group.map((r) => r.context_tokens ?? 0)),
       flagged: Boolean(hit),
+      severity: group.some((r) => flagged.get(r.id)?.Severity === "full") ? "full" : "half",
       label: group.length === 1 ? group[0].text : `${group.length} steps`,
     });
   }

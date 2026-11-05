@@ -39,14 +39,16 @@ describe("Session", () => {
     expect(await screen.findByRole("heading", { name: "Fix the login bug" })).toBeTruthy();
     expect(screen.getByText("$2.50", { selector: ".pill" })).toBeTruthy();
     expect(screen.getByText("31K tok")).toBeTruthy();
-    expect(screen.getByText("Peaked ~40K · compacted 1×")).toBeTruthy();
+    expect(screen.getByText("peak ~40K · compacted once")).toBeTruthy();
+    expect(screen.getByText("Unhealthy", { selector: ".ctx-top .hbadge" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "src/a.ts · ~20K context" })).toBeTruthy();
     const thread = within(screen.getByRole("region", { name: "Session thread" }));
     expect(thread.getByText("Done.")).toBeTruthy();
     expect(thread.getByText("(prompt not logged)")).toBeTruthy();
-    expect(thread.getByText("waited 12s")).toBeTruthy();
+    expect(thread.getByText("12s")).toBeTruthy();
+    expect(thread.getByText(/Waiting on you/)).toBeTruthy();
     expect(thread.getByText("Compacted")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Other session/ }).textContent).toContain("—");
+    expect((await screen.findByRole("link", { name: /Other session/ })).textContent).toContain("—");
   });
 
   it("shows each area's issues with their evidence and fix", async () => {
@@ -108,12 +110,12 @@ describe("Session", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Receipt" }));
     const receipt = within(screen.getByRole("article", { name: "Session receipt" }));
     expect(receipt.getByText("4 model calls")).toBeTruthy();
-    expect(receipt.getByText("70%")).toBeTruthy();
+    expect(receipt.getByText("70% well spent")).toBeTruthy();
     expect(receipt.getByRole("img", { name: "Token mix: 58% from cache, 32% fresh input, 6% output" })).toBeTruthy();
     expect(receipt.getByText("1 flag", { exact: false })).toBeTruthy();
-    expect(receipt.getByText("(prompt not logged)")).toBeTruthy();
-    expect(receipt.getByText("Context")).toBeTruthy();
-    expect(receipt.queryByText("Permissions")).toBeNull();
+    expect(receipt.getByText(/^\d+ · \(prompt not logged\)$/)).toBeTruthy();
+    expect(receipt.getByText("Context health")).toBeTruthy();
+    expect(receipt.queryByText("Permission friction")).toBeNull();
     await userEvent.click(receipt.getByRole("button", { name: /Fix the login bug/ }));
     expect(document.getElementById("row-d1")?.className).toContain("hl");
     await userEvent.click(receipt.getByRole("button", { name: /prompt not logged/ }));
@@ -124,7 +126,7 @@ describe("Session", () => {
     const rows = Array.from({ length: 130 }, (_, i) => ({ id: `r${i}`, kind: "tool" as const, ts: i, name: "Read", text: `f${i}`, context_tokens: i * 100 }));
     fakeAPI({ ...routes({}), "/api/sessions/s1/timeline": timeline({ rows, compactions: 0, cost_unknown: true }) });
     renderAt("/sessions/s1");
-    await screen.findByText("Peaked ~40K");
+    await screen.findByText("peak ~40K");
     const bars = within(screen.getByRole("group", { name: "Context size after each step" })).getAllByRole("button");
     expect(bars).toHaveLength(44);
     expect(bars[0].getAttribute("aria-label")).toBe("3 steps · ~200 context");
@@ -169,6 +171,17 @@ describe("Session", () => {
     renderAt("/sessions/s1");
     expect(await screen.findByText("Done", { selector: "strong" })).toBeTruthy();
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getAllByText("Claude", { selector: ".who b" }).length).toBeGreaterThan(0);
+  });
+
+  it("names a reply after the agent that wrote it", async () => {
+    const t = timeline({ agent_name: "Codex" });
+    t.rows = [...t.rows, { id: "c2", kind: "claude", ts: 99, text: "Done here." }];
+    fakeAPI({ ...routes(), "/api/sessions/s1/timeline": t });
+    renderAt("/sessions/s1");
+    expect(await screen.findByText("Done here.")).toBeTruthy();
+    expect(screen.getAllByText("Codex", { selector: ".who b" }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Claude", { selector: ".who b" })).toBeNull();
   });
 
   it("shows the error for any other failure", async () => {

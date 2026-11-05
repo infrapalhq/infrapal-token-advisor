@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useLocation, useParams } from "react-router-do
 import Overview from "./ta/Overview";
 import Sessions from "./ta/Sessions";
 import SessionPage from "./ta/Session";
-import Fixes from "./ta/Fixes";
+import Fixes, { FixesProgress } from "./ta/Fixes";
 import Settings from "./ta/Settings";
 import NotFound from "./ta/NotFound";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -62,6 +62,7 @@ export function AppRoutes() {
         <Route path="/sessions" element={<><VisitRecorder /><Sessions /></>} />
         <Route path="/sessions/:id" element={<SessionRoute />} />
         <Route path="/fixes" element={<Fixes />} />
+        <Route path="/fixes/progress" element={<FixesProgress />} />
         <Route path="/settings" element={<Settings />} />
 
         <Route path="/spend" element={<RedirectPreservingQuery to="/" />} />
