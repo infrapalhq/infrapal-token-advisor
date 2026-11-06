@@ -90,21 +90,86 @@ type SafeFinding struct {
 // SafeFindings returns the same items as the Fixes page, highest priority
 // first, for a range token such as "30d" or "all".
 func SafeFindings(ctx context.Context, db *sql.DB, since string) ([]SafeFinding, error) {
-	cutoff, err := durationSince(ctx, db, since)
+	_, _, items, err := loadSafe(ctx, db, since)
 	if err != nil {
 		return nil, err
+	}
+	return safeFindings(items), nil
+}
+
+// SafeOverview is the dashboard's Overview without anything that names a
+// project, file or command: totals, spend by day and by model, and the top
+// findings. It is what the MCP overview view draws.
+type SafeOverview struct {
+	Range        string        `json:"range"`
+	SpendUSD     float64       `json:"spend_usd"`
+	Tokens       int64         `json:"tokens"`
+	CacheShare   float64       `json:"cache_share"`
+	AvoidableUSD float64       `json:"avoidable_usd"`
+	OpenFindings int           `json:"open_findings"`
+	Sessions     int           `json:"sessions"`
+	ByDay        []*dayRow     `json:"by_day"`
+	Models       []modelRow    `json:"models"`
+	TopFindings  []SafeFinding `json:"top_findings"`
+}
+
+// maxOverviewFindings is how many open findings the overview lists.
+const maxOverviewFindings = 5
+
+// SafeOverviewFor builds the SafeOverview for a range token such as "30d".
+func SafeOverviewFor(ctx context.Context, db *sql.DB, since string) (SafeOverview, error) {
+	d, occ, items, err := loadSafe(ctx, db, since)
+	if err != nil {
+		return SafeOverview{}, err
+	}
+	totals := totalSpend(d, occ)
+	out := SafeOverview{
+		Range:       since,
+		SpendUSD:    totals.Spend,
+		Tokens:      totals.Tokens,
+		CacheShare:  totals.CacheShare,
+		Sessions:    len(d.sessions),
+		ByDay:       totals.Days,
+		Models:      totals.Models,
+		TopFindings: []SafeFinding{},
+	}
+	for _, f := range safeFindings(items) {
+		if f.MarkedFixed {
+			continue
+		}
+		out.OpenFindings++
+		if f.USD != nil {
+			out.AvoidableUSD += *f.USD
+		}
+		if len(out.TopFindings) < maxOverviewFindings {
+			out.TopFindings = append(out.TopFindings, f)
+		}
+	}
+	return out, nil
+}
+
+// loadSafe runs the detectors over a range and applies the user's marks.
+func loadSafe(ctx context.Context, db *sql.DB, since string) (*insightData, []occurrence, []*insightItem, error) {
+	cutoff, err := durationSince(ctx, db, since)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	d, occ, err := computeInsights(ctx, db, cutoff, "")
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	marks, err := loadMarks(ctx, db)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	items := aggregateItems(occ, d.blendedRate)
 	applyMarks(items, marks)
+	return d, occ, items, nil
+}
 
+// safeFindings strips the fields that could hold a file path, command or
+// project name.
+func safeFindings(items []*insightItem) []SafeFinding {
 	out := make([]SafeFinding, 0, len(items))
 	for _, it := range items {
 		sum := sha256.Sum256([]byte(it.Key))
@@ -132,5 +197,5 @@ func SafeFindings(ctx context.Context, db *sql.DB, since string) ([]SafeFinding,
 		}
 		out = append(out, f)
 	}
-	return out, nil
+	return out
 }
