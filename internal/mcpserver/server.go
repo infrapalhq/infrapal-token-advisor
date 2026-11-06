@@ -2,7 +2,8 @@
 // on stdio), so Claude can derive its own insights from it. Tool results leave
 // the machine with the conversation, so the tools return metrics and ids only:
 // run_sql is limited to v_* views without content columns (guard.go), and
-// get_findings removes file paths and commands (api.SafeFindings).
+// get_findings and get_overview remove project names, file paths and commands
+// (api.SafeFindings, api.SafeOverviewFor).
 package mcpserver
 
 import (
@@ -18,10 +19,11 @@ import (
 )
 
 // protocolVersions lists the MCP revisions this server can speak, newest first.
-// The subset used here (initialize, ping, tools, prompts) is the same in all of them.
+// The subset used here (initialize, ping, tools, prompts, resources) is the same in all of them.
 var protocolVersions = []string{"2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"}
 
 const instructions = "Token Advisor holds this user's coding agent usage: spend, tokens, cache, tools, permissions, and sessions. " +
+	"Use get_overview to show the user a summary with a chart. " +
 	"Start with get_findings for known problems and get_schema for what can be queried, then use run_sql to quantify and compare. " +
 	"Drill into one prompt or session through v_api_request_detail and v_tool_call_detail. " +
 	"Prompt text, responses, file paths, and commands are not available here."
@@ -32,6 +34,8 @@ const (
 	codeInvalidRequest = -32600
 	codeMethodNotFound = -32601
 	codeInvalidParams  = -32602
+	// codeResourceNotFound is MCP's code for an unknown resource URI.
+	codeResourceNotFound = -32002
 )
 
 // Server handles MCP requests over a read-only database.
@@ -39,11 +43,19 @@ type Server struct {
 	db           *sql.DB
 	version      string
 	queryTimeout time.Duration
+	dashboardURL string
 }
 
 // New builds a Server. db should come from store.OpenReadOnly.
 func New(db *sql.DB, version string) *Server {
 	return &Server{db: db, version: version, queryTimeout: 10 * time.Second}
+}
+
+// WithDashboard sets the dashboard's address, which the overview view offers
+// to open.
+func (s *Server) WithDashboard(url string) *Server {
+	s.dashboardURL = url
+	return s
 }
 
 type request struct {
@@ -125,6 +137,12 @@ func (s *Server) dispatch(ctx context.Context, req request) (any, *rpcError) {
 		return map[string]any{"prompts": prompts}, nil
 	case "prompts/get":
 		return getPrompt(req.Params)
+	case "resources/list":
+		return map[string]any{"resources": resources}, nil
+	case "resources/templates/list":
+		return map[string]any{"resourceTemplates": []any{}}, nil
+	case "resources/read":
+		return readResource(req.Params)
 	case "":
 		return nil, &rpcError{codeInvalidRequest, "missing method"}
 	}
@@ -144,7 +162,7 @@ func (s *Server) initialize(params json.RawMessage) any {
 	}
 	return map[string]any{
 		"protocolVersion": version,
-		"capabilities":    map[string]any{"tools": map[string]any{}, "prompts": map[string]any{}},
+		"capabilities":    map[string]any{"tools": map[string]any{}, "prompts": map[string]any{}, "resources": map[string]any{}},
 		"serverInfo":      map[string]any{"name": "infrapal-token-advisor", "version": s.version},
 		"instructions":    instructions,
 	}
@@ -175,7 +193,12 @@ func (s *Server) callTool(ctx context.Context, params json.RawMessage) (any, *rp
 		if err != nil {
 			return toolResult(err.Error(), true), nil
 		}
-		return toolResult(string(encoded), false), nil
+		out := toolResult(string(encoded), false)
+		if t.Meta != nil {
+			// A view draws from structuredContent; the text is for the model.
+			out["structuredContent"] = json.RawMessage(encoded)
+		}
+		return out, nil
 	}
 	return nil, &rpcError{codeInvalidParams, "unknown tool: " + in.Name}
 }
