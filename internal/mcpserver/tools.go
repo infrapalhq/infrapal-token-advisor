@@ -24,6 +24,8 @@ type tool struct {
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"inputSchema"`
 	Annotations map[string]any `json:"annotations"`
+	// Meta links the tool to an MCP App view, for hosts that draw them.
+	Meta map[string]any `json:"_meta,omitempty"`
 
 	call func(s *Server, ctx context.Context, args json.RawMessage) (any, error)
 }
@@ -68,6 +70,17 @@ var tools = []tool{
 		}),
 		Annotations: readOnly,
 		call:        (*Server).getFindings,
+	},
+	{
+		Name: "get_overview",
+		Description: "Show the user an overview of their usage: spend, tokens, cache reuse, spend by day and by model, and the top findings. " +
+			"Hosts that support MCP Apps draw it as an interactive chart. Use it when the user asks how their usage looks, or for a summary.",
+		InputSchema: objectSchema(map[string]any{
+			"since": stringParam(`Time range: "today", "7d", "30d", "3m", "install", or "all". Defaults to "30d".`),
+		}),
+		Annotations: readOnly,
+		Meta:        map[string]any{"ui": map[string]any{"resourceUri": overviewURI}},
+		call:        (*Server).getOverview,
 	},
 }
 

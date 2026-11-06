@@ -196,9 +196,15 @@ ask about your usage in your own words:
 | `/infrapal-token-advisor:session <id>` | Explains why one session cost what it did |
 | `/infrapal-token-advisor:compare` | Compares the last 7 days with the 7 days before |
 
-Behind these are three read-only tools: `get_schema`, `run_sql` (limited to
-`v_*` views) and `get_findings`. Claude runs them on your Claude Code plan, so
-there's no separate API key.
+Behind these are four read-only tools: `get_schema`, `run_sql` (limited to
+`v_*` views), `get_findings` and `get_overview`. Claude runs them on your
+Claude Code plan, so there's no separate API key.
+
+Ask for an overview, and apps that support
+[MCP Apps](https://modelcontextprotocol.io/extensions/apps/overview), such as
+Claude, show it as an interactive view: spend, tokens, cache reuse, a daily
+chart, spend by model and the top findings, with a range switch. Claude Code in
+a terminal shows the same numbers as text.
 
 Once you enable it, what these tools return goes to Anthropic with your
 conversation. They return metrics and ids only. Prompts, responses, file paths,

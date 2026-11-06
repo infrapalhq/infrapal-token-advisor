@@ -21,7 +21,8 @@ The first release.
 - Fixes to paste in, such as `CLAUDE.md` lines and allow rules, offered only for
   read-only commands, with week-by-week tracking of whether they helped.
 - An MCP server, so Claude Code can query your usage itself, with slash commands
-  to review your usage, explain a session and compare weeks. It runs on your
+  to review your usage, explain a session and compare weeks, and an overview
+  that apps supporting MCP Apps draw as an interactive chart. It runs on your
   Claude Code plan, so there's no API key to add.
 - `token-advisor` commands: `init`, `status`, `doctor`, `ui`, `logs`, `export`,
   `purge`, `update`, `restart` and `uninstall`.

@@ -164,26 +164,14 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var spend float64
-	var tokens, cacheRead, context, waitMs, idleMs int64
-	byDay := map[string]*dayRow{}
+	totals := totalSpend(d, occ)
+	var waitMs, idleMs int64
 	byProject := map[string]*projRow{}
-	models := map[string]float64{}
 	projOf := map[string]string{}
 	for _, c := range cards {
 		projOf[c.ID] = c.Project
 	}
 	for _, req := range d.reqs {
-		spend += req.CostUSD
-		tokens += req.Tokens()
-		cacheRead += req.CacheRead
-		context += req.Context
-		day := time.UnixMilli(req.Ts).Format("2006-01-02")
-		if byDay[day] == nil {
-			byDay[day] = &dayRow{Day: day}
-		}
-		byDay[day].Cost += req.CostUSD
-		models[req.Model] += req.CostUSD
 		proj := projOf[req.SessionID]
 		if proj == "" {
 			proj = project.Name("")
@@ -210,21 +198,6 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			avoidable += *it.USD
 		}
 	}
-	for _, o := range occ {
-		if o.SessionID == "" {
-			continue
-		}
-		day := time.UnixMilli(o.Ts).Format("2006-01-02")
-		if byDay[day] == nil {
-			byDay[day] = &dayRow{Day: day}
-		}
-		if o.USD != nil {
-			byDay[day].Avoidable += *o.USD
-		} else if o.Tokens != nil && d.blendedRate > 0 {
-			byDay[day].Avoidable += float64(*o.Tokens) * d.blendedRate
-		}
-	}
-
 	fixFirst := []*insightItem{}
 	var recoveredUSD, recoveredMin float64
 	openFixes := 0
@@ -245,27 +218,12 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	areas := areaSummaries(open, occ)
-	days := make([]*dayRow, 0, len(byDay))
-	for _, v := range byDay {
-		days = append(days, v)
-	}
-	sort.Slice(days, func(i, j int) bool { return days[i].Day < days[j].Day })
 	projects := make([]*projRow, 0, len(byProject))
 	for _, v := range byProject {
 		v.Sessions = len(v.sessions)
 		projects = append(projects, v)
 	}
 	sort.Slice(projects, func(i, j int) bool { return projects[i].Cost > projects[j].Cost })
-
-	modelRows := []map[string]any{}
-	for m, c := range models {
-		share := 0.0
-		if spend > 0 {
-			share = c / spend
-		}
-		modelRows = append(modelRows, map[string]any{"model": m, "cost_usd": c, "share": share})
-	}
-	sort.Slice(modelRows, func(i, j int) bool { return modelRows[i]["cost_usd"].(float64) > modelRows[j]["cost_usd"].(float64) })
 
 	review := []sessionCard{}
 	costUnknown := 0
@@ -277,16 +235,11 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			review = append(review, c)
 		}
 	}
-	cacheShare := 0.0
-	if context > 0 {
-		cacheShare = float64(cacheRead) / float64(context)
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
 		"range":          token,
-		"spend_usd":      spend,
-		"tokens":         tokens,
-		"cache_share":    cacheShare,
+		"spend_usd":      totals.Spend,
+		"tokens":         totals.Tokens,
+		"cache_share":    totals.CacheShare,
 		"waiting_ms":     waitMs,
 		"idle_ms":        idleMs,
 		"avoidable_usd":  avoidable,
@@ -294,14 +247,84 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		"fix_first":      fixFirst,
 		"open_fixes":     openFixes,
 		"areas":          areas,
-		"by_day":         days,
+		"by_day":         totals.Days,
 		"by_project":     projects,
-		"models":         modelRows,
+		"models":         totals.Models,
 		"review":         review,
 		"sessions_count": len(cards),
 
 		"cost_unknown_sessions": costUnknown,
 	})
+}
+
+// spendTotals is what the dashboard's Overview and the MCP overview share.
+type spendTotals struct {
+	Spend      float64
+	Tokens     int64
+	CacheShare float64 // share of context tokens read from the cache
+	Days       []*dayRow
+	Models     []modelRow
+}
+
+// modelRow is one model's share of the spend.
+type modelRow struct {
+	Model string  `json:"model"`
+	Cost  float64 `json:"cost_usd"`
+	Share float64 `json:"share"`
+}
+
+// totalSpend adds up spend, tokens and cache reuse, spend and avoidable spend
+// by day, and spend by model. Global findings, which belong to no session,
+// have no day, so they're left out of the daily avoidable spend.
+func totalSpend(d *insightData, occ []occurrence) spendTotals {
+	var t spendTotals
+	var cacheRead, context int64
+	byDay := map[string]*dayRow{}
+	dayOf := func(ts int64) *dayRow {
+		day := time.UnixMilli(ts).Format("2006-01-02")
+		if byDay[day] == nil {
+			byDay[day] = &dayRow{Day: day}
+		}
+		return byDay[day]
+	}
+	models := map[string]float64{}
+	for _, req := range d.reqs {
+		t.Spend += req.CostUSD
+		t.Tokens += req.Tokens()
+		cacheRead += req.CacheRead
+		context += req.Context
+		dayOf(req.Ts).Cost += req.CostUSD
+		models[req.Model] += req.CostUSD
+	}
+	for _, o := range occ {
+		if o.SessionID == "" {
+			continue
+		}
+		if o.USD != nil {
+			dayOf(o.Ts).Avoidable += *o.USD
+		} else if o.Tokens != nil && d.blendedRate > 0 {
+			dayOf(o.Ts).Avoidable += float64(*o.Tokens) * d.blendedRate
+		}
+	}
+	if context > 0 {
+		t.CacheShare = float64(cacheRead) / float64(context)
+	}
+
+	t.Days = make([]*dayRow, 0, len(byDay))
+	for _, v := range byDay {
+		t.Days = append(t.Days, v)
+	}
+	sort.Slice(t.Days, func(i, j int) bool { return t.Days[i].Day < t.Days[j].Day })
+	t.Models = make([]modelRow, 0, len(models))
+	for m, c := range models {
+		share := 0.0
+		if t.Spend > 0 {
+			share = c / t.Spend
+		}
+		t.Models = append(t.Models, modelRow{Model: m, Cost: c, Share: share})
+	}
+	sort.Slice(t.Models, func(i, j int) bool { return t.Models[i].Cost > t.Models[j].Cost })
+	return t
 }
 
 // dayRow is one bar of the Overview's spend-by-day chart.
