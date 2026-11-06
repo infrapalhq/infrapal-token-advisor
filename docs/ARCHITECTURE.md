@@ -136,11 +136,20 @@ To add one, see [ADDING_A_DETECTOR.md](ADDING_A_DETECTOR.md).
 Code plan, so token-advisor never needs an API key. Claude Code starts it and
 talks to it over stdio. It opens the database read-only, and offers:
 
-- **Tools** (`tools.go`): `get_schema`, `run_sql` and `get_findings`. `run_sql`
-  only reads `v_*` views without content columns (`guard.go`), and
-  `get_findings` leaves out file paths and commands. What they return goes to
-  Anthropic with the conversation, and a test fails if a sensitive fixture
-  string comes back.
+- **Tools** (`tools.go`): `get_schema`, `run_sql`, `get_findings` and
+  `get_overview`. `run_sql` only reads `v_*` views without content columns
+  (`guard.go`), and `get_findings` and `get_overview` leave out project names,
+  file paths and commands. What they return goes to Anthropic with the
+  conversation, and a test fails if a sensitive fixture string comes back.
+- **The overview view** (`apps.go`, `ui/overview.html`): `get_overview` links to
+  the resource `ui://infrapal-token-advisor/overview.html`, an
+  [MCP App](https://modelcontextprotocol.io/extensions/apps/overview). Hosts that
+  support MCP Apps, such as Claude, draw it in a sandboxed frame: totals, spend
+  by day and by model, and the top findings, with a range switch that calls
+  `get_overview` again. Hosts that don't, such as Claude Code in a terminal,
+  ignore the link and use the tool's text. The view is one HTML file with no
+  external requests, so it works under the hosts' default content security
+  policy.
 - **Prompts** (`prompts.go`): `review`, `session` and `compare`, which Claude
   Code lists as `/infrapal-token-advisor:review` and so on. Each tells Claude
   which tools to use and to back every claim with a number. The dashboard's
