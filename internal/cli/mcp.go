@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/infrapalhq/infrapal-token-advisor/internal/config"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/mcpserver"
 	"github.com/infrapalhq/infrapal-token-advisor/internal/store"
 )
@@ -32,5 +33,11 @@ func runMCP(args []string) error {
 	}
 	defer db.Close()
 
-	return mcpserver.New(db, Version).Serve(context.Background(), os.Stdin, os.Stdout)
+	// The overview view offers to open the dashboard. A config that can't be
+	// read only loses that button, so it isn't an error here.
+	server := mcpserver.New(db, Version)
+	if cfg, err := config.Load(p); err == nil {
+		server.WithDashboard(fmt.Sprintf("http://127.0.0.1:%d", cfg.APIPort))
+	}
+	return server.Serve(context.Background(), os.Stdin, os.Stdout)
 }
