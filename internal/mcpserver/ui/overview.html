@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Advisor overview</title>
+<style>
+  /* Host style variables, when the host sends them, override these defaults. */
+  :root {
+    color-scheme: light;
+    --ta-bg: var(--color-background-primary, #ffffff);
+    --ta-tint: var(--color-background-secondary, #f4f4f4);
+    --ta-ink: var(--color-text-primary, #111111);
+    --ta-ink-2: var(--color-text-secondary, #5a5a5a);
+    --ta-line: var(--color-border-primary, #dddddd);
+    --ta-spend: #2f6fd8;
+    --ta-avoid: #d98a0b;
+    --ta-ok: #2f8f4e;
+    --ta-sans: var(--font-sans, Inter, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif);
+    --ta-mono: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ta-bg: var(--color-background-primary, #0a1525);
+    --ta-tint: var(--color-background-secondary, rgba(255, 255, 255, .05));
+    --ta-ink: var(--color-text-primary, #f4f5f7);
+    --ta-ink-2: var(--color-text-secondary, #a9b6c8);
+    --ta-line: var(--color-border-primary, rgba(255, 255, 255, .12));
+    --ta-spend: #71a3f4;
+    --ta-avoid: #f5a623;
+    --ta-ok: #79c387;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ta-bg); color: var(--ta-ink); font: 14px/1.45 var(--ta-sans); }
+  main { padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+  .head h1 { margin: 0; font-size: 15px; font-weight: 650; }
+  .head h1 span { color: var(--ta-ink-2); font-weight: 400; }
+  .ranges { display: flex; gap: 4px; flex-wrap: wrap; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .ranges button { border: 1px solid var(--ta-line); background: transparent; border-radius: 999px; padding: 3px 11px; font-size: 12px; }
+  .ranges button[aria-pressed="true"] { background: var(--ta-ink); color: var(--ta-bg); border-color: var(--ta-ink); }
+  .ranges button:disabled { cursor: progress; opacity: .6; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+  .tile { background: var(--ta-tint); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .tile .lbl { font-size: 12px; color: var(--ta-ink-2); }
+  .tile .num { font: 600 22px/1.2 var(--ta-mono); margin-top: 2px; overflow-wrap: anywhere; }
+  .tile .sub { font-size: 12px; color: var(--ta-ink-2); }
+  .tile.avoid .num { color: var(--ta-avoid); }
+  h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ta-ink-2); margin: -4px 0 8px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  svg.chart { display: block; width: 100%; height: 140px; }
+  .axis { display: flex; justify-content: space-between; font: 11px var(--ta-mono); color: var(--ta-ink-2); margin-top: 4px; }
+  .models { display: flex; flex-direction: column; gap: 6px; }
+  .model { display: grid; grid-template-columns: minmax(90px, 34%) 1fr 8.5em; align-items: center; gap: 10px; font-size: 13px; }
+  .model .name { font-family: var(--ta-mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .model .bar { height: 8px; background: var(--ta-tint); border-radius: 4px; overflow: hidden; }
+  .model .bar div { height: 100%; background: var(--ta-spend); }
+  .model .val { font-family: var(--ta-mono); font-size: 12px; color: var(--ta-ink-2); text-align: right; white-space: nowrap; }
+  ol.findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  ol.findings li { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--ta-line); }
+  ol.findings li:first-child { border-top: 0; padding-top: 0; }
+  .pip { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; border: 1.5px solid var(--ta-avoid); }
+  .pip.full { background: var(--ta-avoid); }
+  .finding { min-width: 0; flex: 1; }
+  .finding strong { font-weight: 600; }
+  .finding .meta { font-size: 12px; color: var(--ta-ink-2); }
+  .finding .usd { font-family: var(--ta-mono); font-size: 13px; white-space: nowrap; }
+  .tag { font-size: 11px; border: 1px solid var(--ta-line); border-radius: 999px; padding: 0 7px; margin-left: 6px; color: var(--ta-ink-2); white-space: nowrap; }
+  .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ta-ink-2); }
+  .foot button { border: 1px solid var(--ta-line); background: transparent; border-radius: 8px; padding: 5px 12px; font-size: 13px; }
+  .state { color: var(--ta-ink-2); padding: 24px 0; text-align: center; }
+  .empty { color: var(--ta-ink-2); font-size: 13px; margin: 0; }
+</style>
+</head>
+<body>
+<main id="app" aria-live="polite"><p class="state">Loading…</p></main>
+<script>
+"use strict";
+(function () {
+  var RANGES = [["today", "Today"], ["7d", "7 days"], ["30d", "30 days"], ["3m", "3 months"], ["all", "All"]];
+  var RANGE_LABEL = { today: "today", "7d": "last 7 days", "30d": "last 30 days", "3m": "last 3 months", install: "since install", all: "all time" };
+  var AREA_NAME = { model: "Model–task mismatch", context: "Context health", exec: "Wasteful execution", perm: "Permission friction" };
+
+  var app = document.getElementById("app");
+  var data = null;
+  var loading = false;
+  var error = "";
+
+  // JSON-RPC over postMessage with the host (the MCP Apps protocol).
+  var nextId = 1;
+  var pending = {};
+  function send(msg) { window.parent.postMessage(msg, "*"); }
+  function request(method, params) {
+    var id = nextId++;
+    send({ jsonrpc: "2.0", id: id, method: method, params: params });
+    return new Promise(function (resolve, reject) { pending[id] = { resolve: resolve, reject: reject }; });
+  }
+  function notify(method, params) { send({ jsonrpc: "2.0", method: method, params: params }); }
+
+  window.addEventListener("message", function (e) {
+    if (e.source !== window.parent) return;
+    var m = e.data;
+    if (!m || m.jsonrpc !== "2.0") return;
+    if (m.method === undefined && m.id != null && pending[m.id]) {
+      var p = pending[m.id];
+      delete pending[m.id];
+      if (m.error) p.reject(new Error(m.error.message || "request failed")); else p.resolve(m.result);
+      return;
+    }
+    switch (m.method) {
+      case "ui/notifications/tool-result":
+        showResult(m.params);
+        break;
+      case "ui/notifications/tool-cancelled":
+        if (!data) { error = "The overview was cancelled."; render(); }
+        break;
+      case "ui/notifications/host-context-changed":
+        applyContext(m.params);
+        break;
+      case "ui/resource-teardown":
+      case "ping":
+        if (m.id != null) send({ jsonrpc: "2.0", id: m.id, result: {} });
+        break;
+    }
+  });
+
+  function applyContext(ctx) {
+    if (!ctx) return;
+    if (ctx.theme === "dark" || ctx.theme === "light") document.documentElement.setAttribute("data-theme", ctx.theme);
+    var vars = ctx.styles && ctx.styles.variables;
+    if (vars) {
+      Object.keys(vars).forEach(function (k) {
+        if (k.indexOf("--") === 0 && typeof vars[k] === "string") document.documentElement.style.setProperty(k, vars[k]);
+      });
+    }
+  }
+
+  // A tool result carries the overview in structuredContent, and as JSON text
+  // for hosts that only pass content along.
+  function overviewFrom(result) {
+    if (!result) return null;
+    if (result.structuredContent && result.structuredContent.by_day) return result.structuredContent;
+    var text = result.content && result.content[0] && result.content[0].text;
+    try { var parsed = JSON.parse(text); if (parsed && parsed.by_day) return parsed; } catch (_) { /* not JSON */ }
+    return null;
+  }
+
+  function showResult(result) {
+    var o = overviewFrom(result);
+    if (result && result.isError) {
+      var text = result.content && result.content[0] && result.content[0].text;
+      error = text || "Token Advisor couldn't build the overview.";
+    } else if (o) {
+      data = o;
+      error = "";
+    } else {
+      error = "Token Advisor returned something this view can't read.";
+    }
+    loading = false;
+    render();
+  }
+
+  function choose(since) {
+    if (loading || (data && data.range === since)) return;
+    loading = true;
+    render();
+    request("tools/call", { name: "get_overview", arguments: { since: since } })
+      .then(showResult)
+      .catch(function (err) { loading = false; error = "Couldn't load that range: " + err.message; render(); });
+  }
+
+  // Formatting.
+  function money(v) {
+    if (!v) return "$0";
+    if (v < 1) return "$" + v.toFixed(2);
+    return "$" + v.toLocaleString("en-US", { maximumFractionDigits: v < 100 ? 2 : 0, minimumFractionDigits: v < 100 ? 2 : 0 });
+  }
+  function tokens(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + "B";
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+    return String(n || 0);
+  }
+  function pct(v) { return Math.round((v || 0) * 100) + "%"; }
+  function day(iso) {
+    var d = new Date(iso + "T00:00:00");
+    return isNaN(d) ? iso : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : many); }
+
+  // el builds an element; children may be strings, nodes or arrays of them.
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === "onclick") node.addEventListener("click", attrs[k]);
+      else node.setAttribute(k, attrs[k]);
+    });
+    [].concat(children == null ? [] : children).forEach(function (c) {
+      if (c == null || c === false) return;
+      node.appendChild(typeof c === "object" ? c : document.createTextNode(String(c)));
+    });
+    return node;
+  }
+  function svg(tag, attrs, children) {
+    var node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    Object.keys(attrs).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+    [].concat(children || []).forEach(function (c) { node.appendChild(c); });
+    return node;
+  }
+
+  function chart(days) {
+    var W = 600, H = 140, gap = days.length > 40 ? 1 : 3;
+    var max = Math.max.apply(null, days.map(function (d) { return d.cost_usd; }).concat([0.01]));
+    var bw = W / days.length;
+    var bars = days.map(function (d, i) {
+      var h = (d.cost_usd / max) * (H - 4);
+      var a = (Math.min(d.avoidable_usd, d.cost_usd) / max) * (H - 4);
+      var x = i * bw + gap / 2, w = Math.max(bw - gap, 1);
+      var tip = svg("title", {});
+      tip.textContent = day(d.day) + ": " + money(d.cost_usd) + " spent, about " + money(d.avoidable_usd) + " avoidable";
+      return svg("g", {}, [
+        tip,
+        svg("rect", { x: x, y: H - h, width: w, height: Math.max(h, 1), rx: 1.5, fill: "var(--ta-spend)", opacity: ".85" }),
+        a > 0 ? svg("rect", { x: x, y: H - a, width: w, height: a, rx: 1.5, fill: "var(--ta-avoid)" }) : null
+      ].filter(Boolean));
+    });
+    var label = "Spend by day, from " + day(days[0].day) + " to " + day(days[days.length - 1].day) + ", highest " + money(max);
+    return el("section", {}, [
+      el("h2", {}, "Spend by day"),
+      el("div", { class: "legend" }, [
+        el("span", {}, [el("i", { style: "background: var(--ta-spend)" }), "Spend"]),
+        el("span", {}, [el("i", { style: "background: var(--ta-avoid)" }), "Avoidable (estimated)"])
+      ]),
+      svg("svg", { class: "chart", viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", role: "img", "aria-label": label }, bars),
+      el("div", { class: "axis" }, [el("span", {}, day(days[0].day)), el("span", {}, "max " + money(max)), el("span", {}, day(days[days.length - 1].day))])
+    ]);
+  }
+
+  function models(rows) {
+    return el("section", {}, [
+      el("h2", {}, "Spend by model"),
+      el("div", { class: "models" }, rows.slice(0, 6).map(function (m) {
+        return el("div", { class: "model" }, [
+          el("span", { class: "name", title: m.model }, m.model || "unknown"),
+          el("div", { class: "bar", role: "img", "aria-label": pct(m.share) + " of spend" }, el("div", { style: "width:" + Math.max(m.share * 100, 1) + "%" })),
+          el("span", { class: "val" }, money(m.cost_usd) + " · " + pct(m.share))
+        ]);
+      }))
+    ]);
+  }
+
+  function findings(o) {
+    var list = o.top_findings || [];
+    return el("section", {}, [
+      el("h2", {}, "Top findings"),
+      list.length === 0
+        ? el("p", { class: "empty" }, "No open findings in this range.")
+        : el("ol", { class: "findings" }, list.map(function (f) {
+            var meta = [AREA_NAME[f.area] || f.area, plural(f.sessions || 0, "session", "sessions"), f.confidence].filter(Boolean).join(" · ");
+            var impact = f.avoidable_usd != null ? "≈ " + money(f.avoidable_usd)
+              : f.minutes != null ? Math.round(f.minutes) + " min"
+              : f.tokens != null ? tokens(f.tokens) + " tokens" : "";
+            return el("li", {}, [
+              el("span", { class: "pip" + (f.severity === "full" ? " full" : ""), "aria-hidden": "true" }),
+              el("div", { class: "finding" }, [
+                el("strong", {}, f.title),
+                f.has_fix ? el("span", { class: "tag" }, "fix ready") : null,
+                el("div", { class: "meta" }, meta)
+              ]),
+              el("span", { class: "usd" }, impact)
+            ]);
+          }))
+    ]);
+  }
+
+  function render() {
+    var nodes = [];
+    var range = data ? data.range : "30d";
+    nodes.push(el("div", { class: "head" }, [
+      el("h1", {}, ["Token Advisor ", el("span", {}, "· " + (RANGE_LABEL[range] || range))]),
+      el("div", { class: "ranges", role: "group", "aria-label": "Time range" }, RANGES.map(function (r) {
+        var attrs = { type: "button", "aria-pressed": String(range === r[0]), onclick: function () { choose(r[0]); } };
+        if (loading) attrs.disabled = "";
+        return el("button", attrs, r[1]);
+      }))
+    ]));
+
+    if (error) nodes.push(el("p", { class: "state", role: "alert" }, error));
+    if (!data) {
+      if (!error) nodes.push(el("p", { class: "state" }, "Loading…"));
+    } else if (!data.by_day || data.by_day.length === 0) {
+      nodes.push(el("p", { class: "state" }, "No usage in this range yet."));
+    } else {
+      nodes.push(el("div", { class: "tiles" }, [
+        el("div", { class: "tile" }, [el("div", { class: "lbl" }, "Spend"), el("div", { class: "num" }, money(data.spend_usd)), el("div", { class: "sub" }, plural(data.sessions || 0, "session", "sessions"))]),
+        el("div", { class: "tile avoid" }, [el("div", { class: "lbl" }, "Avoidable"), el("div", { class: "num" }, money(data.avoidable_usd)), el("div", { class: "sub" }, plural(data.open_findings || 0, "open finding", "open findings"))]),
+        el("div", { class: "tile" }, [el("div", { class: "lbl" }, "Tokens"), el("div", { class: "num" }, tokens(data.tokens)), el("div", { class: "sub" }, "input, output and cache")]),
+        el("div", { class: "tile" }, [el("div", { class: "lbl" }, "Cache reuse"), el("div", { class: "num" }, pct(data.cache_share)), el("div", { class: "sub" }, "of context read from cache")])
+      ]));
+      nodes.push(chart(data.by_day));
+      if (data.models && data.models.length) nodes.push(models(data.models));
+      nodes.push(findings(data));
+    }
+
+    var foot = [el("span", {}, "Avoidable spend is an estimate. File paths and commands stay on your machine.")];
+    if (data && data.dashboard_url) {
+      foot.push(el("button", { type: "button", onclick: function () {
+        request("ui/open-link", { url: data.dashboard_url }).catch(function () { /* the host declined */ });
+      } }, "Open the dashboard"));
+    }
+    nodes.push(el("div", { class: "foot" }, foot));
+
+    app.replaceChildren.apply(app, nodes);
+  }
+
+  // Tell the host how tall the view is, so it can size the frame.
+  if (window.ResizeObserver) {
+    new ResizeObserver(function () {
+      var r = document.documentElement.getBoundingClientRect();
+      notify("ui/notifications/size-changed", { width: Math.ceil(r.width), height: Math.ceil(r.height) });
+    }).observe(document.documentElement);
+  }
+
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  render();
+  request("ui/initialize", {
+    protocolVersion: "2026-01-26",
+    appInfo: { name: "infrapal-token-advisor-overview", version: "1" },
+    appCapabilities: {}
+  }).then(function (result) {
+    applyContext(result && result.hostContext);
+    notify("ui/notifications/initialized", {});
+  }).catch(function (err) {
+    error = "Couldn't connect to the host: " + err.message;
+    render();
+  });
+})();
+</script>
+</body>
+</html>
