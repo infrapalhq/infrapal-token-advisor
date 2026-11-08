@@ -2,10 +2,10 @@
 
 <img src="docs/assets/banner.svg" alt="infrapal token advisor" width="720">
 
-# See where your Claude Code tokens go, and what to change
+# Less token waste. Better AI workflows.
 
-**A local dashboard that finds wasted tokens and hands you the fix.**<br>
-Your data stays on your machine. No account, no cloud, no proxy.
+**Get clearer insights into what is driving token usage across your Claude Code workflows, so you can spot inefficiencies and optimise with confidence.**<br>
+Runs locally. No InfraPal account or hosted dashboard required.
 
 [![CI](https://github.com/infrapalhq/infrapal-token-advisor/actions/workflows/ci.yml/badge.svg)](https://github.com/infrapalhq/infrapal-token-advisor/actions/workflows/ci.yml)
 [![Coverage](https://codecov.io/gh/infrapalhq/infrapal-token-advisor/graph/badge.svg)](https://codecov.io/gh/infrapalhq/infrapal-token-advisor)
@@ -24,12 +24,9 @@ Your data stays on your machine. No account, no cloud, no proxy.
 
 ## Why
 
-Claude Code tells you what a session cost, but not why. token-advisor collects
-the telemetry Claude Code already emits and shows you where it went: the file
-read three times, the command you approve by hand every day, the short answer
-from your most expensive model.
+Claude Code provides visibility into session costs, but understanding what drives those costs can take more investigation.
 
-Then it tells you what to do: a settings change to paste in, or a habit to try.
+Token Advisor helps you explore where your tokens go — from repeated file reads and commands to model choices and growing context. It highlights potential inefficiencies and suggests practical improvements, whether that's a setting to review or a workflow habit to change.
 
 ## Get started
 
@@ -60,13 +57,12 @@ See context grow step by step, with each issue marked where it happened.<br><br>
 <tr>
 <td width="50%" valign="top">
 <b>Fixes</b><br>
-Paste a fix in, mark it done, and see week by week whether it helped.<br><br>
+Review suggested improvements, track the changes you've made and monitor usage trends over time.<br><br>
 <img src="docs/assets/fixes.png" alt="The Fixes page, showing avoidable spend over time and the fixes to make">
 </td>
 <td width="50%" valign="top">
 <b>Numbers you can check</b><br>
-Everything is labelled <b>Measured</b>, <b>Likely</b> or <b>Estimated</b>, and
-<a href="docs/ACCURACY.md">the rules are documented</a>.<br><br>
+Know what's measured and what's estimated. Findings distinguish between Measured, Likely and Estimated values, with <a href="docs/ACCURACY.md">the methodology documented</a>.<br><br>
 <b>Ask Claude</b><br>
 Connect it to Claude Code and run <code>/infrapal-token-advisor:review</code> for
 more suggestions. It uses your Claude Code plan, so there's no API key to add.
@@ -192,7 +188,7 @@ ask about your usage in your own words:
 
 | Command | What Claude does |
 | --- | --- |
-| `/infrapal-token-advisor:review` | Finds where tokens went, and the five changes that would save the most. Add a range, such as `7d` |
+| `/infrapal-token-advisor:review` | Reviews token usage and highlights the highest-priority opportunities for improvement. |
 | `/infrapal-token-advisor:session <id>` | Explains why one session cost what it did |
 | `/infrapal-token-advisor:compare` | Compares the last 7 days with the 7 days before |
 
@@ -211,6 +207,8 @@ conversation. They return metrics and ids only. Prompts, responses, file paths,
 commands, error text and user identity are withheld.
 
 ## Privacy
+
+Token Advisor is designed to collect and analyse telemetry locally. Optional integrations and update commands may make external connections, so it's important to understand what information is shared when those features are enabled.
 
 - The collector and dashboard only listen on `127.0.0.1`, and the dashboard
   refuses requests from web pages.
