@@ -16,7 +16,7 @@ Runs locally. No InfraPal account or hosted dashboard required.
 
 **[Install](#install) · [What it finds](#what-it-finds) · [How it works](#how-it-works) · [Commands](#commands) · [Privacy](#privacy) · [FAQ](#faq) · [Docs](#documentation)**
 
-<img src="docs/assets/overview.png" alt="The Overview page: spend, tokens, avoidable cost and the first things to fix" width="860">
+<img src="docs/assets/overview.png" alt="Token Advisor Overview showing session costs, token usage, potential savings and prioritised findings" width="860">
 
 <sub>All screenshots use made-up sample data.</sub>
 
@@ -45,24 +45,24 @@ Homebrew? See [other ways to install](#install).
 <tr>
 <td width="50%" valign="top">
 <b>Sessions</b><br>
-Every session by project, with its cost, its problems and what to look at first.<br><br>
-<img src="docs/assets/sessions.png" alt="The Sessions page, listing sessions by project with their priority, problems and cost">
+Explore sessions by project, review usage and costs, and see which findings deserve attention first.<br><br>
+<img src="docs/assets/sessions.png" alt="Sessions page showing projects, session costs and prioritised findings">
 </td>
 <td width="50%" valign="top">
 <b>Step-by-step timeline</b><br>
 See context grow step by step, with each issue marked where it happened.<br><br>
-<img src="docs/assets/session.png" alt="A session's timeline, with a context chart, flagged steps and a suggested fix">
+<img src="docs/assets/session.png" alt="Session timeline showing context usage, flagged events and suggested optimisations">
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
 <b>Fixes</b><br>
 Review suggested improvements, track the changes you've made and monitor usage trends over time.<br><br>
-<img src="docs/assets/fixes.png" alt="The Fixes page, showing avoidable spend over time and the fixes to make">
+<img src="docs/assets/fixes.png" alt="Fixes page showing potential savings, recommendations and progress over time">
 </td>
 <td width="50%" valign="top">
 <b>Numbers you can check</b><br>
-Know what's measured and what's estimated. Findings distinguish between Measured, Likely and Estimated values, with <a href="docs/ACCURACY.md">the methodology documented</a>.<br><br>
+Understand which insights are measured, which are inferred and which are estimated. Findings are classified as Measured, Likely or Estimated. <a href="docs/ACCURACY.md">The methodology is documented</a> so you can evaluate findings with confidence.<br><br>
 <b>Ask Claude</b><br>
 Connect it to Claude Code and run <code>/infrapal-token-advisor:review</code> for
 more suggestions. It uses your Claude Code plan, so there's no API key to add.
@@ -74,12 +74,12 @@ more suggestions. It uses your Claude Code plan, so there's no API key to add.
 
 | Issue | What it means | What you get |
 | --- | --- | --- |
-| **Re-read files** | The same lines read again in one prompt with nothing changed | Lines for your `CLAUDE.md` |
-| **Repeated commands** | A command run again with nothing changed | A fix to paste in |
-| **Repeated approvals** | A pattern you keep approving by hand | An allow rule, for read-only commands only |
-| **Compactions** | A session filled its context | Habit advice |
-| **Failing MCP servers** | A server whose calls keep failing | What to check |
-| **Oversized model** | A short, simple answer from an Opus-class model | Habit advice |
+| **Re-read files** | The same lines read again in one prompt with nothing changed | Suggestions for reducing repeated file reads |
+| **Repeated commands** | A command run again with nothing changed | A suggested change to review and apply |
+| **Repeated approvals** | A pattern you keep approving by hand | A suggested permission rule for eligible read-only commands |
+| **Compactions** | A session filled its context | Suggestions for managing growing context |
+| **Failing MCP servers** | A server whose calls keep failing | Troubleshooting guidance |
+| **Oversized model** | A higher-capability model used for a task that may not require it. | Suggestions for reviewing model choice |
 
 ## How it works
 
@@ -208,26 +208,23 @@ commands, error text and user identity are withheld.
 
 ## Privacy
 
-Token Advisor is designed to collect and analyse telemetry locally. Optional integrations and update commands may make external connections, so it's important to understand what information is shared when those features are enabled.
+**Local by default.** Token Advisor collects and analyses Claude Code telemetry on your machine. The collector and dashboard communicate through localhost.
 
-- The collector and dashboard only listen on `127.0.0.1`, and the dashboard
-  refuses requests from web pages.
-- Nothing leaves your machine unless you enable the MCP server or run
-  `token-advisor update`. There's no usage telemetry, automatic update check or
-  crash reporting.
-- Data older than 6 months is deleted automatically. You can change that, and
-  `token-advisor purge` deletes data on demand.
+**External connections.** If you enable the optional MCP integration, selected metrics and identifiers can be shared with Anthropic through your Claude Code conversation. Running `token-advisor update` connects to GitHub to retrieve release files.
 
-[SECURITY.md](SECURITY.md) has the full list of what's stored and what's sent.
+Token Advisor does not include its own usage telemetry, automatic update checks or crash reporting.
+
+See [SECURITY.md](SECURITY.md) for details about stored data, external connections and known security limitations.
+
+Data older than 6 months is deleted automatically. You can change that, and `token-advisor purge` deletes data on demand.
 
 ## FAQ
 
 <details>
-<summary><b>Does it send my prompts anywhere?</b></summary>
-<br>
-No. Telemetry goes from Claude Code to a service on your own machine. The MCP
-server is the one exception to staying local. It's off until you enable it, and
-never sends prompt or response text. <a href="SECURITY.md#what-leaves-your-machine">See exactly what's sent</a>.
+<summary><b>Does Token Advisor send my prompts anywhere?</b></summary>
+<p>Token Advisor collects and stores Claude Code telemetry locally. It does not independently upload your prompts or responses.</p>
+<p>If you enable the optional MCP integration, selected metrics and identifiers can be included in your Claude Code conversations and sent to Anthropic. The MCP tools are designed not to expose prompt or response text.</p>
+<p>See <a href="SECURITY.md#what-leaves-your-machine">SECURITY.md</a> for details.</p>
 </details>
 
 <details>
@@ -299,10 +296,6 @@ for tests and how to send a change.
 Bug fixes, new insight checks and dashboard improvements are welcome. Start with
 [CONTRIBUTING.md](CONTRIBUTING.md). For security problems, follow
 [SECURITY.md](SECURITY.md) instead of opening an issue.
-
-The MCP server is the exception, once you enable it: what its tools return goes
-to Anthropic with your conversation. It returns metrics and ids only. Prompts,
-responses, file paths, commands, error text and user identity are withheld.
 
 ## License
 
