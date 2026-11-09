@@ -188,7 +188,9 @@ jobs:
         run: ${{ matrix.install }}
       - name: Run it
         run: |
-          test "$(command -v token-advisor)" = /usr/bin/token-advisor
+          # Fedora and Arch link /usr/sbin to /usr/bin, so check the file, not
+          # which PATH entry finds it.
+          test -x /usr/bin/token-advisor
           token-advisor version
           test -f /usr/share/licenses/infrapal-token-advisor/LICENSE
       - name: Remove the package
