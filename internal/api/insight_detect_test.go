@@ -712,3 +712,104 @@ func TestInstallWideItemsBelongToNoSession(t *testing.T) {
 		t.Errorf("global-only area = %+v, want 1 item, 1 global, 0 sessions, fine", only)
 	}
 }
+
+// pricedAgent is limitedAgent with a price list of its own.
+type pricedAgent struct {
+	limitedAgent
+	rates   map[string]agent.Rates
+	cheaper map[string]string
+}
+
+func (a pricedAgent) CostSource() agent.CostSource { return agent.CostPerRequest }
+
+func (a pricedAgent) ModelRates(m string) (agent.Rates, bool) {
+	r, ok := a.rates[m]
+	return r, ok
+}
+
+func (a pricedAgent) CheaperModel(m string) (string, bool) {
+	c, ok := a.cheaper[m]
+	return c, ok
+}
+
+func withPricedAgent(t *testing.T, a pricedAgent) {
+	t.Helper()
+	withLimitedAgent(t)
+	old := findAgent
+	findAgent = func(id agent.ID) (agent.Agent, bool) {
+		if id == "priced" {
+			return a, true
+		}
+		return old(id)
+	}
+	t.Cleanup(func() { findAgent = old })
+}
+
+func TestModelPricesNeedAnAgentThatKnowsThem(t *testing.T) {
+	withPricedAgent(t, pricedAgent{
+		rates:   map[string]agent.Rates{"big-model": {Input: 1}},
+		cheaper: map[string]string{"big-model": "unpriced-model"},
+	})
+	d := &insightData{sessions: map[string]sessionRow{
+		"gone":    {ID: "gone", Agent: "no-such-agent"},
+		"limited": {ID: "limited", Agent: "limited"},
+		"priced":  {ID: "priced", Agent: "priced"},
+	}}
+	for _, sid := range []string{"gone", "limited"} {
+		r := reqRow{SessionID: sid, Model: "big-model"}
+		if _, ok := d.rates(r); ok {
+			t.Errorf("%s: rates should be unknown", sid)
+		}
+		if _, _, _, ok := d.cheaperModel(r); ok {
+			t.Errorf("%s: cheaper model should be unknown", sid)
+		}
+	}
+	if r, ok := d.rates(reqRow{SessionID: "priced", Model: "big-model"}); !ok || r.Input != 1 {
+		t.Errorf("rates = %+v, %v", r, ok)
+	}
+	if _, _, _, ok := d.cheaperModel(reqRow{SessionID: "priced", Model: "small-model"}); ok {
+		t.Error("a model with nothing cheaper has no suggestion")
+	}
+	if name, _, _, ok := d.cheaperModel(reqRow{SessionID: "priced", Model: "big-model"}); ok || name != "unpriced-model" {
+		t.Errorf("a suggestion with no price can't be used: %q, %v", name, ok)
+	}
+}
+
+func TestOversizedModelSkipsRequestsWithNoTokens(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: "repl_main_thread"},
+		{PromptID: "p1", SessionID: "s", Ts: 2, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", Output: 100, CostUSD: 0.002},
+	}, nil)
+	occ := detectOversizedModel(d)
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, 0.001) {
+		t.Fatalf("an empty request should add nothing, got %+v", occ)
+	}
+}
+
+func TestContextBloatWithNoPriceKeepsTokens(t *testing.T) {
+	// No list price and no blended rate: the excess stays as tokens.
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "some-model", QuerySource: "repl_main_thread", CacheRead: 150_000, Output: 5000},
+		{PromptID: "p1", SessionID: "s", Ts: 2, Model: "some-model", QuerySource: "repl_main_thread", CacheRead: 130_000, Output: 5000},
+	}, nil)
+	occ := detectContextBloat(d)
+	if len(occ) != 1 || occ[0].USD != nil || occ[0].Tokens == nil || *occ[0].Tokens != 80_000 {
+		t.Fatalf("want 80K excess tokens and no dollars, got %+v", occ)
+	}
+	if occ[0].Count != 2 || len(occ[0].Evidence) != 1 {
+		t.Errorf("two requests in one prompt should give one piece of evidence: %+v", occ[0])
+	}
+}
+
+func TestContextBloatWithZeroRatesUsesBlendedRate(t *testing.T) {
+	withPricedAgent(t, pricedAgent{rates: map[string]agent.Rates{"free-model": {}}})
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "free-model", QuerySource: "repl_main_thread", CacheRead: 110_000, Output: 5000},
+	}, nil)
+	d.sessions["s"] = sessionRow{ID: "s", Agent: "priced"}
+	d.blendedRate = 0.000001
+	occ := detectContextBloat(d)
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, 0.01) {
+		t.Fatalf("a zero list price can't scale a cost, so use the blended rate: %+v", occ)
+	}
+}

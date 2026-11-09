@@ -219,13 +219,19 @@ func (d *insightData) premiumModel(r reqRow) bool {
 	return ok && a.PremiumModel(r.Model)
 }
 
-// rates gives a request's model's list price, when its agent knows it.
-func (d *insightData) rates(r reqRow) (agent.Rates, bool) {
-	a, ok := agentFor(d.sessions[r.SessionID].Agent)
+// pricer is a session's agent's price list, when it has one.
+func (d *insightData) pricer(sessionID string) (agent.ModelPricer, bool) {
+	a, ok := agentFor(d.sessions[sessionID].Agent)
 	if !ok {
-		return agent.Rates{}, false
+		return nil, false
 	}
 	p, ok := a.(agent.ModelPricer)
+	return p, ok
+}
+
+// rates gives a request's model's list price, when its agent knows it.
+func (d *insightData) rates(r reqRow) (agent.Rates, bool) {
+	p, ok := d.pricer(r.SessionID)
 	if !ok {
 		return agent.Rates{}, false
 	}
@@ -235,24 +241,16 @@ func (d *insightData) rates(r reqRow) (agent.Rates, bool) {
 // cheaperModel names the model a request's agent suggests instead of its
 // premium one, with both models' list prices.
 func (d *insightData) cheaperModel(r reqRow) (name string, from, to agent.Rates, ok bool) {
-	a, ok := agentFor(d.sessions[r.SessionID].Agent)
-	if !ok {
-		return "", from, to, false
-	}
-	p, ok := a.(agent.ModelPricer)
+	p, ok := d.pricer(r.SessionID)
 	if !ok {
 		return "", from, to, false
 	}
 	if name, ok = p.CheaperModel(r.Model); !ok {
 		return "", from, to, false
 	}
-	if from, ok = p.ModelRates(r.Model); !ok {
-		return "", from, to, false
-	}
-	if to, ok = p.ModelRates(name); !ok {
-		return "", from, to, false
-	}
-	return name, from, to, true
+	from, fromOK := p.ModelRates(r.Model)
+	to, toOK := p.ModelRates(name)
+	return name, from, to, fromOK && toOK
 }
 
 // tokens splits a request's tokens the way list prices do.
