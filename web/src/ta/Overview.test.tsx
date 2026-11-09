@@ -6,10 +6,26 @@ import { agent, base, cards, overview, status } from "../test/fixtures";
 import { renderAt } from "../test/render";
 
 describe("Overview", () => {
+  describe.each([
+    { cost_unknown_sessions: 0, headline: "$12.50 spent" },
+    { cost_unknown_sessions: 3, headline: "1.5M tokens used" },
+  ])("$headline", ({ cost_unknown_sessions, headline }) => {
+    it.each([
+      { range: "today", period: "today" },
+      { range: "7d", period: "in the last 7 days" },
+      { range: "30d", period: "in the last 30 days" },
+      { range: "3m", period: "in the last 3 months" },
+    ])("formats the $range headline", async ({ range, period }) => {
+      fakeAPI({ ...base(), "/api/overview": overview({ cost_unknown_sessions }) });
+      renderAt(`/?range=${range}`);
+      expect(await screen.findByRole("heading", { name: `${headline} ${period}.` })).toBeTruthy();
+    });
+  });
+
   it("shows spend, what to fix first and where it went", async () => {
     fakeAPI({ ...base(), "/api/overview": overview() });
     renderAt("/");
-    expect(await screen.findByRole("heading", { name: "$12.50 spent last 7 days." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "$12.50 spent in the last 7 days." })).toBeTruthy();
     expect(screen.getByText(/2 things worth fixing/).textContent).toBe(
       "2 things worth fixing. Fixing the top three recovers about $2.10 and saves about 4 minutes of waiting.",
     );
@@ -38,7 +54,7 @@ describe("Overview", () => {
   it("shows tokens instead of spend when no session has cost data", async () => {
     fakeAPI({ ...base(), "/api/overview": overview({ cost_unknown_sessions: 3, open_fixes: 1, fix_first: [overview().fix_first[0]], recovered: { usd: 0, minutes: 1 } }) });
     renderAt("/");
-    expect(await screen.findByRole("heading", { name: "1.5M tokens used last 7 days." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "1.5M tokens used in the last 7 days." })).toBeTruthy();
     expect(screen.getByText(/thing worth fixing/).textContent).toBe("1 thing worth fixing. Fixing the top three saves about 1 minute of waiting.");
     expect(screen.queryByText("Spend by day")).toBeNull();
   });
@@ -54,7 +70,7 @@ describe("Overview", () => {
     renderAt("/");
     await screen.findByText("Fix first");
     await userEvent.selectOptions(screen.getByLabelText("Period"), "30d");
-    expect(await screen.findByRole("heading", { name: "$12.50 spent last 30 days." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "$12.50 spent in the last 30 days." })).toBeTruthy();
     expect(calls.filter((c) => c.path.startsWith("/api/overview")).map((c) => c.path)).toEqual([
       "/api/overview?since=7d",
       "/api/overview?since=30d",
@@ -133,7 +149,7 @@ describe("Overview", () => {
     const select = (await screen.findByLabelText("Period")) as HTMLSelectElement;
     expect([...select.options].map((o) => o.textContent)).toEqual(["Today", "Last 7 days", "Last 30 days", "Last 3 months"]);
     await userEvent.selectOptions(select, "3m");
-    expect(await screen.findByRole("heading", { name: "$12.50 spent last 3 months." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "$12.50 spent in the last 3 months." })).toBeTruthy();
     expect(calls.map((c) => c.path)).toContain("/api/overview?since=3m");
     await userEvent.click(screen.getByRole("link", { name: /Sessions/ }));
     expect(await screen.findByText(/in the last 3 months/)).toBeTruthy();
@@ -142,7 +158,7 @@ describe("Overview", () => {
   it("falls back to 7 days for a range it doesn't know, instead of an error", async () => {
     fakeAPI({ ...base(), "/api/overview": overview() });
     renderAt("/?range=abc");
-    expect(await screen.findByRole("heading", { name: "$12.50 spent last 7 days." })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "$12.50 spent in the last 7 days." })).toBeTruthy();
     expect(screen.queryByText(/Could not load/)).toBeNull();
     expect((screen.getByLabelText("Period") as HTMLSelectElement).value).toBe("7d");
   });
