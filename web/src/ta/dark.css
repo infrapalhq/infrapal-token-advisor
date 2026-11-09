@@ -593,3 +593,40 @@ html[data-theme="dark"] .habit-line { color: var(--soft); }
 html[data-theme="dark"] .habit-line b { color: #fff; }
 html[data-theme="dark"] .card.dashed { border-style: dashed; }
 html[data-theme="dark"] .theme-line { color: #050C16; }
+
+/* Shared select arrows, after theme background resets. Native arrows ignore padding. */
+:root select.btn,
+:root select.sel-dark,
+:root .toolbar-r select.select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 32px;
+  /* IconChevronDown: 24px viewBox, 1.8px round stroke, rendered at 16px. */
+  background-image: var(--select-chevron, url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23000%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22m6%209%206%206%206-6%22/%3E%3C/svg%3E"));
+  /* The SVG's internal inset adds ~3.4px, leaving ~12px to the visible stroke. */
+  background-position: right 9px center;
+  background-size: 16px 16px;
+  background-repeat: no-repeat;
+}
+
+:root select.sel-dark {
+  --select-chevron: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23fff%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22m6%209%206%206%206-6%22/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] select.btn,
+:root[data-theme="dark"] .toolbar-r select.select {
+  --select-chevron: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23F4F5F7%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22m6%209%206%206%206-6%22/%3E%3C/svg%3E");
+}
+:root[data-theme="dark"] select.sel-dark {
+  --select-chevron: url("data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%2216%22%20height=%2216%22%20viewBox=%220%200%2024%2024%22%20fill=%22none%22%20stroke=%22%23C9D1DE%22%20stroke-width=%221.8%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22%3E%3Cpath%20d=%22m6%209%206%206%206-6%22/%3E%3C/svg%3E");
+}
+
+/* Background images may be suppressed in high-contrast mode; keep the native arrow. */
+@media (forced-colors: active) {
+  :root select.btn,
+  :root select.sel-dark,
+  :root .toolbar-r select.select {
+    -webkit-appearance: auto;
+    appearance: auto;
+    background-image: none;
+  }
+}
