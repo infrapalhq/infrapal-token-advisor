@@ -98,7 +98,9 @@ func TestManagedBy(t *testing.T) {
 	for path, want := range map[string]string{
 		"/opt/homebrew/Caskroom/infrapal-token-advisor/1.0/token-advisor": "homebrew",
 		"/home/linuxbrew/.linuxbrew/Cellar/x/1.0/bin/token-advisor":       "homebrew",
-		"/home/me/.local/bin/token-advisor":                               "",
+		"/usr/bin/token-advisor":            "system",
+		"/usr/local/bin/token-advisor":      "",
+		"/home/me/.local/bin/token-advisor": "",
 	} {
 		if got := ManagedBy(path); got != want {
 			t.Errorf("ManagedBy(%s) = %q, want %q", path, got, want)

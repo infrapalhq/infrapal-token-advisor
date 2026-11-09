@@ -148,8 +148,53 @@ jobs:
           name: snapshot
           path: |
             dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/*.pkg.tar.zst
             dist/checksums.txt
           retention-days: 1
+
+  # Installs each Linux package with its distribution's own package manager, on
+  # a clean image of that distribution.
+  packages:
+    name: package / ${{ matrix.distro }}
+    needs: release-snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: debian
+            image: debian:stable-slim@sha256:fbfb4059d2127120aa05b6e6064523d2102552f0cf0026ddf0701c12f1f8f3e0
+            install: apt-get update && apt-get install -y ./snapshot/*_amd64.deb
+            remove: apt-get remove -y infrapal-token-advisor
+          - distro: fedora
+            image: fedora:latest@sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c
+            install: dnf install -y ./snapshot/*.x86_64.rpm
+            remove: dnf remove -y infrapal-token-advisor
+          - distro: arch
+            image: archlinux:latest@sha256:b1c2fe6e717bfd5673af8fc217e1e1c3ce0dcbb1d53c3414c8425e7ce79fc6d9
+            install: pacman -U --noconfirm ./snapshot/*-x86_64.pkg.tar.zst
+            remove: pacman -R --noconfirm infrapal-token-advisor
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: snapshot
+          path: snapshot
+      - name: Install the package
+        run: ${{ matrix.install }}
+      - name: Run it
+        run: |
+          test "$(command -v token-advisor)" = /usr/bin/token-advisor
+          token-advisor version
+          test -f /usr/share/licenses/infrapal-token-advisor/LICENSE
+      - name: Remove the package
+        run: |
+          ${{ matrix.remove }}
+          test ! -e /usr/bin/token-advisor
 
   clean-machine:
     name: install / ${{ matrix.os }}
