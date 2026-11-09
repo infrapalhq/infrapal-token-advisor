@@ -94,6 +94,11 @@ signs:
     signature: "${artifact}.sigstore.json"
     args: ["sign-blob", "--bundle=${signature}", "--yes", "${artifact}"]
 
+# Create the release as a draft. Releases here are immutable once published,
+# so the workflow attaches the provenance first and then publishes it.
+release:
+  draft: true
+
 changelog:
   sort: asc
   filters:
