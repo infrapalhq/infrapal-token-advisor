@@ -33,6 +33,7 @@ var detectors = []detector{
 	{"repeat_approval", "repeated approvals", agent.CapApprovalWait, detectRepeatApproval},
 	{"failing_mcp", "failing MCP servers", 0, detectFailingMCP},
 	{"oversized_model", "oversized models", 0, detectOversizedModel},
+	{"context_bloat", "heavy context", 0, detectContextBloat},
 	{"dead_mcp", "unused MCP servers", agent.CapMCPConnections, detectDeadMCP},
 }
 
@@ -68,6 +69,7 @@ const (
 	failingMCPRate            = 0.2
 	oversizedOutputTokens     = 2000 // a whole prompt whose answer fits in this is "small"
 	oversizedMaxToolCalls     = 3
+	heavyContextTokens        = 100_000 // context per request beyond this is counted as avoidable
 )
 
 // mutatingBash matches shell commands that change files or repo state.
@@ -512,19 +514,23 @@ func detectFailingMCP(d *insightData) []occurrence {
 	return out
 }
 
-// detectOversizedModel flags a prompt answered on a premium model whose
-// answer was small and which used no file changes and few tools: the kind of
-// turn a smaller model would likely handle. A habit, Likely.
-func detectOversizedModel(d *insightData) []occurrence {
-	type agg struct {
-		session, model string
-		ts             int64
-		output         int64
-		cost           float64
-		tools          int
-		mutated        bool
-	}
-	byPrompt := map[string]*agg{}
+// smallTurn is a prompt answered on a premium model whose answer was small and
+// which used no file changes and few tools: the kind of turn a smaller model
+// would likely handle.
+type smallTurn struct {
+	prompt, session, model string
+	ts                     int64
+	output                 int64
+	cost                   float64
+	tools                  int
+	reqs                   []reqRow
+}
+
+// smallPremiumTurns finds the small turns, in the order they started. Both
+// the model check and the context check use it, so one request's cost is
+// never counted by both.
+func smallPremiumTurns(d *insightData) []*smallTurn {
+	byPrompt := map[string]*smallTurn{}
 	var order []string
 	for _, r := range d.reqs {
 		if r.PromptID == "" || r.QuerySource != agent.MainQuerySource || !d.premiumModel(r) {
@@ -532,13 +538,15 @@ func detectOversizedModel(d *insightData) []occurrence {
 		}
 		a, ok := byPrompt[r.PromptID]
 		if !ok {
-			a = &agg{session: r.SessionID, model: r.Model, ts: r.Ts}
+			a = &smallTurn{prompt: r.PromptID, session: r.SessionID, model: r.Model, ts: r.Ts}
 			byPrompt[r.PromptID] = a
 			order = append(order, r.PromptID)
 		}
 		a.output += r.Output
 		a.cost += r.CostUSD
+		a.reqs = append(a.reqs, r)
 	}
+	mutated := map[string]bool{}
 	for _, t := range d.tools {
 		a, ok := byPrompt[t.PromptID]
 		if !ok {
@@ -546,32 +554,155 @@ func detectOversizedModel(d *insightData) []occurrence {
 		}
 		a.tools++
 		if isMutation(t) {
-			a.mutated = true
+			mutated[t.PromptID] = true
 		}
 	}
-	var out []occurrence
+	var out []*smallTurn
 	for _, pid := range order {
 		a := byPrompt[pid]
-		if a.output >= oversizedOutputTokens || a.mutated || a.tools > oversizedMaxToolCalls {
+		if a.output >= oversizedOutputTokens || mutated[pid] || a.tools > oversizedMaxToolCalls {
 			continue
 		}
-		usd := a.cost
+		out = append(out, a)
+	}
+	return out
+}
+
+// smallerModelSaving is what a turn would have saved on the cheaper model
+// its agent suggests. Each request's actual cost is scaled by the ratio of
+// the two models' list prices for its own tokens, so cheap cache reads save
+// less than fresh input and output. ok is false when a price is unknown.
+func smallerModelSaving(d *insightData, a *smallTurn) (usd float64, cheaper string, ok bool) {
+	for _, r := range a.reqs {
+		name, from, to, known := d.cheaperModel(r)
+		if !known {
+			return 0, "", false
+		}
+		cheaper = name
+		full := from.Cost(r.tokens())
+		if full <= 0 {
+			continue
+		}
+		usd += r.CostUSD * max(1-to.Cost(r.tokens())/full, 0)
+	}
+	return usd, cheaper, cheaper != ""
+}
+
+// detectOversizedModel flags each small turn on a premium model. A habit,
+// Likely. Its dollar figure is the saving on the cheaper model, not the turn's
+// whole cost; with no known prices, it has none.
+func detectOversizedModel(d *insightData) []occurrence {
+	var out []occurrence
+	for _, a := range smallPremiumTurns(d) {
+		detail := fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn.", a.output, a.tools, a.cost)
+		var usd *float64
+		if saving, cheaper, ok := smallerModelSaving(d, a); ok {
+			usd = &saving
+			detail = fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn; %s would have cost about $%.2f less at list prices.", a.output, a.tools, a.cost, cheaper, saving)
+		}
 		out = append(out, occurrence{
 			Kind:      "oversized_model",
 			Area:      "model",
 			Subject:   "",
 			SessionID: a.session,
-			PromptID:  pid,
+			PromptID:  a.prompt,
 			Ts:        a.ts,
-			Evidence:  []string{"p:" + pid},
+			Evidence:  []string{"p:" + a.prompt},
 			Count:     1,
 			Severity:  "half",
 			Conf:      "Likely",
-			USD:       &usd,
+			USD:       usd,
 			Title:     fmt.Sprintf("Small turn on %s", a.model),
-			Detail:    fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn.", a.output, a.tools, a.cost),
+			Detail:    detail,
 			Note:      d.advisor(a.session).SmallerModelNote(),
 		})
+	}
+	return out
+}
+
+// detectContextBloat flags a session whose requests kept carrying more
+// context than a fresh session per task would need. Every request re-reads
+// the whole conversation, so context past heavyContextTokens is paid for again
+// on each one. Likely: some long tasks do need it.
+//
+// The figure prices only the excess, at the model's cache-read rate (the
+// cheapest way to carry it), scaled to what each request actually cost. A
+// model with no known price falls back to the install's blended rate. Small
+// turns are left to detectOversizedModel, so no request is counted twice.
+func detectContextBloat(d *insightData) []occurrence {
+	small := map[string]bool{}
+	for _, a := range smallPremiumTurns(d) {
+		small[a.prompt] = true
+	}
+	type agg struct {
+		ts       int64
+		requests int
+		peak     int64
+		excess   int64
+		usd      float64
+		priced   bool
+		prompts  []string
+		seen     map[string]bool
+	}
+	bySession := map[string]*agg{}
+	var order []string
+	for _, r := range d.reqs {
+		if r.QuerySource != agent.MainQuerySource || r.Context <= heavyContextTokens || small[r.PromptID] {
+			continue
+		}
+		a, ok := bySession[r.SessionID]
+		if !ok {
+			a = &agg{ts: r.Ts, seen: map[string]bool{}}
+			bySession[r.SessionID] = a
+			order = append(order, r.SessionID)
+		}
+		excess := r.Context - heavyContextTokens
+		a.requests++
+		a.excess += excess
+		a.peak = max(a.peak, r.Context)
+		if rates, ok := d.rates(r); ok && rates.Cost(r.tokens()) > 0 {
+			share := rates.Cost(agent.Tokens{CacheRead: excess}) / rates.Cost(r.tokens())
+			a.usd += r.CostUSD * min(share, 1)
+			a.priced = true
+		} else if d.blendedRate > 0 {
+			a.usd += float64(excess) * d.blendedRate
+			a.priced = true
+		}
+		if r.PromptID != "" && !a.seen[r.PromptID] && len(a.prompts) < 20 {
+			a.seen[r.PromptID] = true
+			a.prompts = append(a.prompts, r.PromptID)
+		}
+	}
+	var out []occurrence
+	for _, sid := range order {
+		a := bySession[sid]
+		occ := occurrence{
+			Kind:      "context_bloat",
+			Area:      "context",
+			Subject:   "",
+			SessionID: sid,
+			Ts:        a.ts,
+			Count:     a.requests,
+			Severity:  "half",
+			Conf:      "Likely",
+			Title:     fmt.Sprintf("Requests carried over %dK tokens of context", heavyContextTokens/1000),
+			Detail: fmt.Sprintf("%d request(s) carried over %dK tokens of context, peaking at ~%dK. Every request re-reads the whole conversation, so a fresh session per task avoids paying for it again.",
+				a.requests, heavyContextTokens/1000, a.peak/1000),
+		}
+		if a.peak >= 2*heavyContextTokens {
+			occ.Severity = "full"
+		}
+		for _, pid := range a.prompts {
+			occ.Evidence = append(occ.Evidence, "p:"+pid)
+		}
+		if a.priced {
+			usd := a.usd
+			occ.USD = &usd
+		} else {
+			excess := a.excess
+			occ.Tokens = &excess
+		}
+		out = append(out, occ)
 	}
 	return out
 }

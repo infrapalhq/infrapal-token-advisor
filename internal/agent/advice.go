@@ -42,7 +42,7 @@ func (NoAdvice) CompactionDetail() string {
 }
 
 func (NoAdvice) SmallerModelNote() string {
-	return "Habit: use a smaller model for turns like this. Spend shown is what this turn cost, not a saving."
+	return "Habit: use a smaller model for turns like this. The saving assumes the session was already on that model, with its cache warm."
 }
 
 // MCPSetup is how a user connects the token-advisor MCP server to an agent.

@@ -60,7 +60,7 @@ func (a *Agent) CompactionDetail() string {
 
 // SmallerModelNote implements agent.Advisor.
 func (a *Agent) SmallerModelNote() string {
-	return "Habit: switch to a smaller model with /model for turns like this. Spend shown is what this turn cost, not a saving."
+	return "Habit: switch to a smaller model with /model for turns like this. The saving assumes the session was already on that model, with its cache warm."
 }
 
 // MCPSetup implements agent.MCPHost.

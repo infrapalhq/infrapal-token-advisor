@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -25,6 +26,9 @@ func fixture(tools []toolRow, reqs []reqRow, waits map[string]waitRow) *insightD
 		tools[i].Success = -1
 		tools[i].Category = toolCategory("", tools[i].Name)
 		d.tools = append(d.tools, tools[i])
+	}
+	for i := range reqs {
+		reqs[i].Context = reqs[i].Input + reqs[i].CacheRead + reqs[i].CacheCreate // as loadInsightData does
 	}
 	d.reqs = reqs
 	return d
@@ -211,8 +215,80 @@ func TestOversizedModelFiresOnSmallOpusTurn(t *testing.T) {
 		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", Output: 400, CostUSD: 0.8},
 	}, nil)
 	occ := detectOversizedModel(d)
-	if len(occ) != 1 || occ[0].USD == nil || *occ[0].USD != 0.8 {
-		t.Fatalf("small Opus turn should fire with its spend, got %+v", occ)
+	// Output only: Sonnet 5.5's output rate is half Opus 5.5's.
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, 0.4) {
+		t.Fatalf("small Opus turn should fire with the saving on Sonnet, got %+v", occ)
+	}
+}
+
+func near(a, b float64) bool { return math.Abs(a-b) < 1e-9 }
+
+func TestOversizedModelSavesLittleOnCacheReads(t *testing.T) {
+	// Cache reads cost the same on Opus 5.5 and Sonnet 5.5, so a turn that is
+	// almost all cache reads saves almost nothing.
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", CacheRead: 1_000_000, Output: 100, CostUSD: 0.202},
+	}, nil)
+	occ := detectOversizedModel(d)
+	if len(occ) != 1 || occ[0].USD == nil {
+		t.Fatalf("want one priced occurrence, got %+v", occ)
+	}
+	// Opus: 0.20 + 0.002 = 0.202. Sonnet: 0.20 + 0.001 = 0.201.
+	if want := 0.202 * (1 - 0.201/0.202); !near(*occ[0].USD, want) {
+		t.Errorf("saving = %v, want %v", *occ[0].USD, want)
+	}
+}
+
+func TestOversizedModelUnknownPriceHasNoDollars(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-4-1", QuerySource: "repl_main_thread", Output: 100, CostUSD: 0.5},
+	}, nil)
+	occ := detectOversizedModel(d)
+	if len(occ) != 1 || occ[0].USD != nil || occ[0].Tokens != nil {
+		t.Fatalf("an unpriced model should still fire, with no dollar figure: %+v", occ)
+	}
+}
+
+func TestContextBloatPricesOnlyTheExcess(t *testing.T) {
+	// 300K of cache reads on Opus 5.5 and a big answer (so it isn't a small
+	// turn). List cost: 300K × 0.20 + 5K × 20 = 0.06 + 0.10 = 0.16. Excess
+	// 200K × 0.20 = 0.04, a quarter of it, so a quarter of the actual cost.
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 5, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", CacheRead: 300_000, Output: 5000, CostUSD: 0.32},
+		{PromptID: "p1", SessionID: "s", Ts: 6, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", CacheRead: 90_000, Output: 5000, CostUSD: 0.2},
+		{PromptID: "p2", SessionID: "s", Ts: 7, Model: "claude-opus-5-5", QuerySource: "compact", CacheRead: 300_000, CostUSD: 0.06},
+	}, nil)
+	occ := detectContextBloat(d)
+	if len(occ) != 1 {
+		t.Fatalf("want one occurrence for the session, got %+v", occ)
+	}
+	o := occ[0]
+	if o.USD == nil || !near(*o.USD, 0.08) {
+		t.Errorf("USD = %v, want 0.08", o.USD)
+	}
+	if o.Count != 1 || o.Severity != "full" || o.Ts != 5 || len(o.Evidence) != 1 || o.Evidence[0] != "p:p1" {
+		t.Errorf("unexpected occurrence %+v", o)
+	}
+}
+
+func TestContextBloatSkipsSmallTurns(t *testing.T) {
+	// A small Opus turn is already counted by the model check.
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", CacheRead: 300_000, Output: 100, CostUSD: 0.06},
+	}, nil)
+	if occ := detectContextBloat(d); len(occ) != 0 {
+		t.Fatalf("a small turn shouldn't count twice: %+v", occ)
+	}
+}
+
+func TestContextBloatFallsBackToBlendedRate(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "some-model", QuerySource: "repl_main_thread", CacheRead: 150_000, Output: 5000, CostUSD: 1},
+	}, nil)
+	d.blendedRate = 0.000001
+	occ := detectContextBloat(d)
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, 0.05) || occ[0].Severity != "half" {
+		t.Fatalf("want 50K excess at the blended rate, got %+v", occ)
 	}
 }
 

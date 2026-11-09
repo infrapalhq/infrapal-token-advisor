@@ -219,6 +219,47 @@ func (d *insightData) premiumModel(r reqRow) bool {
 	return ok && a.PremiumModel(r.Model)
 }
 
+// rates gives a request's model's list price, when its agent knows it.
+func (d *insightData) rates(r reqRow) (agent.Rates, bool) {
+	a, ok := agentFor(d.sessions[r.SessionID].Agent)
+	if !ok {
+		return agent.Rates{}, false
+	}
+	p, ok := a.(agent.ModelPricer)
+	if !ok {
+		return agent.Rates{}, false
+	}
+	return p.ModelRates(r.Model)
+}
+
+// cheaperModel names the model a request's agent suggests instead of its
+// premium one, with both models' list prices.
+func (d *insightData) cheaperModel(r reqRow) (name string, from, to agent.Rates, ok bool) {
+	a, ok := agentFor(d.sessions[r.SessionID].Agent)
+	if !ok {
+		return "", from, to, false
+	}
+	p, ok := a.(agent.ModelPricer)
+	if !ok {
+		return "", from, to, false
+	}
+	if name, ok = p.CheaperModel(r.Model); !ok {
+		return "", from, to, false
+	}
+	if from, ok = p.ModelRates(r.Model); !ok {
+		return "", from, to, false
+	}
+	if to, ok = p.ModelRates(name); !ok {
+		return "", from, to, false
+	}
+	return name, from, to, true
+}
+
+// tokens splits a request's tokens the way list prices do.
+func (r reqRow) tokens() agent.Tokens {
+	return agent.Tokens{Input: r.Input, Output: r.Output, CacheRead: r.CacheRead, CacheWrite: r.CacheCreate}
+}
+
 // costUnknown reports whether a session's agent gives no dollar figures, so a
 // finding shows none rather than an invented $0.00. A finding with no session
 // isn't tied to one agent.
