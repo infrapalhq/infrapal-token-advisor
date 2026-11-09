@@ -54,6 +54,34 @@ archives:
       group: root
       mtime: "{{ .CommitDate }}"
 
+# Linux packages: .deb for Debian and Ubuntu, .rpm for Fedora and RHEL, and
+# .pkg.tar.zst for Arch. Each installs /usr/bin/token-advisor. They are listed
+# in checksums.txt, so the signature on it covers them too.
+nfpms:
+  - id: packages
+    package_name: infrapal-token-advisor
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: Infrapal
+    homepage: "https://github.com/infrapalhq/infrapal-token-advisor"
+    maintainer: "Infrapal <hello@infrapal.io>"
+    description: "See where your Claude Code tokens go, and what to change. Local collector, SQLite store and dashboard."
+    license: MIT
+    section: utils
+    formats: [deb, rpm, archlinux]
+    bindir: /usr/bin
+    mtime: "{{ .CommitDate }}"
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/infrapal-token-advisor/LICENSE
+        file_info:
+          mtime: "{{ .CommitDate }}"
+      - src: README.md
+        dst: /usr/share/doc/infrapal-token-advisor/README.md
+        file_info:
+          mtime: "{{ .CommitDate }}"
+    archlinux:
+      packager: "Infrapal <hello@infrapal.io>"
+
 checksum:
   name_template: "checksums.txt"
 
@@ -74,17 +102,20 @@ changelog:
       - "^test:"
       - "^chore:"
 
+# Publishing to the Homebrew tap and the AUR each needs a secret. Without it,
+# that step is skipped and the rest of the release still goes out.
 homebrew_casks:
   - name: infrapal-token-advisor
     binaries:
       - token-advisor
+    skip_upload: '{{ if index .Env "HOMEBREW_TAP_TOKEN" }}false{{ else }}true{{ end }}'
     repository:
       owner: infrapalhq
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      token: '{{ index .Env "HOMEBREW_TAP_TOKEN" }}'
     directory: Casks
     homepage: "https://github.com/infrapalhq/infrapal-token-advisor"
-    description: "Local-only OTLP receiver, SQLite store, and dashboard for Claude Code telemetry"
+    description: "See where your Claude Code tokens go, and what to change"
     caveats: |
       Run `token-advisor init` to start collecting.
       After upgrading, run `token-advisor restart`.
@@ -96,3 +127,24 @@ homebrew_casks:
           on_macos do
             run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/token-advisor"]
           end
+
+# The AUR package, so Arch users can install with an AUR helper such as yay.
+# AUR_KEY is the private SSH key of the AUR account that maintains it.
+aurs:
+  - name: infrapal-token-advisor-bin
+    homepage: "https://github.com/infrapalhq/infrapal-token-advisor"
+    description: "See where your Claude Code tokens go, and what to change"
+    maintainers:
+      - "Infrapal <hello@infrapal.io>"
+    license: MIT
+    provides: [infrapal-token-advisor]
+    conflicts: [infrapal-token-advisor]
+    skip_upload: '{{ if index .Env "AUR_KEY" }}false{{ else }}true{{ end }}'
+    private_key: '{{ index .Env "AUR_KEY" }}'
+    git_url: "ssh://aur@aur.archlinux.org/infrapal-token-advisor-bin.git"
+    commit_author:
+      name: Infrapal
+      email: hello@infrapal.io
+    package: |-
+      install -Dm755 "./token-advisor" "${pkgdir}/usr/bin/token-advisor"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/infrapal-token-advisor/LICENSE"

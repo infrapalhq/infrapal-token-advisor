@@ -106,8 +106,10 @@ token-advisor purge --all
 
 Every release is signed, and carries provenance saying which commit and workflow
 built it. Both are tied to this repository's release workflow through GitHub's
-identity, so there's no key that could leak. Download the archive you want with
-`checksums.txt`, `checksums.txt.sigstore.json` and the `.intoto.jsonl` file.
+identity, so there's no key that could leak. Download the archive or package you
+want with `checksums.txt`, `checksums.txt.sigstore.json` and the `.intoto.jsonl`
+file. The `.deb`, `.rpm` and Arch packages are listed in `checksums.txt` too, so
+the same steps check them.
 
 Check the signature on the checksums with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/),
 replacing `v0.1.0` with the release's tag:

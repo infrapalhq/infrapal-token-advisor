@@ -2,6 +2,7 @@
 # Installs the latest token-advisor release, checking its checksum.
 #
 #   curl -fsSL https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
+#   wget -qO- https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
 #
 # INSTALL_DIR               where to put it (default: ~/.local/bin)
 # DESTDIR                   a staging directory to put INSTALL_DIR under, for
@@ -19,7 +20,21 @@ fail() {
 	exit 1
 }
 
-command -v curl >/dev/null 2>&1 || fail "curl is required"
+# fetch FILE URL downloads URL to FILE. final_url URL prints where URL
+# redirects to. Either curl or wget will do.
+if command -v curl >/dev/null 2>&1; then
+	fetch() { curl -fsSL -o "$1" "$2"; }
+	final_url() { curl -fsSLI -o /dev/null -w '%{url_effective}' "$1"; }
+elif command -v wget >/dev/null 2>&1; then
+	fetch() { wget -q -O "$1" "$2"; }
+	final_url() {
+		wget -q -S --spider "$1" 2>&1 |
+			awk 'tolower($1) == "location:" { url = $2 } END { if (url == "") exit 1; print url }' |
+			tr -d '\r'
+	}
+else
+	fail "curl or wget is required"
+fi
 
 case $(uname -s) in
 Darwin) os=darwin ;;
@@ -36,11 +51,15 @@ esac
 version=${TOKEN_ADVISOR_VERSION:-}
 if [ -z "$version" ]; then
 	# The /latest page redirects to the newest tag, with no API rate limit.
-	url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$repo/releases/latest") ||
+	url=$(final_url "https://github.com/$repo/releases/latest") ||
 		fail "couldn't find the latest release"
+	# With no release yet, it redirects to the releases list instead.
+	case $url in
+	*/releases/tag/v*) ;;
+	*) fail "no release found" ;;
+	esac
 	version=${url##*/}
 	version=${version#v}
-	[ -n "$version" ] && [ "$version" != latest ] || fail "no release found"
 fi
 
 base=${TOKEN_ADVISOR_BASE_URL:-https://github.com/$repo/releases/download/v$version}
@@ -50,8 +69,8 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 echo "downloading token-advisor $version ($os/$arch)"
-curl -fsSL -o "$tmp/$archive" "$base/$archive" || fail "couldn't download $base/$archive"
-curl -fsSL -o "$tmp/checksums.txt" "$base/checksums.txt" || fail "couldn't download checksums.txt"
+fetch "$tmp/$archive" "$base/$archive" || fail "couldn't download $base/$archive"
+fetch "$tmp/checksums.txt" "$base/checksums.txt" || fail "couldn't download checksums.txt"
 
 want=$(awk -v name="$archive" '$2 == name { print $1 }' "$tmp/checksums.txt")
 [ -n "$want" ] || fail "no checksum for $archive"

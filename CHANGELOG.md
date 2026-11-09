@@ -7,6 +7,8 @@ All notable changes to token-advisor are recorded here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-09
+
 The first release.
 
 ### Added
@@ -28,6 +30,8 @@ The first release.
   `purge`, `update`, `restart` and `uninstall`.
 - A background service that starts at login and restarts if it stops, using
   launchd on macOS and systemd on Linux.
+- Packages for Homebrew, Debian and Ubuntu (`.deb`), Fedora and RHEL (`.rpm`) and
+  Arch (`.pkg.tar.zst`), and an install script that works with curl or wget. Every release is signed with Sigstore and carries build provenance.
 - Automatic deletion of data older than 6 months, which you can change.
 - Database backups before every upgrade, and a refusal to open a database from a
   newer version.
@@ -84,3 +88,6 @@ The first release.
   [checking a release](docs/OPERATIONS.md#checking-a-release).
 - Releases are reproducible, so anyone can check a download was built from its
   source. See [reproducing a release](docs/OPERATIONS.md#reproducing-a-release).
+
+[Unreleased]: https://github.com/infrapalhq/infrapal-token-advisor/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/infrapalhq/infrapal-token-advisor/releases/tag/v0.1.0

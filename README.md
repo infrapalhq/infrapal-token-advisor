@@ -103,15 +103,31 @@ macOS, with Homebrew:
 brew install --cask infrapalhq/tap/infrapal-token-advisor
 ```
 
-Linux or macOS, without Homebrew. This installs to `~/.local/bin`, or to
-`INSTALL_DIR` if you set it, and checks the download's checksum:
+Linux, with your package manager. Download the package for your system from the
+[latest release](https://github.com/infrapalhq/infrapal-token-advisor/releases/latest),
+then install it:
+
+```sh
+sudo apt install ./infrapal-token-advisor_*_amd64.deb         # Debian, Ubuntu
+sudo dnf install ./infrapal-token-advisor-*.x86_64.rpm         # Fedora, RHEL
+sudo pacman -U ./infrapal-token-advisor-*-x86_64.pkg.tar.zst   # Arch
+```
+
+On ARM, use the `arm64` or `aarch64` file instead.
+
+Linux or macOS, with the install script. This installs to `~/.local/bin`, or to
+`INSTALL_DIR` if you set it, and checks the download's checksum. It works with
+curl or wget:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/infrapalhq/infrapal-token-advisor/main/scripts/install.sh | sh
 ```
 
 Packagers can set `DESTDIR` to stage the binary under another directory, such as
 `DESTDIR=./pkg INSTALL_DIR=/usr/local/bin`.
+
+Every release is signed. See [checking a release](docs/OPERATIONS.md#checking-a-release).
 
 Then start collecting. This patches `~/.claude/settings.json`, keeping a backup,
 and installs a background service:
@@ -159,7 +175,8 @@ token-advisor update --check   # is there a newer release?
 token-advisor update           # install it and restart the service
 ```
 
-With Homebrew, use `brew upgrade --cask infrapal-token-advisor`, then
+With Homebrew, use `brew upgrade --cask infrapal-token-advisor`. With a Linux
+package, install the new release's package the same way as the first. Then run
 `token-advisor restart`. The database is backed up before any schema upgrade.
 
 ## Uninstall
@@ -169,8 +186,10 @@ token-advisor uninstall             # restores settings.json and deletes all dat
 token-advisor uninstall --keep-db   # the same, keeping ~/.infrapal-token-advisor
 ```
 
-This doesn't remove the binary. Delete it, or run
-`brew uninstall --cask infrapal-token-advisor`.
+This doesn't remove the binary. Delete it, or remove the package: run
+`brew uninstall --cask infrapal-token-advisor`, or remove `infrapal-token-advisor`
+with apt, dnf or pacman. Run `token-advisor uninstall` first, so the background
+service is removed too.
 
 ## Ask Claude about your data (MCP)
 

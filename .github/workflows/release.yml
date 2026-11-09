@@ -1,7 +1,10 @@
 name: release
 
-# Publishes a release when a v* tag is pushed. HOMEBREW_TAP_TOKEN must be a
-# token that can push to infrapalhq/homebrew-tap.
+# Publishes a release when a v* tag is pushed: archives, .deb, .rpm and Arch
+# packages, then the Homebrew cask and the AUR package. Two optional secrets turn
+# on the last two, and either is skipped without its secret:
+#   HOMEBREW_TAP_TOKEN  a token that can push to infrapalhq/homebrew-tap
+#   AUR_KEY             the private SSH key of the AUR account for the package
 #
 # Each release is signed and carries build provenance, both tied to this
 # workflow's identity through GitHub's OIDC token, so there's no key to manage.
@@ -45,6 +48,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          AUR_KEY: ${{ secrets.AUR_KEY }}
       # SLSA build provenance for every archive: which commit and workflow built
       # it. It's stored with GitHub, and attached to the release as well, where
       # tools such as OpenSSF Scorecard look for it.

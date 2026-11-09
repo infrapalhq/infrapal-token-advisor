@@ -117,9 +117,14 @@ func parseVersion(v string) ([3]int, error) {
 }
 
 // ManagedBy names the package manager that owns the binary at path, or "".
+// The .deb, .rpm and Arch packages install to /usr/bin, which nothing else
+// does, so a binary there belongs to the system's package manager.
 func ManagedBy(path string) string {
-	if strings.Contains(path, "/Caskroom/") || strings.Contains(path, "/Cellar/") {
+	switch {
+	case strings.Contains(path, "/Caskroom/") || strings.Contains(path, "/Cellar/"):
 		return "homebrew"
+	case strings.HasPrefix(path, "/usr/bin/"):
+		return "system"
 	}
 	return ""
 }

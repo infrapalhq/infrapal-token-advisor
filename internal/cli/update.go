@@ -48,8 +48,11 @@ func runUpdate(args []string) error {
 	if exe, err = filepath.EvalSymlinks(exe); err != nil {
 		return err
 	}
-	if update.ManagedBy(exe) == "homebrew" {
+	switch update.ManagedBy(exe) {
+	case "homebrew":
 		return errors.New("this install is managed by Homebrew — run `brew upgrade --cask infrapal-token-advisor`, then `token-advisor restart`")
+	case "system":
+		return errors.New("this install is managed by your system's package manager — install the new .deb, .rpm or Arch package from the release, then run `token-advisor restart`")
 	}
 
 	if err := client.Install(ctx, tag, runtime.GOOS, runtime.GOARCH, exe); err != nil {
