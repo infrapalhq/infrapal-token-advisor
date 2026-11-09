@@ -16,7 +16,7 @@ Runs locally. No InfraPal account or hosted dashboard required.
 
 **[Install](#install) · [What it finds](#what-it-finds) · [How it works](#how-it-works) · [Commands](#commands) · [Privacy](#privacy) · [FAQ](#faq) · [Docs](#documentation)**
 
-<img src="docs/assets/overview.png" alt="Token Advisor Overview showing session costs, token usage, potential savings and prioritised findings" width="860">
+<img src="docs/assets/overview-v2.png" alt="Token Advisor Overview showing session costs, token usage, potential savings and prioritised findings" width="860">
 
 <sub>All screenshots use made-up sample data.</sub>
 
