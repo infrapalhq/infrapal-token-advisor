@@ -112,7 +112,7 @@ homebrew_casks:
     repository:
       owner: infrapalhq
       name: homebrew-tap
-      token: '{{ index .Env "HOMEBREW_TAP_TOKEN" }}'
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Casks
     homepage: "https://github.com/infrapalhq/infrapal-token-advisor"
     description: "See where your Claude Code tokens go, and what to change"
@@ -140,7 +140,7 @@ aurs:
     provides: [infrapal-token-advisor]
     conflicts: [infrapal-token-advisor]
     skip_upload: '{{ if index .Env "AUR_KEY" }}false{{ else }}true{{ end }}'
-    private_key: '{{ index .Env "AUR_KEY" }}'
+    private_key: "{{ .Env.AUR_KEY }}"
     git_url: "ssh://aur@aur.archlinux.org/infrapal-token-advisor-bin.git"
     commit_author:
       name: Infrapal
