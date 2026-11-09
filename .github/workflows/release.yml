@@ -56,7 +56,9 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-checksums: dist/checksums.txt
-      - name: Attach the provenance to the release
+      # GoReleaser leaves the release as a draft, because a published release is
+      # immutable and nothing more can be attached to it.
+      - name: Attach the provenance and publish the release
         env:
           GH_TOKEN: ${{ github.token }}
           BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
@@ -64,3 +66,4 @@ jobs:
           name="infrapal-token-advisor_${GITHUB_REF_NAME#v}.intoto.jsonl"
           cp "$BUNDLE" "$name"
           gh release upload "$GITHUB_REF_NAME" "$name" --repo "$GITHUB_REPOSITORY"
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest --repo "$GITHUB_REPOSITORY"
