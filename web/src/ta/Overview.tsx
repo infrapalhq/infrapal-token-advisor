@@ -39,7 +39,7 @@ export default function Overview() {
   const recoveredMinutes = Math.round(data?.recovered.minutes ?? 0);
   const unknownCost = data?.cost_unknown_sessions ?? 0;
   const noCost = unknownCost > 0 && unknownCost === data?.sessions_count;
-  const periodLabel = PERIODS.find((p) => p.value === range)?.label.toLowerCase() ?? "in range";
+  const periodLabel = range === "today" ? "today" : `in the ${PERIODS.find((p) => p.value === range)?.label.toLowerCase() ?? "selected period"}`;
 
   if (firstRun) return <Shell><FirstRun /></Shell>;
 
