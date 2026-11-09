@@ -112,10 +112,10 @@ file. The `.deb`, `.rpm` and Arch packages are listed in `checksums.txt` too, so
 the same steps check them.
 
 Check the signature on the checksums with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/),
-replacing `v0.1.0` with the release's tag:
+replacing `v0.1.1` with the release's tag:
 
 ```bash
-cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json --certificate-identity "https://github.com/infrapalhq/infrapal-token-advisor/.github/workflows/release.yml@refs/tags/v0.1.0" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+cosign verify-blob checksums.txt --bundle checksums.txt.sigstore.json --certificate-identity "https://github.com/infrapalhq/infrapal-token-advisor/.github/workflows/release.yml@refs/tags/v0.1.1" --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
 ```
 
 Then check your archive against the checksums:
@@ -127,7 +127,7 @@ shasum -a 256 --ignore-missing -c checksums.txt
 Or check the archive's provenance with the [GitHub CLI](https://cli.github.com/):
 
 ```bash
-gh attestation verify infrapal-token-advisor_0.1.0_darwin_arm64.tar.gz --repo infrapalhq/infrapal-token-advisor
+gh attestation verify infrapal-token-advisor_0.1.1_darwin_arm64.tar.gz --repo infrapalhq/infrapal-token-advisor
 ```
 
 `install.sh` and `token-advisor update` check the SHA-256 checksums, but not the
@@ -140,7 +140,7 @@ so you can check a download was built from the source it claims. You need the
 same Go version as the release, which is the `toolchain` line in `go.mod`, and
 Node.js 24 for the dashboard.
 
-1. Check out the release's tag, such as `git checkout v0.1.0`.
+1. Check out the release's tag, such as `git checkout v0.1.1`.
 2. Build it with the GoReleaser version the release workflow uses:
 
    ```bash

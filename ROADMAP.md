@@ -7,7 +7,7 @@ or start a [discussion](https://github.com/infrapalhq/infrapal-token-advisor/dis
 
 ## Now: the first release
 
-- **v0.1.0**, supporting Claude Code on macOS and Linux, installed with Homebrew or
+- **v0.1.1**, supporting Claude Code on macOS and Linux, installed with Homebrew or
   a script.
 - **Signed releases** with build provenance, so you can check a download came from
   this repository's CI.

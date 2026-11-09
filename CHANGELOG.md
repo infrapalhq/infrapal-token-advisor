@@ -7,9 +7,10 @@ All notable changes to token-advisor are recorded here. The format follows
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-09
+## [0.1.1] - 2026-11-09
 
-The first release.
+The first release. v0.1.0 went out the same day without its Homebrew cask
+or build provenance, and was withdrawn.
 
 ### Added
 
@@ -89,5 +90,5 @@ The first release.
 - Releases are reproducible, so anyone can check a download was built from its
   source. See [reproducing a release](docs/OPERATIONS.md#reproducing-a-release).
 
-[Unreleased]: https://github.com/infrapalhq/infrapal-token-advisor/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/infrapalhq/infrapal-token-advisor/releases/tag/v0.1.0
+[Unreleased]: https://github.com/infrapalhq/infrapal-token-advisor/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/infrapalhq/infrapal-token-advisor/releases/tag/v0.1.1
