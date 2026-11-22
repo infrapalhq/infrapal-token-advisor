@@ -103,6 +103,7 @@ type insightData struct {
 	waits       map[string]waitRow // keyed by tool_use_id
 	deadMCP     []string           // connected MCP servers that were never used
 	blendedRate float64            // USD per token, this install's own rate
+	priceIdx    *priceIndex        // built on first use by prices()
 }
 
 // agentFor finds a session's agent. ok is false for an agent this build doesn't
@@ -426,6 +427,7 @@ func loadInsightData(ctx context.Context, db *sql.DB, cutoffMs int64) (*insightD
 	if err != nil {
 		return nil, err
 	}
+	d.prices() // before any view is taken, so every view prices from all requests
 	return d, nil
 }
 

@@ -31,7 +31,10 @@ data through the MCP server, its answer is Claude's reading of these same figure
 | Figure | How it's worked out | What can be off |
 | --- | --- | --- |
 | Tool result tokens | Result size in bytes ÷ 4, as telemetry doesn't report tokens per tool | Rough, particularly for code or non-English text |
-| Dollar value of waste | Tokens × your own average cost per token | Understated: a large result is often re-sent as cached input on later requests |
+| Price per kind of token | Each model's cost per token, worked out from your own requests assuming the usual price structure: output 5×, cache write 1.25× and cache read 0.1× the price of fresh input | Off by 10–20% per request for some models; totals are closer |
+| Dollar value of a re-read or repeated command | Its tokens written to the prompt cache once, then read back by every later request in the session until a compaction, each at that request's model price | Overstated if the result was cleared from context early; understated if it changed what Claude did next |
+| Dollar value of a cache rebuild | The tokens rewritten after a pause, priced as the difference between writing and reading them | Some of that context may have been needed anyway |
+| Dollar value of an oversized model | What the turn cost, less what it would have cost on the priciest smaller model you used, or 40% of it if you've used none | A smaller model might have needed more turns |
 | Context per step | Each tool row takes the context of the next API request | Approximate per step; peak context and compactions are exact |
 | Project | The session transcript's working directory, else the nearest `.git` above the files touched, else their common folder | Claude Code deletes transcripts after 30 days, so it's read while it exists. A session with neither has no project |
 | Waiting on you | Time blocked on your approval, capped at 10 minutes per approval | Longer waits count as idle, as you probably walked away |
@@ -47,6 +50,7 @@ data through the MCP server, its answer is Claude's reading of these same figure
 | Failing MCP server | At least 5 calls, with 20% or more failing | Measured | |
 | Compaction | Claude Code compacted the session's context | Measured | |
 | Oversized model | An Opus-class model gave a short answer, up to 2,000 tokens, with no file changes and few tools | Likely | A short answer can still need the larger model's judgment |
+| Cache rebuild | After a pause of 5 minutes or more, a request wrote at least half of the earlier context, and 10K+ tokens, to the cache instead of reading it, with no compaction in between | Likely | The conversation needed all of that context again |
 
 token-advisor only sees what Claude does, so a change you make in your editor is
 invisible to it. That's why rules that depend on "nothing changed" are Likely.

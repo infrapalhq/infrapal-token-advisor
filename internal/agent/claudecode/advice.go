@@ -60,7 +60,12 @@ func (a *Agent) CompactionDetail() string {
 
 // SmallerModelNote implements agent.Advisor.
 func (a *Agent) SmallerModelNote() string {
-	return "Habit: switch to a smaller model with /model for turns like this. Spend shown is what this turn cost, not a saving."
+	return "Habit: switch to a smaller model with /model for turns like this. The figure shown is the estimated saving, not what the turn cost."
+}
+
+// CacheRebuildNote implements agent.Advisor.
+func (a *Agent) CacheRebuildNote() string {
+	return "Habit: after a long pause, start a new task with /clear, or run /compact before stepping away, so less context is cached again. Allowing read-only commands you approve often also shortens the waits that let the cache expire."
 }
 
 // MCPSetup implements agent.MCPHost.

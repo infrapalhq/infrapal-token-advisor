@@ -135,7 +135,7 @@ func buildCards(ctx context.Context, db *sql.DB, d *insightData, occ []occurrenc
 		a := get(r.SessionID)
 		a.tokens += r.Tokens()
 		a.costF += r.CostUSD
-		if r.QuerySource == agent.MainQuerySource || r.QuerySource == "" {
+		if agent.IsMainQuerySource(r.QuerySource) {
 			a.modelCost[r.Model] += r.CostUSD
 		}
 	}

@@ -26,6 +26,9 @@ type Advisor interface {
 	CompactionDetail() string
 	// SmallerModelNote suggests a cheaper model for a small turn.
 	SmallerModelNote() string
+	// CacheRebuildNote suggests how to avoid re-caching a long conversation
+	// after a pause.
+	CacheRebuildNote() string
 }
 
 // NoAdvice is the Advisor for an agent with nothing specific to say.
@@ -42,7 +45,11 @@ func (NoAdvice) CompactionDetail() string {
 }
 
 func (NoAdvice) SmallerModelNote() string {
-	return "Habit: use a smaller model for turns like this. Spend shown is what this turn cost, not a saving."
+	return "Habit: use a smaller model for turns like this. The figure shown is the estimated saving, not what the turn cost."
+}
+
+func (NoAdvice) CacheRebuildNote() string {
+	return "Habit: after a long pause, start a fresh session for a new task, or summarise the conversation before stepping away, so less context is cached again."
 }
 
 // MCPSetup is how a user connects the token-advisor MCP server to an agent.

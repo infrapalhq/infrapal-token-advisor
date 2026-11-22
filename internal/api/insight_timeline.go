@@ -209,8 +209,8 @@ func loadClaudeReplies(ctx context.Context, db *sql.DB, sid string) ([]claudeRep
 	rows, err := db.QueryContext(ctx, `
 		SELECT message_uuid, COALESCE(prompt_id,''), COALESCE(ts,0), COALESCE(response_text,'')
 		FROM assistant_responses
-		WHERE session_id = ? AND query_source = ?
-		ORDER BY ts`, sid, agent.MainQuerySource)
+		WHERE session_id = ? AND query_source IN (?, ?)
+		ORDER BY ts`, sid, agent.MainQuerySource, agent.SDKQuerySource)
 	if err != nil {
 		return nil, err
 	}

@@ -34,6 +34,7 @@ var detectors = []detector{
 	{"failing_mcp", "failing MCP servers", 0, detectFailingMCP},
 	{"oversized_model", "oversized models", 0, detectOversizedModel},
 	{"dead_mcp", "unused MCP servers", agent.CapMCPConnections, detectDeadMCP},
+	{"cache_rebuild", "prompt cache rebuilds", agent.CapContextSize, detectCacheRebuild},
 }
 
 // occurrence is one instance of a detected problem in one session.
@@ -68,6 +69,11 @@ const (
 	failingMCPRate            = 0.2
 	oversizedOutputTokens     = 2000 // a whole prompt whose answer fits in this is "small"
 	oversizedMaxToolCalls     = 3
+
+	cacheBreakMs            = 5 * 60 * 1000 // a pause this long can outlast the prompt cache
+	minRebuildTokens        = 10_000        // a smaller rewrite is ordinary new context
+	minRebuildShare         = 0.5           // of the earlier context rewritten, not read, to call it a rebuild
+	fullSeverityRebuildToks = 100_000
 )
 
 // mutatingBash matches shell commands that change files or repo state.
@@ -106,6 +112,7 @@ func detectReRead(d *insightData) []occurrence {
 		reads                 []read
 		rereads               int
 		tokens                int64
+		usd                   float64
 	}
 	const whole = int64(1) << 62
 
@@ -145,6 +152,7 @@ func detectReRead(d *insightData) []occurrence {
 				}
 				g.rereads++
 				g.tokens += t.ResultBytes / 4
+				g.usd += d.carryUSD(t.SessionID, t.Ts, t.ResultBytes/4)
 				g.reads = append(g.reads, cur)
 				break
 			}
@@ -178,6 +186,7 @@ func detectReRead(d *insightData) []occurrence {
 			Severity:  sev,
 			Conf:      "Likely",
 			Tokens:    &tokens,
+			USD:       priced(g.usd),
 			Title:     fmt.Sprintf("%s read %d× in one prompt", filepath.Base(g.file), total),
 			Detail:    fmt.Sprintf("%d re-read(s) with no edit to the file between them.", g.rereads),
 			Fix:       fix.Text,
@@ -221,6 +230,7 @@ func detectRepeatCommand(d *insightData) []occurrence {
 		ts      int64
 		repeats int
 		tokens  int64
+		usd     float64
 		ev      []string
 	}
 	groups := map[key]*group{}
@@ -248,6 +258,7 @@ func detectRepeatCommand(d *insightData) []occurrence {
 			}
 			g.repeats++
 			g.tokens += t.ResultBytes / 4
+			g.usd += d.carryUSD(t.SessionID, t.Ts, t.ResultBytes/4)
 			g.ev = append(g.ev, "t:"+t.ID)
 		}
 		if !seen {
@@ -302,6 +313,7 @@ func detectRepeatCommand(d *insightData) []occurrence {
 			Severity:  sev,
 			Conf:      "Likely",
 			Tokens:    &tokens,
+			USD:       priced(g.usd),
 			Title:     fmt.Sprintf("`%s` ran again with nothing changed", truncate(k.cmd, 60)),
 			Detail:    fmt.Sprintf("%d extra run(s) in one prompt with no file change between.", g.repeats),
 			Fix:       fix.Text,
@@ -521,13 +533,14 @@ func detectOversizedModel(d *insightData) []occurrence {
 		ts             int64
 		output         int64
 		cost           float64
+		saving         float64
 		tools          int
 		mutated        bool
 	}
 	byPrompt := map[string]*agg{}
 	var order []string
 	for _, r := range d.reqs {
-		if r.PromptID == "" || r.QuerySource != agent.MainQuerySource || !d.premiumModel(r) {
+		if r.PromptID == "" || !agent.IsMainQuerySource(r.QuerySource) || !d.premiumModel(r) {
 			continue
 		}
 		a, ok := byPrompt[r.PromptID]
@@ -538,6 +551,7 @@ func detectOversizedModel(d *insightData) []occurrence {
 		}
 		a.output += r.Output
 		a.cost += r.CostUSD
+		a.saving += d.smallerModelSaving(r)
 	}
 	for _, t := range d.tools {
 		a, ok := byPrompt[t.PromptID]
@@ -555,7 +569,6 @@ func detectOversizedModel(d *insightData) []occurrence {
 		if a.output >= oversizedOutputTokens || a.mutated || a.tools > oversizedMaxToolCalls {
 			continue
 		}
-		usd := a.cost
 		out = append(out, occurrence{
 			Kind:      "oversized_model",
 			Area:      "model",
@@ -567,9 +580,9 @@ func detectOversizedModel(d *insightData) []occurrence {
 			Count:     1,
 			Severity:  "half",
 			Conf:      "Likely",
-			USD:       &usd,
+			USD:       priced(a.saving),
 			Title:     fmt.Sprintf("Small turn on %s", a.model),
-			Detail:    fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn.", a.output, a.tools, a.cost),
+			Detail:    fmt.Sprintf("Answer of ~%d output tokens with %d tool call(s) and no file changes. Spent $%.2f on this turn, about $%.2f more than a smaller model.", a.output, a.tools, a.cost, a.saving),
 			Note:      d.advisor(a.session).SmallerModelNote(),
 		})
 	}
@@ -597,6 +610,127 @@ func detectDeadMCP(d *insightData) []occurrence {
 		})
 	}
 	return out
+}
+
+// detectCacheRebuild flags a session's context being written to the prompt
+// cache again after a pause. Each request normally reads the conversation
+// back from the cache at a tenth of the input price; once the cache has
+// expired the whole conversation is written again at 1.25×. A rebuild is a
+// request, after a pause of cacheBreakMs or more, that wrote at least half of
+// the earlier request's context instead of reading it. The cost is the
+// difference between writing those tokens and reading them. A compaction in
+// the pause is reported on its own, so it isn't counted again here. A habit,
+// Likely: the cache write is measured, but the conversation may have needed
+// all of that context again.
+func detectCacheRebuild(d *insightData) []occurrence {
+	p := d.prices()
+	inView := map[string]bool{}
+	for _, r := range d.reqs {
+		inView[r.SessionID] = true
+	}
+	sids := make([]string, 0, len(inView))
+	for sid := range inView {
+		sids = append(sids, sid)
+	}
+	sort.Strings(sids)
+
+	var out []occurrence
+	for _, sid := range sids {
+		rs := p.main[sid]
+		for i := 1; i < len(rs); i++ {
+			prev, cur := rs[i-1], rs[i]
+			gap := cur.Ts - prev.Ts
+			prevCtx := prev.Input + prev.CacheRead + prev.CacheCreate
+			if gap < cacheBreakMs || prevCtx <= 0 {
+				continue
+			}
+			lost := min(cur.CacheCreate, prevCtx)
+			if lost < minRebuildTokens || float64(cur.CacheCreate) < minRebuildShare*float64(prevCtx) || cur.CacheRead >= cur.CacheCreate {
+				continue
+			}
+			if compactedBetween(p.compactions[sid], prev.Ts, cur.Ts) {
+				continue
+			}
+			usd := float64(lost) * p.unitRate(cur.Model) * (priceCacheWrite - priceCacheRead)
+			tokens := lost
+			sev := "half"
+			if lost >= fullSeverityRebuildToks {
+				sev = "full"
+			}
+			why := "after a pause"
+			if d.approvalBetween(sid, prev.Ts, cur.Ts) {
+				why = "while waiting on your approval"
+			}
+			var ev []string
+			if cur.PromptID != "" {
+				ev = []string{"p:" + cur.PromptID}
+			}
+			out = append(out, occurrence{
+				Kind:      "cache_rebuild",
+				Area:      "context",
+				Subject:   "",
+				SessionID: sid,
+				PromptID:  cur.PromptID,
+				Ts:        cur.Ts,
+				Evidence:  ev,
+				Count:     1,
+				Severity:  sev,
+				Conf:      "Likely",
+				Tokens:    &tokens,
+				USD:       &usd,
+				Title:     "Conversation re-cached after a pause",
+				Detail:    fmt.Sprintf("After %s away the prompt cache had expired %s, so ~%dK tokens of conversation were written again instead of read back.", gapText(gap), why, lost/1000),
+				Note:      d.advisor(sid).CacheRebuildNote(),
+			})
+		}
+	}
+	return out
+}
+
+// compactedBetween reports whether a compaction happened in (from, to].
+func compactedBetween(times []int64, from, to int64) bool {
+	for _, c := range times {
+		if c > from && c <= to {
+			return true
+		}
+	}
+	return false
+}
+
+// approvalBetween reports whether a hand-approved tool call in the session
+// started in (from, to], so the pause was spent waiting on the user.
+func (d *insightData) approvalBetween(sessionID string, from, to int64) bool {
+	for id, w := range d.waits {
+		if w.SessionID != sessionID {
+			continue
+		}
+		if t, ok := d.toolByID[id]; ok && t.Ts > from && t.Ts <= to {
+			return true
+		}
+	}
+	return false
+}
+
+// gapText writes a pause as minutes, hours or days.
+func gapText(ms int64) string {
+	m := ms / 60000
+	switch {
+	case m < 60:
+		return fmt.Sprintf("%dm", m)
+	case m < 48*60:
+		return fmt.Sprintf("%dh", m/60)
+	default:
+		return fmt.Sprintf("%dd", m/(24*60))
+	}
+}
+
+// priced is a dollar figure for an occurrence, or nil when there is none to
+// give, so the token count is priced the usual way instead.
+func priced(usd float64) *float64 {
+	if usd <= 0 {
+		return nil
+	}
+	return &usd
 }
 
 // truncate shortens s to n runes with an ellipsis.

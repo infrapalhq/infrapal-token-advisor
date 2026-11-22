@@ -211,8 +211,130 @@ func TestOversizedModelFiresOnSmallOpusTurn(t *testing.T) {
 		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: "repl_main_thread", Output: 400, CostUSD: 0.8},
 	}, nil)
 	occ := detectOversizedModel(d)
-	if len(occ) != 1 || occ[0].USD == nil || *occ[0].USD != 0.8 {
-		t.Fatalf("small Opus turn should fire with its spend, got %+v", occ)
+	// No smaller model was used to measure from, so the saving is the default 40%.
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, 0.8*(1-smallerModelPriceRatio)) {
+		t.Fatalf("small Opus turn should fire with its saving, got %+v", occ)
+	}
+}
+
+func TestOversizedModelCountsDesktopAppTurns(t *testing.T) {
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: agent.SDKQuerySource, Output: 400, CostUSD: 0.8},
+	}, nil)
+	if occ := detectOversizedModel(d); len(occ) != 1 {
+		t.Fatalf("a desktop-app turn is the user's own turn, got %+v", occ)
+	}
+}
+
+func TestOversizedModelPricesSavingFromTheSmallerModelUsed(t *testing.T) {
+	// Opus: 1000 output tokens = 5000 units for $0.05, so $10/M units.
+	// Sonnet: 1000 output tokens = 5000 units for $0.03, so $6/M units.
+	d := fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1, Model: "claude-opus-5-5", QuerySource: agent.MainQuerySource, Output: 1000, CostUSD: 0.05},
+		{PromptID: "p2", SessionID: "s", Ts: 2, Model: "claude-sonnet-5-5", QuerySource: agent.MainQuerySource, Output: 1000, CostUSD: 0.03},
+	}, nil)
+	occ := detectOversizedModel(d)
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, 0.02) {
+		t.Fatalf("saving should be $0.05 - $0.03 = $0.02, got %+v", occ)
+	}
+}
+
+func near(a, b float64) bool { return a-b < 1e-9 && b-a < 1e-9 }
+
+// carryFixture is one session with a request every minute from ts 10 to 50,
+// each $1 per million units on one model, and a compaction at 35.
+func carryFixture(tools []toolRow) *insightData {
+	var reqs []reqRow
+	for ts := int64(10); ts <= 50; ts += 10 {
+		reqs = append(reqs, reqRow{PromptID: "p1", SessionID: "s", Ts: ts, Model: "m", QuerySource: agent.MainQuerySource, Input: 1_000_000, CostUSD: 1})
+	}
+	d := fixture(tools, reqs, nil)
+	d.compactions = []compactRow{{SessionID: "s", Ts: 35}}
+	return d
+}
+
+func TestCarryUSD_WritesOnceThenReadsUntilCompaction(t *testing.T) {
+	d := carryFixture(nil)
+	// At ts 15: written at 20 (1.25×), read at 30 (0.1×), then compacted at 35.
+	want := 1000 * 1e-6 * (priceCacheWrite + priceCacheRead)
+	if got := d.carryUSD("s", 15, 1000); !near(got, want) {
+		t.Errorf("carry = %v, want %v", got, want)
+	}
+	// After the last request, the tokens were sent once at the average rate.
+	if got := d.carryUSD("s", 60, 1000); !near(got, 1000*1e-6) {
+		t.Errorf("carry with no later request = %v", got)
+	}
+	if got := d.carryUSD("s", 15, 0); got != 0 {
+		t.Errorf("no tokens, no cost: %v", got)
+	}
+}
+
+func TestReReadIsPricedByWhatItCarries(t *testing.T) {
+	d := carryFixture([]toolRow{
+		{ID: "r1", Name: "Read", File: "/a.go", ResultBytes: 4000, Ts: 11},
+		{ID: "r2", Name: "Read", File: "/a.go", ResultBytes: 4000, Ts: 12},
+	})
+	occ := detectReRead(d)
+	want := 1000 * 1e-6 * (priceCacheWrite + priceCacheRead)
+	if len(occ) != 1 || occ[0].USD == nil || !near(*occ[0].USD, want) {
+		t.Fatalf("re-read should be priced by its carry, want %v got %+v", want, occ)
+	}
+}
+
+func TestReReadLeavesPriceToTokensWhenThereIsNoCost(t *testing.T) {
+	d := fixture([]toolRow{read("r1", "/a.go", 4000, 0, 0), read("r2", "/a.go", 4000, 0, 0)}, nil, nil)
+	if occ := detectReRead(d); len(occ) != 1 || occ[0].USD != nil {
+		t.Fatalf("with no cost data the tokens are priced later, got %+v", occ)
+	}
+}
+
+func rebuildFixture(gapMs, cacheWrite, cacheRead int64) *insightData {
+	return fixture(nil, []reqRow{
+		{PromptID: "p1", SessionID: "s", Ts: 1000, Model: "m", QuerySource: agent.MainQuerySource, CacheRead: 190_000, CacheCreate: 10_000, Input: 0, CostUSD: 0.032},
+		{PromptID: "p2", SessionID: "s", Ts: 1000 + gapMs, Model: "m", QuerySource: agent.SDKQuerySource, CacheRead: cacheRead, CacheCreate: cacheWrite, CostUSD: 0.25},
+	}, nil)
+}
+
+func TestCacheRebuildFiresAfterAPause(t *testing.T) {
+	d := rebuildFixture(30*60*1000, 200_000, 0)
+	occ := detectCacheRebuild(d)
+	if len(occ) != 1 {
+		t.Fatalf("want 1 rebuild, got %+v", occ)
+	}
+	o := occ[0]
+	want := 200_000 * d.prices().unitRate("m") * (priceCacheWrite - priceCacheRead)
+	if o.Tokens == nil || *o.Tokens != 200_000 || o.USD == nil || !near(*o.USD, want) || o.Severity != "full" || o.Conf != "Likely" {
+		t.Fatalf("rebuild = %+v, want 200K tokens at $%v", o, want)
+	}
+	if !strings.Contains(o.Detail, "30m away") || !strings.Contains(o.Detail, "after a pause") {
+		t.Errorf("title/detail = %q / %q", o.Title, o.Detail)
+	}
+}
+
+func TestCacheRebuildIgnoresWarmCacheShortPausesAndCompactions(t *testing.T) {
+	if occ := detectCacheRebuild(rebuildFixture(60*1000, 200_000, 0)); len(occ) != 0 {
+		t.Errorf("a short pause keeps the cache: %+v", occ)
+	}
+	if occ := detectCacheRebuild(rebuildFixture(30*60*1000, 5_000, 200_000)); len(occ) != 0 {
+		t.Errorf("a context read back from the cache isn't a rebuild: %+v", occ)
+	}
+	d := rebuildFixture(30*60*1000, 200_000, 0)
+	d.compactions = []compactRow{{SessionID: "s", Ts: 2000}}
+	d.priceIdx = nil
+	if occ := detectCacheRebuild(d); len(occ) != 0 {
+		t.Errorf("a compaction rewrites the context on purpose: %+v", occ)
+	}
+}
+
+func TestCacheRebuildSaysWhenTheWaitWasAnApproval(t *testing.T) {
+	d := rebuildFixture(30*60*1000, 200_000, 0)
+	tool := toolRow{ID: "a1", SessionID: "s", Ts: 5000, Name: "Bash", Category: agent.ToolShell, Command: "ls"}
+	d.tools = append(d.tools, tool)
+	d.toolByID[tool.ID] = tool
+	d.waits["a1"] = waitRow{ToolUseID: "a1", SessionID: "s", WaitMs: 600_000}
+	occ := detectCacheRebuild(d)
+	if len(occ) != 1 || !strings.Contains(occ[0].Detail, "waiting on your approval") {
+		t.Fatalf("got %+v", occ)
 	}
 }
 

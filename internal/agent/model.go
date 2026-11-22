@@ -87,6 +87,17 @@ func InputWithoutCached(input, cached int64) int64 {
 // Code's own value, which its telemetry writes directly.
 const MainQuerySource = "repl_main_thread"
 
+// SDKQuerySource is how Claude Code stores the user's own turns when it runs
+// through the Agent SDK, as the desktop app does.
+const SDKQuerySource = "sdk"
+
+// IsMainQuerySource reports whether a stored query source is the user's own
+// turn rather than a subagent or housekeeping. Empty counts: a request with
+// no source isn't known to be anything else.
+func IsMainQuerySource(s string) bool {
+	return s == "" || s == MainQuerySource || s == SDKQuerySource
+}
+
 // Approval says how a tool call was allowed to run.
 type Approval string
 
