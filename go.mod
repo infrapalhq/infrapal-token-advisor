@@ -2,7 +2,7 @@ module github.com/infrapalhq/infrapal-token-advisor
 
 go 1.26.2
 
-toolchain go1.26.10
+toolchain go1.26.11
 
 require (
 	go.opentelemetry.io/proto/otlp v1.11.1
